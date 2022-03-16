@@ -1,0 +1,25 @@
+jmeter:
+  test-plan-dir: /opt/webtester/test-plans
+  test-execution-dir: /opt/webtester/test-executions
+spring:
+  application:
+    name: WebTester
+  security:
+    user:
+      name: webtester
+      password: Dctm1234
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+server:
+  error:
+    include-message: always
+  port: 8080
+  servlet:
+    context-path: /webtester
+logging:
+  level:
+    org.apache.jmeter: warn
+    org.hibernate: warn
+    org.springframework: warn

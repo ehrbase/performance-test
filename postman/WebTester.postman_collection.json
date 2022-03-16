@@ -1,0 +1,370 @@
+{
+	"info": {
+		"_postman_id": "d7a73d18-81ef-48a2-992b-2027586e10b8",
+		"name": "WebTester",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Actuator",
+			"item": [
+				{
+					"name": "Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/actuator/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"actuator",
+								"health"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "JMeter",
+			"item": [
+				{
+					"name": "Engine",
+					"item": [
+						{
+							"name": "Get status",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/rest/jmeter",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"rest",
+										"jmeter"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Stop running test",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/rest/jmeter/stop?immediate=false",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"rest",
+										"jmeter",
+										"stop"
+									],
+									"query": [
+										{
+											"key": "immediate",
+											"value": "false"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Test Plan",
+					"item": [
+						{
+							"name": "List test plans",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/rest/jmeter/test-plans",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"rest",
+										"jmeter",
+										"test-plans"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Upload test plan",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"type": "file",
+											"src": "demo_test_plan.jmx"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/rest/jmeter/test-plans",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"rest",
+										"jmeter",
+										"test-plans"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Download test plan",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"type": "file",
+											"src": "/D:/Travail/ehrbase/jmeter/plans/TP00_load_test_data.jmx"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/rest/jmeter/test-plans/:testPlanId",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"rest",
+										"jmeter",
+										"test-plans",
+										":testPlanId"
+									],
+									"variable": [
+										{
+											"key": "testPlanId",
+											"value": "demo_test_plan"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Start test",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"protocol\": \"http\",\r\n    \"host\": \"localhost\",\r\n    \"port\": 8081,\r\n    \"threads\": 1,\r\n    \"rampUp\": 1,\r\n    \"loopCount\": 10\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/rest/jmeter/test-plans/:testPlanId/start",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"rest",
+										"jmeter",
+										"test-plans",
+										":testPlanId",
+										"start"
+									],
+									"variable": [
+										{
+											"key": "testPlanId",
+											"value": "demo_test_plan"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Test Execution",
+					"item": [
+						{
+							"name": "Download log file",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"type": "file",
+											"src": "/D:/Travail/ehrbase/jmeter/plans/TP00_load_test_data.jmx"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/rest/jmeter/test-executions/:testExecutionId/logfile",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"rest",
+										"jmeter",
+										"test-executions",
+										":testExecutionId",
+										"logfile"
+									],
+									"variable": [
+										{
+											"key": "testExecutionId",
+											"value": "3e7e56e6-b119-4307-acd4-a38de2f663a4"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Generate report",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"type": "file",
+											"src": "/D:/Travail/ehrbase/jmeter/plans/TP00_load_test_data.jmx"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/rest/jmeter/test-executions/:testExecutionId/generate-report",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"rest",
+										"jmeter",
+										"test-executions",
+										":testExecutionId",
+										"generate-report"
+									],
+									"variable": [
+										{
+											"key": "testExecutionId",
+											"value": "1f668748-a963-4358-b63b-75fda6150f23"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Download report",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"type": "file",
+											"src": "/D:/Travail/ehrbase/jmeter/plans/TP00_load_test_data.jmx"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/rest/jmeter/test-executions/:testExecutionId/report",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"rest",
+										"jmeter",
+										"test-executions",
+										":testExecutionId",
+										"report"
+									],
+									"variable": [
+										{
+											"key": "testExecutionId",
+											"value": "1f668748-a963-4358-b63b-75fda6150f23"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "basic",
+		"basic": [
+			{
+				"key": "password",
+				"value": "{{password}}",
+				"type": "string"
+			},
+			{
+				"key": "username",
+				"value": "{{username}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

@@ -1,0 +1,6 @@
+logging:
+  level:
+    org.apache.jmeter: info
+    org.hibernate: info
+    org.springframework: info
+    org.ehrbase.webtester: debug
