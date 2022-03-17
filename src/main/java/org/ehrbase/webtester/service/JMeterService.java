@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Service
+@SuppressWarnings("java:S1192")
 public class JMeterService {
 
     public static final String JMX_EXTENSION = "jmx";
@@ -219,7 +220,7 @@ public class JMeterService {
     public InputStream getReport(String executionId) {
         var report = getReportPath(executionId);
         if (Files.notExists(report)) {
-            throw new WebTesterException("Report " + report + "not found");
+            throw new WebTesterException("Report " + report + " not found");
         }
 
         var zipReport = Path.of(testExecutionDir, executionId, REPORT_FILE);

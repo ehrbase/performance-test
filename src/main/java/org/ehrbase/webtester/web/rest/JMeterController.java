@@ -81,14 +81,12 @@ public class JMeterController {
 
     @PostMapping(path = "/test-plans")
     public ResponseEntity<Void> uploadTestPlan(@RequestPart MultipartFile file) {
-        InputStream in;
-        try {
-            in = file.getInputStream();
+        String testPlanId;
+        try (var in = file.getInputStream()) {
+            testPlanId = jmeterService.saveTestPlan(in, file.getOriginalFilename());
         } catch (IOException e) {
             throw new WebTesterException("An error occurred while reading the uploaded file", e);
         }
-
-        var testPlanId = jmeterService.saveTestPlan(in, file.getOriginalFilename());
 
         var headers = new HttpHeaders();
         headers.setLocation(ServletUriComponentsBuilder.fromCurrentRequest()

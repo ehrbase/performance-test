@@ -27,6 +27,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import javax.annotation.PostConstruct;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 
@@ -42,16 +44,41 @@ public class JMeterConfiguration {
 
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
+    private final JMeterProperties properties;
+
+    public JMeterConfiguration(JMeterProperties properties) {
+        this.properties = properties;
+    }
+
     @PostConstruct
     public void initialize() {
         log.info("Initializing Apache JMeter {}", JMeterUtils.getJMeterVersion());
         JMeterUtils.loadJMeterProperties(Path.of(NewDriver.getJMeterDir(), "bin/jmeter.properties").toString());
         JMeterUtils.setLocale(Locale.ENGLISH);
         JMeterUtils.setJMeterHome(NewDriver.getJMeterDir());
+
+        initializeDirectories();
     }
 
     @Bean(destroyMethod = "exit")
     public JMeterEngine jmeterEngine() {
         return new StandardJMeterEngine();
+    }
+
+    private void initializeDirectories() {
+        try {
+            var testPlanDir = Path.of(properties.getTestPlanDir());
+            var testExecutionDir = Path.of(properties.getTestExecutionDir());
+
+            if (Files.notExists(testPlanDir)) {
+                Files.createDirectories(testPlanDir);
+            }
+
+            if (Files.notExists(testExecutionDir)) {
+                Files.createDirectories(testExecutionDir);
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to create directories on the file system", e);
+        }
     }
 }
