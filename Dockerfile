@@ -13,6 +13,8 @@ RUN wget https://downloads.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VER
 ARG JAR_FILE=target/*.jar
 COPY ${JAR_FILE} app.jar
 
+COPY test-plans/*.jmx /opt/webtester/test-plans/
+
 EXPOSE 8080
 
 ENTRYPOINT ["java","-jar","app.jar"]
