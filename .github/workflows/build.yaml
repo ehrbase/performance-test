@@ -32,7 +32,7 @@ jobs:
 #            ${{ runner.os }}-sonar
 
       - name: Build with Maven
-        run: mvn -B verify
+        run: mvn -B verify -P no-jmeter
 
 #      - name: SonarCloud analysis
 #        run: mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=ehrbase_webtester

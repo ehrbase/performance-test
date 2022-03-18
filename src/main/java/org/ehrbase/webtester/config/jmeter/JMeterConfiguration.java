@@ -16,7 +16,6 @@
 
 package org.ehrbase.webtester.config.jmeter;
 
-import org.apache.jmeter.NewDriver;
 import org.apache.jmeter.engine.JMeterEngine;
 import org.apache.jmeter.engine.StandardJMeterEngine;
 import org.apache.jmeter.util.JMeterUtils;
@@ -53,9 +52,10 @@ public class JMeterConfiguration {
     @PostConstruct
     public void initialize() {
         log.info("Initializing Apache JMeter {}", JMeterUtils.getJMeterVersion());
-        JMeterUtils.loadJMeterProperties(Path.of(NewDriver.getJMeterDir(), "bin/jmeter.properties").toString());
+
+        JMeterUtils.loadJMeterProperties(Path.of(getJMeterDir(), "bin/jmeter.properties").toString());
         JMeterUtils.setLocale(Locale.ENGLISH);
-        JMeterUtils.setJMeterHome(NewDriver.getJMeterDir());
+        JMeterUtils.setJMeterHome(getJMeterDir());
 
         initializeDirectories();
     }
@@ -63,6 +63,14 @@ public class JMeterConfiguration {
     @Bean(destroyMethod = "exit")
     public JMeterEngine jmeterEngine() {
         return new StandardJMeterEngine();
+    }
+
+    private String getJMeterDir() {
+        if (properties.getInstallDir() == null) {
+            throw new IllegalStateException("Either define JMETER_HOME environment variable " +
+                    "or specify jmeter.install-dir application property");
+        }
+        return properties.getInstallDir();
     }
 
     private void initializeDirectories() {

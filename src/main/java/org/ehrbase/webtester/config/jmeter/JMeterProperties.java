@@ -27,9 +27,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "jmeter")
 public class JMeterProperties {
 
+    private String installDir;
+
     private String testPlanDir;
 
     private String testExecutionDir;
+
+    public String getInstallDir() {
+        return installDir;
+    }
+
+    public void setInstallDir(String installDir) {
+        this.installDir = installDir;
+    }
 
     public String getTestPlanDir() {
         return testPlanDir;

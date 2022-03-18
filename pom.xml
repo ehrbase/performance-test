@@ -40,6 +40,56 @@
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     </properties>
 
+    <profiles>
+        <profile>
+            <id>default</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <configurationProperties>
+                    --jmeter.test-plan-dir=${java.io.tmpdir}/webtester/test-plans \
+                    --jmeter.test-execution-dir=${java.io.tmpdir}/webtester/test-executions
+                </configurationProperties>
+            </properties>
+        </profile>
+        <profile>
+            <id>no-jmeter</id>
+            <properties>
+                <configurationProperties>
+                    --jmeter.install-dir=${project.build.directory}/apache-jmeter-${jmeter.version} \
+                    --jmeter.test-plan-dir=${java.io.tmpdir}/webtester/test-plans \
+                    --jmeter.test-execution-dir=${java.io.tmpdir}/webtester/test-executions
+                </configurationProperties>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>setup-jmeter</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <get src="https://downloads.apache.org/jmeter/binaries/apache-jmeter-${jmeter.version}.zip"
+                                             dest="${project.build.directory}"/>
+                                        <unzip src="${project.build.directory}/apache-jmeter-${jmeter.version}.zip"
+                                               dest="${project.build.directory}"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
     <build>
         <testResources>
             <testResource>
@@ -63,10 +113,7 @@
                             <goal>start</goal>
                         </goals>
                         <configuration>
-                            <commandlineArguments>
-                                --jmeter.test-plan-dir=${java.io.tmpdir}/webtester/test-plans \
-                                --jmeter.test-execution-dir=${java.io.tmpdir}/webtester/test-executions
-                            </commandlineArguments>
+                            <commandlineArguments>${configurationProperties}</commandlineArguments>
                         </configuration>
                     </execution>
                     <execution>
