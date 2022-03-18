@@ -50,3 +50,23 @@ Default credentials for basic authentication are:
 - Username: webtester
 - Password: Dctm1234
 
+## Building from source code
+
+### Prerequisites
+
+- Java 11
+- Apache Maven
+- Apache JMeter (optional)
+
+### Build the application
+
+```shell
+$ mvn clean install
+```
+
+The previous command requires:
+
+- Apache JMeter installed on your computer.
+- `JMETER_HOME` environment variable defined.
+
+If this is not the case, please enable the specific profile using `-P no-jmeter`
