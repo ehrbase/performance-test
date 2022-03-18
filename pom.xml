@@ -29,16 +29,130 @@
     <properties>
         <java.version>11</java.version>
         <commons-io.version>2.11.0</commons-io.version>
+        <cucumber-reporting.version>5.6.1</cucumber-reporting.version>
+        <jacoco-maven-plugin.version>0.8.7</jacoco-maven-plugin.version>
         <jmeter.version>5.4.3</jmeter.version>
+        <karate.version>1.1.0</karate.version>
         <springdoc-openapi.version>1.6.6</springdoc-openapi.version>
         <zip4j.version>2.9.1</zip4j.version>
+        <!-- SonarQube Properties -->
+        <sonar.organization>ehrbase</sonar.organization>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     </properties>
 
+    <profiles>
+        <profile>
+            <id>default</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <configurationProperties>
+                    --jmeter.test-plan-dir=${java.io.tmpdir}/webtester/test-plans \
+                    --jmeter.test-execution-dir=${java.io.tmpdir}/webtester/test-executions
+                </configurationProperties>
+            </properties>
+        </profile>
+        <profile>
+            <id>no-jmeter</id>
+            <properties>
+                <configurationProperties>
+                    --jmeter.install-dir=${project.build.directory}/apache-jmeter-${jmeter.version} \
+                    --jmeter.test-plan-dir=${java.io.tmpdir}/webtester/test-plans \
+                    --jmeter.test-execution-dir=${java.io.tmpdir}/webtester/test-executions
+                </configurationProperties>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>setup-jmeter</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <get src="https://downloads.apache.org/jmeter/binaries/apache-jmeter-${jmeter.version}.zip"
+                                             dest="${project.build.directory}"/>
+                                        <unzip src="${project.build.directory}/apache-jmeter-${jmeter.version}.zip"
+                                               dest="${project.build.directory}"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
     <build>
+        <testResources>
+            <testResource>
+                <directory>src/test/java</directory>
+                <excludes>
+                    <exclude>**/*.java</exclude>
+                </excludes>
+            </testResource>
+        </testResources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <jvmArguments>${argLine}</jvmArguments>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>pre-integration-test</id>
+                        <goals>
+                            <goal>start</goal>
+                        </goals>
+                        <configuration>
+                            <commandlineArguments>${configurationProperties}</commandlineArguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>post-integration-test</id>
+                        <goals>
+                            <goal>stop</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-Dfile.encoding=UTF-8</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -100,6 +214,18 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-ui</artifactId>
             <version>${springdoc-openapi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.intuit.karate</groupId>
+            <artifactId>karate-junit5</artifactId>
+            <version>${karate.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.masterthought</groupId>
+            <artifactId>cucumber-reporting</artifactId>
+            <version>${cucumber-reporting.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

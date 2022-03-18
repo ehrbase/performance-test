@@ -1,4 +1,5 @@
 jmeter:
+  install-dir: ${JMETER_HOME}
   test-plan-dir: /opt/webtester/test-plans
   test-execution-dir: /opt/webtester/test-executions
 spring:
