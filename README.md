@@ -20,7 +20,7 @@ $ docker run -p 8080:8080 --name webtester -d ehrbase/webtester:next
 
 After downloading the Docker image, the result of the command above should look like:
 
-```shell
+```
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
 ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
@@ -43,10 +43,34 @@ And the WebTester application should be at [http://localhost:8080/webtester](htt
 You can now start to use the WebTester through
 the [REST API](https://github.com/ehrbase/webtester/wiki/REST-API-Reference).
 
-### Credentials
+## Building from source code
+
+### Prerequisites
+
+- Java 11
+- Apache Maven
+- Apache JMeter (optional)
+
+### Build the application
+
+```shell
+$ mvn clean install
+```
+
+The previous command requires:
+
+- Apache JMeter installed on your computer.
+- `JMETER_HOME` environment variable defined.
+
+If this is not the case, enable the `no-jmeter` profile using the following command:
+
+```shell
+$ mvn clean install -P no-jmeter
+```
+
+## Credentials
 
 Default credentials for basic authentication are:
 
 - Username: webtester
 - Password: Dctm1234
-
