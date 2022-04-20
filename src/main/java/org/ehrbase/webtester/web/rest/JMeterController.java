@@ -108,15 +108,15 @@ public class JMeterController {
     }
 
     @PostMapping(path = "/test-plans/{testPlanId}/start")
-    public ResponseEntity<InputStreamResource> startTest(@PathVariable String testPlanId,
-                                                         @RequestBody(required = false) Map<String, Object> parameters) {
+    public ResponseEntity<String> startTest(@PathVariable String testPlanId,
+                                            @RequestBody(required = false) Map<String, Object> parameters) {
         String executionId = jmeterService.startTest(testPlanId, parameters);
 
         var headers = new HttpHeaders();
         headers.setLocation(ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/rest/jmeter/test-executions/{executionId}")
                 .build(executionId));
-        return new ResponseEntity<>(headers, HttpStatus.ACCEPTED);
+        return new ResponseEntity<>(executionId, headers, HttpStatus.ACCEPTED);
     }
 
     // Test Execution
