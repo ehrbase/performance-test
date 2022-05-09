@@ -53,9 +53,10 @@ public class JMeterConfiguration {
     public void initialize() {
         log.info("Initializing Apache JMeter {}", JMeterUtils.getJMeterVersion());
 
-        JMeterUtils.loadJMeterProperties(Path.of(getJMeterDir(), "bin/jmeter.properties").toString());
+        String jMeterDir = getJMeterDir();
+        JMeterUtils.loadJMeterProperties(Path.of(jMeterDir, "bin/jmeter.properties").toString());
         JMeterUtils.setLocale(Locale.ENGLISH);
-        JMeterUtils.setJMeterHome(getJMeterDir());
+        JMeterUtils.setJMeterHome(jMeterDir);
 
         initializeDirectories();
     }

@@ -13,6 +13,17 @@ spring:
     multipart:
       max-file-size: 100MB
       max-request-size: 100MB
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ehrbase
+    username: ehrbase
+    password: ehrbase
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+  jooq:
+    sql-dialect: postgres
+  flyway:
+    enabled: false
 server:
   error:
     include-message: always

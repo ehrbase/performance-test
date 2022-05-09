@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: jdbc:yugabytedb://localhost:5433/ehrbase
+    driver-class-name: com.yugabyte.Driver
+    hikari:
+      maximum-pool-size: 20
+  jooq:
+    sql-dialect: yugabytedb
+
