@@ -14,21 +14,6 @@ import org.testcontainers.containers.GenericContainer;
 
 class KarateIT {
 
-
-    public static GenericContainer simpleWebServer
-        = new GenericContainer("ehrbase/ehrbase-postgres:13.4")
-        .withExposedPorts(5432);
-    @BeforeAll
-    static void init(){
-        simpleWebServer.addEnv("POSTGRES_PASSWORD","POSTGRES");
-        simpleWebServer.start();
-    }
-
-    @AfterAll
-    static void destroy(){
-        simpleWebServer.stop();
-    }
-
     @Karate.Test
     Karate test() {
         return Karate.run("classpath:karate")
