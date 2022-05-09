@@ -8,7 +8,26 @@ import org.apache.commons.io.FileUtils;
 import java.io.File;
 import java.util.stream.Collectors;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.testcontainers.containers.GenericContainer;
+
 class KarateIT {
+
+
+    public static GenericContainer simpleWebServer
+        = new GenericContainer("ehrbase/ehrbase-postgres:13.4")
+        .withExposedPorts(5432);
+    @BeforeAll
+    static void init(){
+        simpleWebServer.addEnv("POSTGRES_PASSWORD","POSTGRES");
+        simpleWebServer.start();
+    }
+
+    @AfterAll
+    static void destroy(){
+        simpleWebServer.stop();
+    }
 
     @Karate.Test
     Karate test() {
