@@ -56,6 +56,7 @@
             --jmeter.install-dir=${project.build.directory}/apache-jmeter-${jmeter.version} \
             --jmeter.test-plan-dir=${java.io.tmpdir}/webtester/test-plans \
             --jmeter.test-execution-dir=${java.io.tmpdir}/webtester/test-executions
+            --loader.enabled=false
         </configurationProperties>
     </properties>
 

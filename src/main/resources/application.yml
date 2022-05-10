@@ -35,3 +35,10 @@ logging:
     org.apache.jmeter: warn
     org.hibernate: warn
     org.springframework: warn
+loader:
+  enabled: false
+
+management:
+  health:
+    db:
+      enabled: false
