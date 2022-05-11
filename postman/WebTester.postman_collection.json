@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "d7a73d18-81ef-48a2-992b-2027586e10b8",
+		"_postman_id": "cc82ad0c-475a-43f5-8bb1-da54d1d3681d",
 		"name": "WebTester",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
@@ -328,6 +328,54 @@
 							"response": []
 						}
 					]
+				}
+			]
+		},
+		{
+			"name": "Data Loader",
+			"item": [
+				{
+					"name": "Create Dummy Data",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "Dctm1234",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "webtester",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"ehr\":2,\r\n    \"compositionPerEhr\":10\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/rest/loader/load",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"rest",
+								"loader",
+								"load"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		}

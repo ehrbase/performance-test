@@ -62,6 +62,16 @@ the [REST API](https://github.com/ehrbase/webtester/wiki/REST-API-Reference).
 $ mvn clean install
 ```
 
+## Data Loading
+
+The WebTester can also fill the DB with dummy data. For this you need to configure. 
+
+| Name                         | Description                     | Default Value                              |
+|------------------------------|---------------------------------|--------------------------------------------|
+| `loader.enabled`             | Set to true to enable it.       | false                                      |
+| `spring.datasource.url`      | JDBC URL of the database.       | `jdbc:postgresql://localhost:5432/ehrbase` |
+| `spring.datasource.username` | Login username of the database. | `ehrbase`                                  |
+| `spring.datasource.password` | Login password of the database. | `ehrbase`                                  |
 
 ## Credentials
 

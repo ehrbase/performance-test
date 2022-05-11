@@ -1,7 +1,7 @@
 package org.ehrbase.webtester.web.rest;
 
 import org.ehrbase.webtester.service.LoaderService;
-import org.ehrbase.webtester.service.LoaderProperties;
+import org.ehrbase.webtester.service.LoaderRequestDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,7 +22,7 @@ public class LoaderController {
   }
 
   @PostMapping("load")
- public ResponseEntity<Void> load(@RequestBody LoaderProperties properties){
+ public ResponseEntity<Void> load(@RequestBody LoaderRequestDto properties){
 
     loaderService.load(properties);
 

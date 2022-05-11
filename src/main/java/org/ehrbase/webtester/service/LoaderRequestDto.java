@@ -16,14 +16,12 @@
 
 package org.ehrbase.webtester.service;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 /**
  * @author Renaud Subiger
  * @since 1.0
  */
 
-public class LoaderProperties {
+public class LoaderRequestDto {
 
     private Integer ehr = 100;
 

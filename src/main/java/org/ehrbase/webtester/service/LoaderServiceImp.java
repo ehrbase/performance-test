@@ -156,7 +156,7 @@ public class LoaderServiceImp implements LoaderService {
 
 
     @Override
-    public void load(LoaderProperties properties1) {
+    public void load(LoaderRequestDto properties1) {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
 
@@ -176,7 +176,7 @@ public class LoaderServiceImp implements LoaderService {
 
 
 
-    public void insertCompositions(UUID ehrId, LoaderProperties properties1) {
+    public void insertCompositions(UUID ehrId, LoaderRequestDto properties1) {
         IntStream.rangeClosed(1, properties1.getCompositionPerEhr())
                 .forEach(i -> {
                     var composition = getRandomComposition();

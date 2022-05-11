@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "false")
 public class LoaderServiceDummyImp implements LoaderService{
   @Override
-  public void load(LoaderProperties properties1) {
+  public void load(LoaderRequestDto properties1) {
 
     throw new WebTesterException("Loader not enabled");
   }
