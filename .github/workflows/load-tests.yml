@@ -1,0 +1,120 @@
+name: EHRbase Performance Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Name of the Docker image
+        default: 'ehrbase/ehrbase:next'
+        required: false
+      threads:
+        description: Number of threads (users)
+        default: '5'
+        required: true
+      ramp-up:
+        description: Ramp-up period (seconds)
+        default: '15'
+        required: true
+      loop-count:
+        description: Loop count
+        default: '100'
+        required: true
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Hetzner Cloud CLI
+        run: sudo apt install -y hcloud-cli
+
+      - name: Setup SSH
+        run: |
+          mkdir ~/.ssh
+          cat > ~/.ssh/known_hosts << EOF
+          $SSH_HOST $SSH_FINGERPRINT
+          EOF
+          cat > ~/.ssh/id_ed25519 << EOF
+          $SSH_KEY
+          EOF
+          chmod 600 ~/.ssh/id_ed25519
+          cat > ~/.ssh/config << EOF
+          Host *
+            ServerAliveInterval 30
+            ServerAliveCountMax 5
+
+          Host ehrbase-load-test
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/id_ed25519
+          EOF
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_FINGERPRINT: ${{ secrets.SSH_FINGERPRINT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+
+      - name: Rebuild server
+        run: |
+          hcloud server rebuild --image=$HCLOUD_IMAGE $HCLOUD_SERVER
+          echo "Waiting for SSH service to be ready..."
+          sleep 1m
+        env:
+          HCLOUD_IMAGE: 68159203
+          HCLOUD_SERVER: 19045767
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        timeout-minutes: 15
+
+      - name: Start minikube
+        run: ssh ehrbase-load-test "minikube start --driver=none"
+
+      - name: Update Docker image
+        if: "${{ github.event.inputs.image != '' }}"
+        run: |
+          ssh ehrbase-load-test "sed -i '0,/^\([[:space:]]*ehrbase: \).*/s||\1${{ github.event.inputs.image }}|' ~/ehrbase-helm-chart-hetzner/values.yaml"
+
+      - name: Install EHRbase and WebTester
+        run: |
+          scp ./scripts/startup.sh ehrbase-load-test:~/scripts/
+          ssh ehrbase-load-test '~/scripts/startup.sh'
+        timeout-minutes: 10
+
+      - name: Run performance tests
+        run: |
+          scp ./scripts/run_tests.sh ehrbase-load-test:~/scripts/
+          EXECUTION_ID=$(ssh ehrbase-load-test "~/scripts/run_tests.sh ${{ github.event.inputs.threads }} ${{ github.event.inputs.ramp-up }} ${{ github.event.inputs.loop-count }} | tail -1")
+          echo "EXECUTION_ID=$EXECUTION_ID" >> $GITHUB_ENV
+        timeout-minutes: 240
+
+      - name: Generate report
+        run: ssh ehrbase-load-test "curl -X POST -f -s -u webtester:Dctm1234 http://localhost:30902/webtester/rest/jmeter/test-executions/${{ env.EXECUTION_ID }}/generate-report"
+
+      - name: Download JTL and report
+        run: |
+          ssh ehrbase-load-test "curl -s -u webtester:Dctm1234 http://localhost:30902/webtester/rest/jmeter/test-executions/${{ env.EXECUTION_ID }}/report -o ~/report.zip"
+          ssh ehrbase-load-test "curl -s -u webtester:Dctm1234 http://localhost:30902/webtester/rest/jmeter/test-executions/${{ env.EXECUTION_ID }}/logfile -o ~/result.jtl"
+          
+          scp ehrbase-load-test:~/report.zip ~/report.zip
+          unzip ~/report.zip -d ~
+          
+          scp ehrbase-load-test:~/result.jtl ~/report/result.jtl
+          
+
+      - name: Publish report
+        uses: JamesIves/github-pages-deploy-action@3.7.1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages
+          FOLDER: ~/report/
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v2
+        with:
+          name: jmeter-results
+          path: |
+            ~/report.zip
+            ~/report/result.jtl
