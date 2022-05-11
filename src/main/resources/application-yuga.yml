@@ -5,5 +5,5 @@ spring:
     hikari:
       maximum-pool-size: 20
   jooq:
-    sql-dialect: yugabytedb
+    sql-dialect: YUGABYTEDB
 

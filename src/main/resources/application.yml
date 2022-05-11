@@ -21,7 +21,7 @@ spring:
     hikari:
       maximum-pool-size: 20
   jooq:
-    sql-dialect: postgres
+    sql-dialect: POSTGRES
   flyway:
     enabled: false
 server:
@@ -36,7 +36,7 @@ logging:
     org.hibernate: warn
     org.springframework: warn
 loader:
-  enabled: false
+  enabled: true
 
 management:
   health:

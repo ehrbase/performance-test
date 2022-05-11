@@ -10,6 +10,7 @@ import org.jooq.impl.DefaultDSLContext;
 import org.jooq.impl.DefaultExecuteListener;
 import org.jooq.impl.DefaultExecuteListenerProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +25,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableTransactionManagement
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class PersistenceConfig {
+
+  @Value("${spring.jooq.sql-dialect}")
+  private String  sqlDialect;
 
   static class ExceptionTranslator extends DefaultExecuteListener {
     @Override
@@ -71,7 +75,7 @@ public class PersistenceConfig {
     jooqConfiguration.set(connectionProvider());
     jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));
 //        jooqConfiguration.set(new PerformanceListener());
-    SQLDialect dialect = SQLDialect.POSTGRES;
+    SQLDialect dialect = SQLDialect.valueOf(sqlDialect);
     jooqConfiguration.set(dialect);
     return jooqConfiguration;
   }
