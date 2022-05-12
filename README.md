@@ -73,6 +73,8 @@ The WebTester can also fill the DB with dummy data. For this you need to configu
 | `spring.datasource.username` | Login username of the database. | `ehrbase`                                  |
 | `spring.datasource.password` | Login password of the database. | `ehrbase`                                  |
 
+For the API Call see [REST API](https://github.com/ehrbase/webtester/wiki/Test-Data-Loader)
+
 ## Credentials
 
 Default credentials for basic authentication are:
