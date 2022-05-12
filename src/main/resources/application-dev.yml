@@ -1,3 +1,5 @@
+jmeter:
+  install-dir: "target/apache-jmeter-5.4.3"
 logging:
   level:
     org.apache.jmeter: info

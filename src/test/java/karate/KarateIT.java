@@ -8,6 +8,10 @@ import org.apache.commons.io.FileUtils;
 import java.io.File;
 import java.util.stream.Collectors;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.testcontainers.containers.GenericContainer;
+
 class KarateIT {
 
     @Karate.Test

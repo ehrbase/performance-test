@@ -26,6 +26,19 @@
         </license>
     </licenses>
 
+    <repositories>
+        <repository>
+            <id>ossrh-snapshots</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <properties>
         <java.version>11</java.version>
         <commons-io.version>2.11.0</commons-io.version>
@@ -38,57 +51,15 @@
         <!-- SonarQube Properties -->
         <sonar.organization>ehrbase</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <log4j.version>2.17.2</log4j.version>
+        <configurationProperties>
+            --jmeter.install-dir=${project.build.directory}/apache-jmeter-${jmeter.version} \
+            --jmeter.test-plan-dir=${java.io.tmpdir}/webtester/test-plans \
+            --jmeter.test-execution-dir=${java.io.tmpdir}/webtester/test-executions
+            --loader.enabled=false
+        </configurationProperties>
     </properties>
 
-    <profiles>
-        <profile>
-            <id>default</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <properties>
-                <configurationProperties>
-                    --jmeter.test-plan-dir=${java.io.tmpdir}/webtester/test-plans \
-                    --jmeter.test-execution-dir=${java.io.tmpdir}/webtester/test-executions
-                </configurationProperties>
-            </properties>
-        </profile>
-        <profile>
-            <id>no-jmeter</id>
-            <properties>
-                <configurationProperties>
-                    --jmeter.install-dir=${project.build.directory}/apache-jmeter-${jmeter.version} \
-                    --jmeter.test-plan-dir=${java.io.tmpdir}/webtester/test-plans \
-                    --jmeter.test-execution-dir=${java.io.tmpdir}/webtester/test-executions
-                </configurationProperties>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-antrun-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>setup-jmeter</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                                <configuration>
-                                    <target>
-                                        <get src="https://downloads.apache.org/jmeter/binaries/apache-jmeter-${jmeter.version}.zip"
-                                             dest="${project.build.directory}"/>
-                                        <unzip src="${project.build.directory}/apache-jmeter-${jmeter.version}.zip"
-                                               dest="${project.build.directory}"/>
-                                    </target>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 
     <build>
         <testResources>
@@ -100,6 +71,27 @@
             </testResource>
         </testResources>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>setup-jmeter</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <get src="https://downloads.apache.org/jmeter/binaries/apache-jmeter-${jmeter.version}.zip"
+                                     dest="${project.build.directory}"/>
+                                <unzip src="${project.build.directory}/apache-jmeter-${jmeter.version}.zip"
+                                       dest="${project.build.directory}"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -135,29 +127,30 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
             </plugin>
-            <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>${jacoco-maven-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>report</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>report</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.ehrbase.openehr</groupId>
+                <artifactId>bom</artifactId>
+                <type>pom</type>
+                <scope>import</scope>
+                <version>0.21.0-SNAPSHOT</version>
+            </dependency>
+
+        </dependencies>
+
+
+    </dependencyManagement>
+
     <dependencies>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <version>1.8.1</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -176,8 +169,22 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq</artifactId>
+            <version>3.16.5</version>
+        </dependency>
+        <dependency>
+            <groupId>com.yugabyte</groupId>
+            <artifactId>jdbc-yugabytedb</artifactId>
+            <version>42.3.4</version>
         </dependency>
         <dependency>
             <groupId>org.apache.jmeter</groupId>
@@ -214,6 +221,24 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-ui</artifactId>
             <version>${springdoc-openapi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>1.17.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.ehrbase.openehr</groupId>
+            <artifactId>jooq-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.ehrbase.openehr.sdk</groupId>
+            <artifactId>serialisation</artifactId>
         </dependency>
         <dependency>
             <groupId>com.intuit.karate</groupId>

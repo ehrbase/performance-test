@@ -3,3 +3,5 @@
 target/
 
 application-local.yml
+/webtester.iml
+/jmeter/

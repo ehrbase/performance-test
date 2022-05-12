@@ -1,3 +1,9 @@
+# EHRbase Performance Tests
+
+[![EHRbase Performance Tests](https://github.com/ehrbase/webtester/actions/workflows/load-tests.yml/badge.svg)](https://github.com/ehrbase/ehrbase-load-test/actions/workflows/load-tests.yml)
+
+Last execution report: https://ehrbase.github.io/ehrbase-load-test/
+
 # WebTester [![build](https://github.com/ehrbase/webtester/actions/workflows/build.yaml/badge.svg)](https://github.com/ehrbase/webtester/actions/workflows/build.yaml)
 
 WebTester in simple web application that wraps [Apache JMeter](https://jmeter.apache.org/) and provides a REST API to
@@ -49,7 +55,6 @@ the [REST API](https://github.com/ehrbase/webtester/wiki/REST-API-Reference).
 
 - Java 11
 - Apache Maven
-- Apache JMeter (optional)
 
 ### Build the application
 
@@ -57,16 +62,18 @@ the [REST API](https://github.com/ehrbase/webtester/wiki/REST-API-Reference).
 $ mvn clean install
 ```
 
-The previous command requires:
+## Data Loading
 
-- Apache JMeter installed on your computer.
-- `JMETER_HOME` environment variable defined.
+The WebTester can also fill the DB with dummy data. For this you need to configure. 
 
-If this is not the case, enable the `no-jmeter` profile using the following command:
+| Name                         | Description                     | Default Value                              |
+|------------------------------|---------------------------------|--------------------------------------------|
+| `loader.enabled`             | Set to true to enable it.       | false                                      |
+| `spring.datasource.url`      | JDBC URL of the database.       | `jdbc:postgresql://localhost:5432/ehrbase` |
+| `spring.datasource.username` | Login username of the database. | `ehrbase`                                  |
+| `spring.datasource.password` | Login password of the database. | `ehrbase`                                  |
 
-```shell
-$ mvn clean install -P no-jmeter
-```
+For the API Call see [REST API](https://github.com/ehrbase/webtester/wiki/Test-Data-Loader)
 
 ## Credentials
 

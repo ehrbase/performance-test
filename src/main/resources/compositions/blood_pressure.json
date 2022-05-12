@@ -1,0 +1,291 @@
+{
+  "_type": "COMPOSITION",
+  "name": {
+    "_type": "DV_TEXT",
+    "value": "Encounter (training sample)"
+  },
+  "archetype_details": {
+    "archetype_id": {
+      "value": "openEHR-EHR-COMPOSITION.sample_encounter.v1"
+    },
+    "template_id": {
+      "value": "ehrbase_blood_pressure_simple.de.v0"
+    },
+    "rm_version": "1.0.4"
+  },
+  "language": {
+    "_type": "CODE_PHRASE",
+    "terminology_id": {
+      "_type": "TERMINOLOGY_ID",
+      "value": "ISO_639-1"
+    },
+    "code_string": "de"
+  },
+  "territory": {
+    "_type": "CODE_PHRASE",
+    "terminology_id": {
+      "_type": "TERMINOLOGY_ID",
+      "value": "ISO_3166-1"
+    },
+    "code_string": "DE"
+  },
+  "category": {
+    "_type": "DV_CODED_TEXT",
+    "value": "event",
+    "defining_code": {
+      "_type": "CODE_PHRASE",
+      "terminology_id": {
+        "_type": "TERMINOLOGY_ID",
+        "value": "openehr"
+      },
+      "code_string": "433"
+    }
+  },
+  "composer": {
+    "_type": "PARTY_IDENTIFIED",
+    "name": "Test"
+  },
+  "context": {
+    "_type": "EVENT_CONTEXT",
+    "start_time": {
+      "_type": "DV_DATE_TIME",
+      "value": "2019-04-03T22:00:00Z"
+    },
+    "end_time": {
+      "_type": "DV_DATE_TIME",
+      "value": "2021-09-15T11:22:11,403Z"
+    },
+    "setting": {
+      "_type": "DV_CODED_TEXT",
+      "value": "nursing home care",
+      "defining_code": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "openehr"
+        },
+        "code_string": "237"
+      }
+    },
+    "participations": [
+      {
+        "_type": "PARTICIPATION",
+        "function": {
+          "_type": "DV_TEXT",
+          "value": "Pos1"
+        },
+        "performer": {
+          "_type": "PARTY_IDENTIFIED",
+          "name": "Test"
+        }
+      },
+      {
+        "_type": "PARTICIPATION",
+        "function": {
+          "_type": "DV_TEXT",
+          "value": "Pos2"
+        },
+        "performer": {
+          "_type": "PARTY_IDENTIFIED",
+          "name": "Test2"
+        }
+      }
+    ]
+  },
+  "content": [
+    {
+      "_type": "OBSERVATION",
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "Blood pressure (Training sample)"
+      },
+      "archetype_details": {
+        "archetype_id": {
+          "value": "openEHR-EHR-OBSERVATION.sample_blood_pressure.v1"
+        },
+        "template_id": {
+          "value": "ehrbase_blood_pressure_simple.de.v0"
+        },
+        "rm_version": "1.0.4"
+      },
+      "language": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "ISO_639-1"
+        },
+        "code_string": "de"
+      },
+      "encoding": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "IANA_character-sets"
+        },
+        "code_string": "UTF-8"
+      },
+      "subject": {
+        "_type": "PARTY_SELF"
+      },
+      "protocol": {
+        "_type": "ITEM_TREE",
+        "name": {
+          "_type": "DV_TEXT",
+          "value": "list structure"
+        },
+        "items": [
+          {
+            "_type": "ELEMENT",
+            "name": {
+              "_type": "DV_TEXT",
+              "value": "Cuff size"
+            },
+            "value": {
+              "_type": "DV_CODED_TEXT",
+              "value": "Adult",
+              "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                  "_type": "TERMINOLOGY_ID",
+                  "value": "local"
+                },
+                "code_string": "at0015"
+              }
+            },
+            "archetype_node_id": "at0013"
+          },
+          {
+            "_type": "ELEMENT",
+            "name": {
+              "_type": "DV_TEXT",
+              "value": "Location of measurement"
+            },
+            "value": {
+              "_type": "DV_CODED_TEXT",
+              "value": "Finger",
+              "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                  "_type": "TERMINOLOGY_ID",
+                  "value": "local"
+                },
+                "code_string": "at1026"
+              }
+            },
+            "archetype_node_id": "at0014"
+          },
+          {
+            "_type": "ELEMENT",
+            "name": {
+              "_type": "DV_TEXT",
+              "value": "Korotkoff sounds"
+            },
+            "value": {
+              "_type": "DV_CODED_TEXT",
+              "value": "Fifth sound",
+              "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                  "_type": "TERMINOLOGY_ID",
+                  "value": "local"
+                },
+                "code_string": "at1012"
+              }
+            },
+            "archetype_node_id": "at1010"
+          }
+        ],
+        "archetype_node_id": "at0011"
+      },
+      "data": {
+        "name": {
+          "_type": "DV_TEXT",
+          "value": "history"
+        },
+        "origin": {
+          "_type": "DV_DATE_TIME",
+          "value": "2021-09-15T11:22:11Z"
+        },
+        "events": [
+          {
+            "_type": "POINT_EVENT",
+            "name": {
+              "_type": "DV_TEXT",
+              "value": "Baseline reading"
+            },
+            "time": {
+              "_type": "DV_DATE_TIME",
+              "value": "2021-09-15T11:22:11Z"
+            },
+            "data": {
+              "_type": "ITEM_LIST",
+              "name": {
+                "_type": "DV_TEXT",
+                "value": "blood pressure"
+              },
+              "items": [
+                {
+                  "_type": "ELEMENT",
+                  "name": {
+                    "_type": "DV_TEXT",
+                    "value": "Systolic"
+                  },
+                  "value": {
+                    "_type": "DV_QUANTITY",
+                    "units": "mm[Hg]",
+                    "magnitude": 22.0
+                  },
+                  "archetype_node_id": "at0004"
+                },
+                {
+                  "_type": "ELEMENT",
+                  "name": {
+                    "_type": "DV_TEXT",
+                    "value": "Diastolic"
+                  },
+                  "value": {
+                    "_type": "DV_QUANTITY",
+                    "units": "mm[Hg]",
+                    "magnitude": 22.0
+                  },
+                  "archetype_node_id": "at0005"
+                },
+                {
+                  "_type": "ELEMENT",
+                  "name": {
+                    "_type": "DV_TEXT",
+                    "value": "Mean Arterial Pressure"
+                  },
+                  "value": {
+                    "_type": "DV_QUANTITY",
+                    "units": "mm[Hg]",
+                    "magnitude": 22.0
+                  },
+                  "archetype_node_id": "at1006"
+                },
+                {
+                  "_type": "ELEMENT",
+                  "name": {
+                    "_type": "DV_TEXT",
+                    "value": "Pulse Pressure"
+                  },
+                  "value": {
+                    "_type": "DV_QUANTITY",
+                    "units": "mm[Hg]",
+                    "magnitude": 22.0
+                  },
+                  "archetype_node_id": "at1007"
+                }
+              ],
+              "archetype_node_id": "at0003"
+            },
+            "archetype_node_id": "at0002"
+          }
+        ],
+        "archetype_node_id": "at0001"
+      },
+      "archetype_node_id": "openEHR-EHR-OBSERVATION.sample_blood_pressure.v1"
+    }
+  ],
+  "archetype_node_id": "openEHR-EHR-COMPOSITION.sample_encounter.v1"
+}
