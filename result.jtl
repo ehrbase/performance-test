@@ -1,0 +1,226 @@
+timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1652430231438,711,Setup - Upload template 'Corona Anamnese',204,,Set Up 1-1,,true,,437,1211177,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/definition/template/adl1.4,0,0,83
+1652430232931,82,Setup - Upload template 'Blood Pressure',204,,Set Up 1-1,,true,,477,139656,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/definition/template/adl1.4,0,0,0
+1652430233015,60,Setup - Upload template 'Laboratory Test Report',204,,Set Up 1-1,,true,,479,67427,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/definition/template/adl1.4,0,0,0
+1652430233077,727,Setup - Upload template 'International Patient Summary',204,,Set Up 1-1,,true,,469,1958342,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/definition/template/adl1.4,0,0,0
+1652430233806,352,Get existing EHR Id,200,,Set Up 1-1,text,true,,537,420,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,345,0,0
+1652430234331,334,Create EHR,204,,Thread Group 1-1,,true,,433,743,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr,0,0,1
+1652430234668,762,Composition - Create 'Corona Anamnese',204,,Thread Group 1-1,,true,,553,46838,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/dd428ddc-d313-4841-a1a7-bc5bc1e81414/composition,0,0,0
+1652430235431,76,Composition - Create 'Blood Pressure',204,,Thread Group 1-1,,true,,553,8256,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/dd428ddc-d313-4841-a1a7-bc5bc1e81414/composition,0,0,0
+1652430235509,252,Composition - Create 'Laboratory Test Report',204,,Thread Group 1-1,,true,,553,11400,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/dd428ddc-d313-4841-a1a7-bc5bc1e81414/composition,0,0,0
+1652430235762,401,Composition - Create International Patient Summary',204,,Thread Group 1-1,,true,,553,302918,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/dd428ddc-d313-4841-a1a7-bc5bc1e81414/composition,0,0,0
+1652430236164,195,Composition - Get composition by version ID,200,,Thread Group 1-1,text,true,,231727,316,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/dd428ddc-d313-4841-a1a7-bc5bc1e81414/composition/f7616257-da19-47c1-a863-600d221887b0::local.ehrbase.org::1,194,0,0
+1652430236360,130,Query ehr_id #1,200,,Thread Group 1-1,text,true,,907,421,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,129,0,0
+1652430236490,793,Query ehr_id #2,200,,Thread Group 1-1,text,true,,936,451,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,793,0,0
+1652430237284,27,Query ehr_id #3,200,,Thread Group 1-1,text,true,,600,483,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,27,0,0
+1652430237312,17,Query ehr_id #4,200,,Thread Group 1-1,text,true,,629,512,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,17,0,0
+1652430237330,32,Query start_time #1,200,,Thread Group 1-1,text,true,,861,433,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,32,0,0
+1652430237323,45,Create EHR,204,,Thread Group 1-2,,true,,433,743,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr,0,0,1
+1652430237370,120,Composition - Create 'Corona Anamnese',204,,Thread Group 1-2,,true,,553,46838,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/9a3bd82c-6be3-48ab-8f10-c8f012308e3e/composition,0,0,0
+1652430237491,47,Composition - Create 'Blood Pressure',204,,Thread Group 1-2,,true,,553,8256,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/9a3bd82c-6be3-48ab-8f10-c8f012308e3e/composition,0,0,0
+1652430237539,48,Composition - Create 'Laboratory Test Report',204,,Thread Group 1-2,,true,,553,11400,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/9a3bd82c-6be3-48ab-8f10-c8f012308e3e/composition,0,0,0
+1652430237363,422,Query start_time #2,200,,Thread Group 1-1,text,true,,902,474,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,421,0,0
+1652430237785,11,Query start_time #3,200,,Thread Group 1-1,text,true,,928,500,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,11,0,0
+1652430237587,274,Composition - Create International Patient Summary',204,,Thread Group 1-2,,true,,553,302918,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/9a3bd82c-6be3-48ab-8f10-c8f012308e3e/composition,0,0,0
+1652430237862,104,Composition - Get composition by version ID,200,,Thread Group 1-2,text,true,,231727,316,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/9a3bd82c-6be3-48ab-8f10-c8f012308e3e/composition/c8044fb4-7a5c-4794-9563-ac207c76945a::local.ehrbase.org::1,103,0,0
+1652430237967,20,Query ehr_id #1,200,,Thread Group 1-2,text,true,,907,421,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,20,0,0
+1652430237987,371,Query ehr_id #2,200,,Thread Group 1-2,text,true,,936,451,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,370,0,0
+1652430238358,15,Query ehr_id #3,200,,Thread Group 1-2,text,true,,600,483,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,15,0,0
+1652430238374,11,Query ehr_id #4,200,,Thread Group 1-2,text,true,,629,512,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,11,0,0
+1652430238385,10,Query start_time #1,200,,Thread Group 1-2,text,true,,861,433,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,10,0,0
+1652430238396,332,Query start_time #2,200,,Thread Group 1-2,text,true,,902,474,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,332,0,0
+1652430238728,12,Query start_time #3,200,,Thread Group 1-2,text,true,,928,500,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,12,0,0
+1652430237797,965,Query start_time #4,200,,Thread Group 1-1,text,true,,969,541,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,965,0,0
+1652430238763,15,Query start_time #5,200,,Thread Group 1-1,text,true,,988,560,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,15,0,0
+1652430238779,23,Query start_time #6,200,,Thread Group 1-1,text,true,,1029,601,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,23,0,0
+1652430238803,63,Query magnitude #1,200,,Thread Group 1-1,text,true,,683,479,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,63,0,0
+1652430238741,976,Query start_time #4,200,,Thread Group 1-2,text,true,,969,541,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,976,0,0
+1652430239718,12,Query start_time #5,200,,Thread Group 1-2,text,true,,988,560,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,12,0,0
+1652430239731,12,Query start_time #6,200,,Thread Group 1-2,text,true,,1029,601,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,12,0,0
+1652430239744,21,Query magnitude #1,200,,Thread Group 1-2,text,true,,683,479,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,21,0,0
+1652430240324,49,Create EHR,204,,Thread Group 1-3,,true,,433,743,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr,0,0,1
+1652430240375,106,Composition - Create 'Corona Anamnese',204,,Thread Group 1-3,,true,,553,46838,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/6adc154d-b0a0-4a94-ab05-a540baab84ae/composition,0,0,0
+1652430240482,45,Composition - Create 'Blood Pressure',204,,Thread Group 1-3,,true,,553,8256,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/6adc154d-b0a0-4a94-ab05-a540baab84ae/composition,0,0,0
+1652430240527,44,Composition - Create 'Laboratory Test Report',204,,Thread Group 1-3,,true,,553,11400,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/6adc154d-b0a0-4a94-ab05-a540baab84ae/composition,0,0,0
+1652430240572,330,Composition - Create International Patient Summary',204,,Thread Group 1-3,,true,,553,302918,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/6adc154d-b0a0-4a94-ab05-a540baab84ae/composition,0,0,0
+1652430240903,105,Composition - Get composition by version ID,200,,Thread Group 1-3,text,true,,231727,316,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/6adc154d-b0a0-4a94-ab05-a540baab84ae/composition/2467dc3a-21aa-4b58-9790-7586ec70e7fe::local.ehrbase.org::1,102,0,0
+1652430241009,33,Query ehr_id #1,200,,Thread Group 1-3,text,true,,907,421,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,32,0,0
+1652430241042,517,Query ehr_id #2,200,,Thread Group 1-3,text,true,,936,451,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,516,0,0
+1652430241559,13,Query ehr_id #3,200,,Thread Group 1-3,text,true,,600,483,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,13,0,0
+1652430241572,12,Query ehr_id #4,200,,Thread Group 1-3,text,true,,629,512,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,11,0,0
+1652430241584,16,Query start_time #1,200,,Thread Group 1-3,text,true,,861,433,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,16,0,0
+1652430241601,413,Query start_time #2,200,,Thread Group 1-3,text,true,,902,474,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,413,0,0
+1652430242015,13,Query start_time #3,200,,Thread Group 1-3,text,true,,928,500,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,13,0,0
+1652430238867,3886,Query magnitude #2,200,,Thread Group 1-1,text,true,,770,566,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,3886,0,0
+1652430242754,33,Query magnitude #3,200,,Thread Group 1-1,text,true,,769,565,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,33,0,0
+1652430239765,3102,Query magnitude #2,200,,Thread Group 1-2,text,true,,770,566,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,3102,0,0
+1652430242867,36,Query magnitude #3,200,,Thread Group 1-2,text,true,,769,565,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,36,0,0
+1652430242029,1236,Query start_time #4,200,,Thread Group 1-3,text,true,,969,541,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,1236,0,0
+1652430243266,9,Query start_time #5,200,,Thread Group 1-3,text,true,,988,560,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430243275,9,Query start_time #6,200,,Thread Group 1-3,text,true,,1029,601,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430243284,15,Query magnitude #1,200,,Thread Group 1-3,text,true,,683,479,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,15,0,0
+1652430243318,40,Create EHR,204,,Thread Group 1-4,,true,,433,743,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr,0,0,1
+1652430243359,80,Composition - Create 'Corona Anamnese',204,,Thread Group 1-4,,true,,553,46838,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/87068038-7c30-4e61-bab7-56ed1479fa21/composition,0,0,0
+1652430243439,43,Composition - Create 'Blood Pressure',204,,Thread Group 1-4,,true,,553,8256,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/87068038-7c30-4e61-bab7-56ed1479fa21/composition,0,0,0
+1652430243483,53,Composition - Create 'Laboratory Test Report',204,,Thread Group 1-4,,true,,553,11400,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/87068038-7c30-4e61-bab7-56ed1479fa21/composition,0,0,0
+1652430243537,254,Composition - Create International Patient Summary',204,,Thread Group 1-4,,true,,553,302918,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/87068038-7c30-4e61-bab7-56ed1479fa21/composition,0,0,0
+1652430243299,575,Query magnitude #2,200,,Thread Group 1-3,text,true,,770,566,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,575,0,0
+1652430243792,96,Composition - Get composition by version ID,200,,Thread Group 1-4,text,true,,231727,316,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/87068038-7c30-4e61-bab7-56ed1479fa21/composition/b16b6205-d010-496e-807e-455784c3c1d5::local.ehrbase.org::1,96,0,0
+1652430243874,39,Query magnitude #3,200,,Thread Group 1-3,text,true,,769,565,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,39,0,0
+1652430243889,25,Query ehr_id #1,200,,Thread Group 1-4,text,true,,907,421,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,24,0,0
+1652430243914,398,Query ehr_id #2,200,,Thread Group 1-4,text,true,,936,451,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,398,0,0
+1652430244313,9,Query ehr_id #3,200,,Thread Group 1-4,text,true,,600,483,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430244323,9,Query ehr_id #4,200,,Thread Group 1-4,text,true,,629,512,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430244333,7,Query start_time #1,200,,Thread Group 1-4,text,true,,861,433,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430244340,365,Query start_time #2,200,,Thread Group 1-4,text,true,,902,474,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,365,0,0
+1652430244706,10,Query start_time #3,200,,Thread Group 1-4,text,true,,928,500,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430242788,2078,Query magnitude #4,200,,Thread Group 1-1,text,true,,856,652,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,2078,0,0
+1652430244867,32,Query magnitude #5,200,,Thread Group 1-1,text,true,,829,625,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,31,0,0
+1652430242903,2000,Query magnitude #4,200,,Thread Group 1-2,text,true,,856,652,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,1999,0,0
+1652430244903,99,Query magnitude #5,200,,Thread Group 1-2,text,true,,829,625,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,99,0,0
+1652430244899,114,Query magnitude #6,200,,Thread Group 1-1,text,true,,916,712,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,114,0,0
+1652430245002,156,Query magnitude #6,200,,Thread Group 1-2,text,true,,916,712,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,156,0,0
+1652430245013,196,Query magnitude #7,200,,Thread Group 1-1,text,true,,836,632,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,196,0,0
+1652430245158,124,Query magnitude #7,200,,Thread Group 1-2,text,true,,836,632,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,124,0,0
+1652430245209,200,Query magnitude #8,200,,Thread Group 1-1,text,true,,852,648,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,200,0,0
+1652430245283,137,Query magnitude #8,200,,Thread Group 1-2,text,true,,852,648,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,137,0,0
+1652430245410,32,"Query ehr_id, start_time, magnitude #1",200,,Thread Group 1-1,text,true,,1523,523,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,32,0,0
+1652430245421,24,"Query ehr_id, start_time, magnitude #1",200,,Thread Group 1-2,text,true,,1523,523,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,24,0,0
+1652430244716,992,Query start_time #4,200,,Thread Group 1-4,text,true,,969,541,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,992,0,0
+1652430245709,10,Query start_time #5,200,,Thread Group 1-4,text,true,,988,560,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,10,0,0
+1652430245720,10,Query start_time #6,200,,Thread Group 1-4,text,true,,1029,601,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,10,0,0
+1652430245731,14,Query magnitude #1,200,,Thread Group 1-4,text,true,,683,479,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,14,0,0
+1652430243913,2087,Query magnitude #4,200,,Thread Group 1-3,text,true,,856,652,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,2087,0,0
+1652430246001,29,Query magnitude #5,200,,Thread Group 1-3,text,true,,829,625,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,29,0,0
+1652430246031,30,Query magnitude #6,200,,Thread Group 1-3,text,true,,916,712,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,30,0,0
+1652430246062,35,Query magnitude #7,200,,Thread Group 1-3,text,true,,836,632,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,34,0,0
+1652430246097,25,Query magnitude #8,200,,Thread Group 1-3,text,true,,852,648,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,25,0,0
+1652430246122,23,"Query ehr_id, start_time, magnitude #1",200,,Thread Group 1-3,text,true,,1523,523,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,23,0,0
+1652430245745,538,Query magnitude #2,200,,Thread Group 1-4,text,true,,770,566,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,538,0,0
+1652430246284,19,Query magnitude #3,200,,Thread Group 1-4,text,true,,769,565,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,19,0,0
+1652430246318,24,Create EHR,204,,Thread Group 1-5,,true,,433,743,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr,0,0,1
+1652430246343,78,Composition - Create 'Corona Anamnese',204,,Thread Group 1-5,,true,,553,46838,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/1d101b50-8dd1-4147-bd77-04a329d9e174/composition,0,0,0
+1652430246422,56,Composition - Create 'Blood Pressure',204,,Thread Group 1-5,,true,,553,8256,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/1d101b50-8dd1-4147-bd77-04a329d9e174/composition,0,0,0
+1652430246479,35,Composition - Create 'Laboratory Test Report',204,,Thread Group 1-5,,true,,553,11400,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/1d101b50-8dd1-4147-bd77-04a329d9e174/composition,0,0,0
+1652430246515,264,Composition - Create International Patient Summary',204,,Thread Group 1-5,,true,,553,302918,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/1d101b50-8dd1-4147-bd77-04a329d9e174/composition,0,0,0
+1652430246780,75,Composition - Get composition by version ID,200,,Thread Group 1-5,text,true,,231727,316,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/ehr/1d101b50-8dd1-4147-bd77-04a329d9e174/composition/73d8ec7c-5e1e-48df-acca-59e345d94d45::local.ehrbase.org::1,74,0,0
+1652430246856,24,Query ehr_id #1,200,,Thread Group 1-5,text,true,,907,421,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,24,0,0
+1652430246881,409,Query ehr_id #2,200,,Thread Group 1-5,text,true,,936,451,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,409,0,0
+1652430247291,7,Query ehr_id #3,200,,Thread Group 1-5,text,true,,600,483,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430247299,9,Query ehr_id #4,200,,Thread Group 1-5,text,true,,629,512,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430247308,7,Query start_time #1,200,,Thread Group 1-5,text,true,,861,433,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430245446,2111,"Query ehr_id, start_time, magnitude #2",200,,Thread Group 1-2,text,true,,1564,564,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,2110,0,0
+1652430247557,21,"Query ehr_id, start_time, magnitude #3",200,,Thread Group 1-2,text,true,,1585,585,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,20,0,0
+1652430247578,32,"Query ehr_id, start_time, magnitude #4",200,,Thread Group 1-2,text,true,,1609,609,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,31,0,0
+1652430247610,25,"Query ehr_id, start_time, magnitude #5",200,,Thread Group 1-2,text,true,,1669,669,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,25,0,0
+1652430247635,21,"Query ehr_id, start_time, magnitude #6",200,,Thread Group 1-2,text,true,,1734,734,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,20,0,0
+1652430245442,2242,"Query ehr_id, start_time, magnitude #2",200,,Thread Group 1-1,text,true,,1564,564,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,2242,0,0
+1652430247656,35,"Query ehr_id, start_time, magnitude #7",200,,Thread Group 1-2,text,true,,1854,854,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,35,0,0
+1652430247684,21,"Query ehr_id, start_time, magnitude #3",200,,Thread Group 1-1,text,true,,1585,585,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,20,0,0
+1652430247705,18,"Query ehr_id, start_time, magnitude #4",200,,Thread Group 1-1,text,true,,1609,609,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,18,0,0
+1652430247315,422,Query start_time #2,200,,Thread Group 1-5,text,true,,902,474,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,422,0,0
+1652430247738,5,Query start_time #3,200,,Thread Group 1-5,text,true,,928,500,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,5,0,0
+1652430247691,57,"Query ehr_id, time_created #1",200,,Thread Group 1-2,text,true,,4203,372,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,57,0,0
+1652430247724,34,"Query ehr_id, start_time, magnitude #5",200,,Thread Group 1-1,text,true,,1669,669,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,33,0,0
+1652430247758,20,"Query ehr_id, start_time, magnitude #6",200,,Thread Group 1-1,text,true,,1734,734,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,20,0,0
+1652430247748,53,"Query ehr_id, time_created #2",200,,Thread Group 1-2,text,true,,4259,426,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,53,0,0
+1652430247802,6,"Query ehr_id, time_created #3",200,,Thread Group 1-2,text,true,,640,433,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,6,0,0
+1652430247779,29,"Query ehr_id, start_time, magnitude #7",200,,Thread Group 1-1,text,true,,1854,854,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,29,0,0
+1652430247809,38,"Query ehr_id, time_created #1",200,,Thread Group 1-1,text,true,,4203,372,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,38,0,0
+1652430247848,51,"Query ehr_id, time_created #2",200,,Thread Group 1-1,text,true,,4259,426,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,51,0,0
+1652430247900,13,"Query ehr_id, time_created #3",200,,Thread Group 1-1,text,true,,640,433,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,13,0,0
+1652430246146,2281,"Query ehr_id, start_time, magnitude #2",200,,Thread Group 1-3,text,true,,1564,564,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,2281,0,0
+1652430248428,20,"Query ehr_id, start_time, magnitude #3",200,,Thread Group 1-3,text,true,,1585,585,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,19,0,0
+1652430248448,33,"Query ehr_id, start_time, magnitude #4",200,,Thread Group 1-3,text,true,,1609,609,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,33,0,0
+1652430246304,2198,Query magnitude #4,200,,Thread Group 1-4,text,true,,856,652,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,2198,0,0
+1652430248482,25,"Query ehr_id, start_time, magnitude #5",200,,Thread Group 1-3,text,true,,1669,669,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,25,0,0
+1652430248503,31,Query magnitude #5,200,,Thread Group 1-4,text,true,,829,625,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,30,0,0
+1652430248507,27,"Query ehr_id, start_time, magnitude #6",200,,Thread Group 1-3,text,true,,1734,734,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,27,0,0
+1652430248534,29,Query magnitude #6,200,,Thread Group 1-4,text,true,,916,712,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,29,0,0
+1652430247913,656,"Query ehr_id, time_created #4",200,,Thread Group 1-1,text,true,,4331,498,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,656,0,0
+1652430248534,42,"Query ehr_id, start_time, magnitude #7",200,,Thread Group 1-3,text,true,,1854,854,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,42,0,0
+1652430248564,28,Query magnitude #7,200,,Thread Group 1-4,text,true,,836,632,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,28,0,0
+1652430248569,47,Query participation #1,200,,Thread Group 1-1,text,true,,10996,432,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,47,0,0
+1652430248592,29,Query magnitude #8,200,,Thread Group 1-4,text,true,,852,648,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,29,0,0
+1652430248577,48,"Query ehr_id, time_created #1",200,,Thread Group 1-3,text,true,,4203,372,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,48,0,0
+1652430248622,15,"Query ehr_id, start_time, magnitude #1",200,,Thread Group 1-4,text,true,,1523,523,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,15,0,0
+1652430247808,829,"Query ehr_id, time_created #4",200,,Thread Group 1-2,text,true,,4331,498,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,829,0,0
+1652430248617,22,Query participation #2,200,,Thread Group 1-1,text,true,,10934,370,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,21,0,0
+1652430248639,9,Query ehr_status #1,200,,Thread Group 1-1,text,true,,581,397,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430248638,16,Query participation #1,200,,Thread Group 1-2,text,true,,10996,432,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,16,0,0
+1652430248654,11,Query participation #2,200,,Thread Group 1-2,text,true,,10934,370,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,11,0,0
+1652430248626,46,"Query ehr_id, time_created #2",200,,Thread Group 1-3,text,true,,4259,426,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,45,0,0
+1652430248665,7,Query ehr_status #1,200,,Thread Group 1-2,text,true,,581,397,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430248672,6,"Query ehr_id, time_created #3",200,,Thread Group 1-3,text,true,,640,433,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,6,0,0
+1652430248648,276,Query ehr_status #2,200,,Thread Group 1-1,text,true,,933,334,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,276,0,0
+1652430248672,252,Query ehr_status #2,200,,Thread Group 1-2,text,true,,933,334,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,252,0,0
+1652430248924,9,Query ehr_status #3,200,,Thread Group 1-2,text,true,,571,429,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430248924,10,Query ehr_status #3,200,,Thread Group 1-1,text,true,,571,429,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430248934,11,Query composer #1,200,,Thread Group 1-2,text,true,,1051,377,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,11,0,0
+1652430248934,12,Query composer #1,200,,Thread Group 1-1,text,true,,1051,377,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,11,0,0
+1652430248946,6,Query composer #2,200,,Thread Group 1-1,text,true,,1113,439,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,6,0,0
+1652430248945,7,Query composer #2,200,,Thread Group 1-2,text,true,,1113,439,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430248952,7,Query composer #3,200,,Thread Group 1-1,text,true,,1090,416,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430248953,7,Query composer #3,200,,Thread Group 1-2,text,true,,1090,416,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430247744,1220,Query start_time #4,200,,Thread Group 1-5,text,true,,969,541,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,1220,0,0
+1652430248964,10,Query start_time #5,200,,Thread Group 1-5,text,true,,988,560,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,10,0,0
+1652430248974,8,Query start_time #6,200,,Thread Group 1-5,text,true,,1029,601,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,8,0,0
+1652430248983,13,Query magnitude #1,200,,Thread Group 1-5,text,true,,683,479,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,13,0,0
+1652430248960,512,Query composer #4,200,,Thread Group 1-2,text,true,,1114,440,5,5,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,512,0,0
+1652430248678,863,"Query ehr_id, time_created #4",200,,Thread Group 1-3,text,true,,4331,498,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,862,0,0
+1652430249541,15,Query participation #1,200,,Thread Group 1-3,text,true,,10996,432,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,15,0,0
+1652430248959,611,Query composer #4,200,,Thread Group 1-1,text,true,,1114,440,4,4,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,611,0,0
+1652430249556,17,Query participation #2,200,,Thread Group 1-3,text,true,,10934,370,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,17,0,0
+1652430249573,5,Query ehr_status #1,200,,Thread Group 1-3,text,true,,581,397,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,5,0,0
+1652430248997,613,Query magnitude #2,200,,Thread Group 1-5,text,true,,770,566,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,613,0,0
+1652430249610,27,Query magnitude #3,200,,Thread Group 1-5,text,true,,769,565,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,27,0,0
+1652430249578,112,Query ehr_status #2,200,,Thread Group 1-3,text,true,,933,334,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,112,0,0
+1652430249691,5,Query ehr_status #3,200,,Thread Group 1-3,text,true,,571,429,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,5,0,0
+1652430249697,9,Query composer #1,200,,Thread Group 1-3,text,true,,1051,377,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,9,0,0
+1652430249707,7,Query composer #2,200,,Thread Group 1-3,text,true,,1113,439,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430249714,7,Query composer #3,200,,Thread Group 1-3,text,true,,1090,416,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430249721,386,Query composer #4,200,,Thread Group 1-3,text,true,,1114,440,3,3,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,386,0,0
+1652430248638,1888,"Query ehr_id, start_time, magnitude #2",200,,Thread Group 1-4,text,true,,1564,564,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,1888,0,0
+1652430250527,17,"Query ehr_id, start_time, magnitude #3",200,,Thread Group 1-4,text,true,,1585,585,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,17,0,0
+1652430250544,25,"Query ehr_id, start_time, magnitude #4",200,,Thread Group 1-4,text,true,,1609,609,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,25,0,0
+1652430250570,19,"Query ehr_id, start_time, magnitude #5",200,,Thread Group 1-4,text,true,,1669,669,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,19,0,0
+1652430250589,21,"Query ehr_id, start_time, magnitude #6",200,,Thread Group 1-4,text,true,,1734,734,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,21,0,0
+1652430250610,25,"Query ehr_id, start_time, magnitude #7",200,,Thread Group 1-4,text,true,,1854,854,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,25,0,0
+1652430250636,34,"Query ehr_id, time_created #1",200,,Thread Group 1-4,text,true,,4203,372,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,34,0,0
+1652430250670,38,"Query ehr_id, time_created #2",200,,Thread Group 1-4,text,true,,4259,426,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,38,0,0
+1652430250708,8,"Query ehr_id, time_created #3",200,,Thread Group 1-4,text,true,,640,433,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,8,0,0
+1652430250717,597,"Query ehr_id, time_created #4",200,,Thread Group 1-4,text,true,,4331,498,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,596,0,0
+1652430251314,15,Query participation #1,200,,Thread Group 1-4,text,true,,10996,432,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,15,0,0
+1652430251329,17,Query participation #2,200,,Thread Group 1-4,text,true,,10934,370,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,17,0,0
+1652430249637,1714,Query magnitude #4,200,,Thread Group 1-5,text,true,,856,652,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,1714,0,0
+1652430251346,6,Query ehr_status #1,200,,Thread Group 1-4,text,true,,581,397,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,6,0,0
+1652430251351,23,Query magnitude #5,200,,Thread Group 1-5,text,true,,829,625,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,23,0,0
+1652430251375,29,Query magnitude #6,200,,Thread Group 1-5,text,true,,916,712,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,29,0,0
+1652430251405,18,Query magnitude #7,200,,Thread Group 1-5,text,true,,836,632,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,18,0,0
+1652430251424,16,Query magnitude #8,200,,Thread Group 1-5,text,true,,852,648,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,16,0,0
+1652430251352,96,Query ehr_status #2,200,,Thread Group 1-4,text,true,,933,334,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,95,0,0
+1652430251440,12,"Query ehr_id, start_time, magnitude #1",200,,Thread Group 1-5,text,true,,1523,523,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,12,0,0
+1652430251448,5,Query ehr_status #3,200,,Thread Group 1-4,text,true,,571,429,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,5,0,0
+1652430251453,7,Query composer #1,200,,Thread Group 1-4,text,true,,1051,377,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,7,0,0
+1652430251460,6,Query composer #2,200,,Thread Group 1-4,text,true,,1113,439,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,6,0,0
+1652430251466,5,Query composer #3,200,,Thread Group 1-4,text,true,,1090,416,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,5,0,0
+1652430251471,370,Query composer #4,200,,Thread Group 1-4,text,true,,1114,440,2,2,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,370,0,0
+1652430251453,1470,"Query ehr_id, start_time, magnitude #2",200,,Thread Group 1-5,text,true,,1564,564,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,1469,0,0
+1652430252923,15,"Query ehr_id, start_time, magnitude #3",200,,Thread Group 1-5,text,true,,1585,585,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,15,0,0
+1652430252938,25,"Query ehr_id, start_time, magnitude #4",200,,Thread Group 1-5,text,true,,1609,609,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,24,0,0
+1652430252963,19,"Query ehr_id, start_time, magnitude #5",200,,Thread Group 1-5,text,true,,1669,669,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,19,0,0
+1652430252982,22,"Query ehr_id, start_time, magnitude #6",200,,Thread Group 1-5,text,true,,1734,734,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,22,0,0
+1652430253004,29,"Query ehr_id, start_time, magnitude #7",200,,Thread Group 1-5,text,true,,1854,854,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,29,0,0
+1652430253034,35,"Query ehr_id, time_created #1",200,,Thread Group 1-5,text,true,,4203,372,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,35,0,0
+1652430253069,32,"Query ehr_id, time_created #2",200,,Thread Group 1-5,text,true,,4259,426,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,32,0,0
+1652430253102,4,"Query ehr_id, time_created #3",200,,Thread Group 1-5,text,true,,640,433,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,4,0,0
+1652430253106,566,"Query ehr_id, time_created #4",200,,Thread Group 1-5,text,true,,4331,498,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,566,0,0
+1652430253673,17,Query participation #1,200,,Thread Group 1-5,text,true,,10996,432,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,17,0,0
+1652430253690,18,Query participation #2,200,,Thread Group 1-5,text,true,,10934,370,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,18,0,0
+1652430253708,8,Query ehr_status #1,200,,Thread Group 1-5,text,true,,581,397,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,8,0,0
+1652430253716,92,Query ehr_status #2,200,,Thread Group 1-5,text,true,,933,334,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,92,0,0
+1652430253808,5,Query ehr_status #3,200,,Thread Group 1-5,text,true,,571,429,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,5,0,0
+1652430253813,11,Query composer #1,200,,Thread Group 1-5,text,true,,1051,377,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,11,0,0
+1652430253825,6,Query composer #2,200,,Thread Group 1-5,text,true,,1113,439,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,6,0,0
+1652430253832,5,Query composer #3,200,,Thread Group 1-5,text,true,,1090,416,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,5,0,0
+1652430253838,354,Query composer #4,200,,Thread Group 1-5,text,true,,1114,440,1,1,http://ehrbase-service.default.svc.cluster.local:8080/ehrbase/rest/openehr/v1/query/aql,354,0,0
