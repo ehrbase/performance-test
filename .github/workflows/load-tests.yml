@@ -80,12 +80,14 @@ jobs:
       - name: Install EHRbase and WebTester
         run: |
           scp ./scripts/startup.sh ehrbase-load-test:~/scripts/
+          ssh ehrbase-load-test 'chmod u+x ~/scripts/startup.sh'
           ssh ehrbase-load-test '~/scripts/startup.sh'
         timeout-minutes: 10
 
       - name: Run performance tests
         run: |
           scp ./scripts/run_tests.sh ehrbase-load-test:~/scripts/
+          ssh ehrbase-load-test 'chmod u+x ~/scripts/run_tests.sh'
           EXECUTION_ID=$(ssh ehrbase-load-test "~/scripts/run_tests.sh ${{ github.event.inputs.threads }} ${{ github.event.inputs.ramp-up }} ${{ github.event.inputs.loop-count }} | tail -1")
           echo "EXECUTION_ID=$EXECUTION_ID" >> $GITHUB_ENV
         timeout-minutes: 240
