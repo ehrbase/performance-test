@@ -16,7 +16,6 @@
 
 package org.ehrbase.webtester.service;
 
-
 import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
 import static org.ehrbase.jooq.pg.Tables.SYSTEM;
 import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
@@ -43,7 +42,11 @@ import com.nedap.archie.rm.datavalues.TermMapping;
 import com.nedap.archie.rm.generic.Participation;
 import com.nedap.archie.rm.generic.PartyIdentified;
 import com.nedap.archie.rm.generic.PartyProxy;
+import com.nedap.archie.rm.support.identification.TerminologyId;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -53,10 +56,19 @@ import java.time.temporal.TemporalAccessor;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import javax.annotation.PostConstruct;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 import org.ehrbase.jooq.pg.enums.ContributionChangeType;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.jooq.pg.enums.ContributionState;
@@ -77,7 +89,6 @@ import org.ehrbase.jooq.pg.tables.records.TerritoryRecord;
 import org.ehrbase.jooq.pg.udt.records.CodePhraseRecord;
 import org.ehrbase.jooq.pg.udt.records.DvCodedTextRecord;
 import org.ehrbase.serialisation.dbencoding.RawJson;
-
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
 import org.slf4j.Logger;
@@ -87,19 +98,31 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
+import org.w3c.dom.Document;
+import org.xml.sax.SAXException;
 
 /**
  * @author Renaud Subiger
  * @since 1.0
  */
-
 @Service
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class LoaderServiceImp implements LoaderService {
 
+    private static final String TEMPLATES_BASE = "templates/";
+    private static final String[] TEMPLATES = {
+        "corona_anamnese.opt",
+        "ehrbase_blood_pressure.opt",
+        "virologischer_befund.opt",
+        "international_patient_summary.opt"
+    };
+    private static final String COMPOSITIONS_BASE = "compositions/";
+    private static final String[] COMPOSITIONS = {
+        "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
+    };
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
 
-    private final Random random = new Random();
+    private final Random random = new SecureRandom();
     private final List<Composition> compositions = new ArrayList<>();
 
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
@@ -107,21 +130,16 @@ public class LoaderServiceImp implements LoaderService {
 
     private final DSLContext dsl;
 
-
     private UUID systemId;
     private UUID committerId;
     private String zoneId;
 
     public LoaderServiceImp(DSLContext dsl) {
         this.dsl = dsl;
-
-
     }
 
-
-
     @PostConstruct
-    public void initialize() throws IOException {
+    public void initialize() {
         zoneId = ZoneId.systemDefault().toString();
         systemId = getSystemId();
         committerId = getCommitterId();
@@ -130,63 +148,75 @@ public class LoaderServiceImp implements LoaderService {
         initializeCompositions();
     }
 
-    private void initializeTemplates() throws IOException {
-        createTemplate("Corona_Anamnese", "templates/corona_anamnese.opt");
-        createTemplate("ehrbase_blood_pressure_simple.de.v0", "templates/ehrbase_blood_pressure.opt");
-        createTemplate("International Patient Summary", "templates/international_patient_summary.opt");
-        createTemplate("Virologischer Befund", "templates/virologischer_befund.opt");
-    }
-
-    private void initializeCompositions() {
-        List<String> compositionFiles = List.of(
-                "compositions/blood_pressure.json",
-                "compositions/international_patient_summary.json",
-                "compositions/corona_anamnese.json",
-                "compositions/virologischer_befund.json"
-        );
-
-        compositionFiles.forEach(location -> {
-            try (var in = FileUtils.getInputStream(location)) {
-                compositions.add(objectMapper.readValue(in, Composition.class));
+    private void initializeTemplates() {
+        Stream.of(TEMPLATES).map(p -> TEMPLATES_BASE + p).forEach(p -> {
+            String templateId;
+            try (var in = ResourceUtils.getInputStream(p); ) {
+                templateId = xpath(in, "//template/template_id/value/text()");
             } catch (IOException e) {
-                throw new LoaderException("Failed to read composition file", e);
+                throw new UncheckedIOException(e);
             }
+            createTemplate(templateId, p);
         });
     }
 
+    private String xpath(InputStream document, String xpathExpression) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(false);
+            Document doc = factory.newDocumentBuilder().parse(document);
+
+            XPathExpression expr = XPathFactory.newInstance().newXPath().compile(xpathExpression);
+            return (String) expr.evaluate(doc, XPathConstants.STRING);
+
+        } catch (ParserConfigurationException | SAXException | IOException | XPathExpressionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void initializeCompositions() {
+        Stream.of(COMPOSITIONS)
+                .map(p -> COMPOSITIONS_BASE + p)
+                .map(ResourceUtils::getContent)
+                .map(p -> {
+                    try {
+                        return objectMapper.readValue(p, Composition.class);
+                    } catch (IOException e) {
+                        throw new LoaderException("Failed to read composition file", e);
+                    }
+                })
+                .forEach(compositions::add);
+    }
 
     @Override
     public void load(LoaderRequestDto properties1) {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
 
-        log.info("Start loading test data... ({} EHRs, {} compositions)", properties1.getEhr(),
+        log.info(
+                "Start loading test data... ({} EHRs, {} compositions)",
+                properties1.getEhr(),
                 properties1.getEhr() * properties1.getCompositionPerEhr());
 
-        IntStream.rangeClosed(1, properties1.getEhr())
-                .parallel()
-                .forEach(i -> {
-                    UUID ehrId = insertEhr();
-                    insertCompositions(ehrId, properties1);
-                });
+        IntStream.rangeClosed(1, properties1.getEhr()).parallel().forEach(i -> {
+            UUID ehrId = insertEhr();
+            insertCompositions(ehrId, properties1);
+        });
 
         stopWatch.stop();
         log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
     }
 
-
-
     public void insertCompositions(UUID ehrId, LoaderRequestDto properties1) {
-        IntStream.rangeClosed(1, properties1.getCompositionPerEhr())
-                .forEach(i -> {
-                    var composition = getRandomComposition();
-                    var compositionId = createComposition(ehrId, composition);
-                    createEntry(compositionId, composition);
-                    if (composition.getContext() != null) {
-                        var eventContextId = createEventContext(compositionId, composition.getContext());
-                        createParticipations(eventContextId, composition.getContext().getParticipations());
-                    }
-                });
+        IntStream.rangeClosed(1, properties1.getCompositionPerEhr()).forEach(i -> {
+            var composition = getRandomComposition();
+            var compositionId = createComposition(ehrId, composition);
+            createEntry(compositionId, composition);
+            if (composition.getContext() != null) {
+                var eventContextId = createEventContext(compositionId, composition.getContext());
+                createParticipations(eventContextId, composition.getContext().getParticipations());
+            }
+        });
     }
 
     public UUID insertEhr() {
@@ -231,14 +261,12 @@ public class LoaderServiceImp implements LoaderService {
         statusRecord.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
         statusRecord.setName(new DvCodedTextRecord("EHR Status", null, null, null, null, null));
 
-
-
         statusRecord.store();
         log.trace("Created EHR_STATUS: {}", statusRecord.getId());
     }
 
     private Composition getRandomComposition() {
-        return compositions.get(random.nextInt(4));
+        return compositions.get(random.nextInt(compositions.size()));
     }
 
     private UUID getSystemId() {
@@ -273,16 +301,13 @@ public class LoaderServiceImp implements LoaderService {
             identifierRecord.setAssigner("EHRbase");
             identifierRecord.setTypeName("EHRbase Security Authentication User");
             identifierRecord.setParty(committerRecord.getId());
-            dsl.insertInto(Identifier.IDENTIFIER)
-                    .set(identifierRecord)
-                    .execute();
+            dsl.insertInto(Identifier.IDENTIFIER).set(identifierRecord).execute();
         }
         return committerRecord.getId();
     }
 
-    private void createTemplate(String templateId, String resourceLocation) throws IOException {
-        var existingTemplateStore =
-                dsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
+    private void createTemplate(String templateId, String resourceLocation) {
+        var existingTemplateStore = dsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
 
         if (existingTemplateStore.isPresent()) {
             log.info("Template {} already exists", templateId);
@@ -290,7 +315,7 @@ public class LoaderServiceImp implements LoaderService {
             var templateStoreRecord = dsl.newRecord(TEMPLATE_STORE);
             templateStoreRecord.setId(UUID.randomUUID());
             templateStoreRecord.setTemplateId(templateId);
-            templateStoreRecord.setContent(FileUtils.getContent(resourceLocation));
+            templateStoreRecord.setContent(ResourceUtils.getContent(resourceLocation));
             templateStoreRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
             templateStoreRecord.store();
         }
@@ -316,7 +341,8 @@ public class LoaderServiceImp implements LoaderService {
     private UUID createComposition(UUID ehrId, Composition composition) {
         var compositionRecord = dsl.newRecord(COMPOSITION);
         compositionRecord.setEhrId(ehrId);
-        compositionRecord.setInContribution(createContribution(ehrId, ContributionDataType.composition, "Create COMPOSITION"));
+        compositionRecord.setInContribution(
+                createContribution(ehrId, ContributionDataType.composition, "Create COMPOSITION"));
         compositionRecord.setLanguage(composition.getLanguage().getCodeString());
         compositionRecord.setTerritory(getTerritory(composition.getTerritory().getCodeString()));
         compositionRecord.setComposer(createPartyIdentified(composition.getComposer()));
@@ -340,7 +366,8 @@ public class LoaderServiceImp implements LoaderService {
         entryRecord.setCompositionId(compositionId);
         entryRecord.setSequence(0);
         entryRecord.setItemType(resolveEntryType(composition));
-        entryRecord.setTemplateId(composition.getArchetypeDetails().getTemplateId().getValue());
+        entryRecord.setTemplateId(
+                composition.getArchetypeDetails().getTemplateId().getValue());
         entryRecord.setArchetypeId(composition.getArchetypeNodeId());
         entryRecord.setCategory(createDvCodedText(composition.getCategory()));
         entryRecord.setEntry(JSONB.jsonb(rawJson.marshal(composition)));
@@ -373,7 +400,8 @@ public class LoaderServiceImp implements LoaderService {
             eventContextRecord.setEndTimeTzid(resolveTimeZone(endTime));
         }
 
-        if (eventContext.getOtherContext() != null && !CollectionUtils.isEmpty(eventContext.getOtherContext().getItems())) {
+        if (eventContext.getOtherContext() != null
+                && !CollectionUtils.isEmpty(eventContext.getOtherContext().getItems())) {
             eventContextRecord.setOtherContext(JSONB.jsonb(rawJson.marshal(eventContext.getOtherContext())));
         }
 
@@ -468,18 +496,20 @@ public class LoaderServiceImp implements LoaderService {
 
         return termMappings.stream()
                 .map(termMapping -> {
-                    String result = termMapping.getMatch() + "|";
-
-                    if (termMapping.getPurpose() != null) {
-                        result += termMapping.getPurpose().getValue() + "|";
-                    }
-
-                    result += termMapping.getPurpose().getDefiningCode().getTerminologyId().getValue() + "|" +
-                            termMapping.getPurpose().getDefiningCode().getCodeString() + "|" +
-                            termMapping.getTarget().getTerminologyId().getValue() + "|" +
-                            termMapping.getTarget().getCodeString();
-
-                    return result;
+                    var purpose = Optional.of(termMapping).map(TermMapping::getPurpose);
+                    return Stream.of(
+                                    Character.toString(termMapping.getMatch()),
+                                    purpose.map(DvCodedText::getValue).orElse(""),
+                                    purpose.map(DvCodedText::getDefiningCode)
+                                            .map(CodePhrase::getTerminologyId)
+                                            .map(TerminologyId::getValue)
+                                            .orElse(""),
+                                    purpose.map(DvCodedText::getDefiningCode)
+                                            .map(CodePhrase::getCodeString)
+                                            .orElse(""),
+                                    termMapping.getTarget().getTerminologyId().getValue(),
+                                    termMapping.getTarget().getCodeString())
+                            .collect(Collectors.joining("|"));
                 })
                 .toArray(String[]::new);
     }
