@@ -19,6 +19,7 @@ package org.ehrbase.webtester.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import org.springframework.util.FileCopyUtils;
 
@@ -26,17 +27,19 @@ import org.springframework.util.FileCopyUtils;
  * @author Renaud Subiger
  * @since 1.0
  */
-public class FileUtils {
+public class ResourceUtils {
 
-    private FileUtils() {
-    }
+    private ResourceUtils() {}
 
-    public static String getContent(String location) throws IOException {
-        var reader = new InputStreamReader(getInputStream(location), StandardCharsets.UTF_8);
-        return FileCopyUtils.copyToString(reader);
+    public static String getContent(String location) {
+        try (var reader = new InputStreamReader(getInputStream(location), StandardCharsets.UTF_8)) {
+            return FileCopyUtils.copyToString(reader);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     public static InputStream getInputStream(String location) {
-        return FileUtils.class.getClassLoader().getResourceAsStream(location);
+        return ResourceUtils.class.getClassLoader().getResourceAsStream(location);
     }
 }
