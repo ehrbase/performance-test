@@ -1,5 +1,7 @@
 /*
- * Copyright 2022 vitasystems GmbH and Hannover Medical School.
+ * Copyright (c) 2022 vitasystems GmbH and Hannover Medical School.
+ *
+ * This file is part of project EHRbase
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.ehrbase.webtester.web;
 
 import org.springframework.http.HttpHeaders;
@@ -25,8 +26,7 @@ import org.springframework.http.MediaType;
  */
 public class HttpHeadersUtils {
 
-    private HttpHeadersUtils() {
-    }
+    private HttpHeadersUtils() {}
 
     public static HttpHeaders generateFileHeaders(String filename, MediaType contentType) {
         var headers = new HttpHeaders();

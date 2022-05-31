@@ -1,5 +1,7 @@
 /*
- * Copyright 2022 vitasystems GmbH and Hannover Medical School.
+ * Copyright (c) 2022 vitasystems GmbH and Hannover Medical School.
+ *
+ * This file is part of project EHRbase
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.ehrbase.webtester.web.rest;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.ehrbase.webtester.exception.WebTesterException;
 import org.ehrbase.webtester.service.JMeterService;
 import org.ehrbase.webtester.web.HttpHeadersUtils;
@@ -34,12 +40,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * REST API for JMeter.
@@ -102,14 +102,12 @@ public class JMeterController {
 
         var filename = jmeterService.getTestPlanFilename(testPlanId);
         var headers = HttpHeadersUtils.generateFileHeaders(filename, MediaType.APPLICATION_XML);
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(new InputStreamResource(stream));
+        return ResponseEntity.ok().headers(headers).body(new InputStreamResource(stream));
     }
 
     @PostMapping(path = "/test-plans/{testPlanId}/start")
-    public ResponseEntity<String> startTest(@PathVariable String testPlanId,
-                                            @RequestBody(required = false) Map<String, Object> parameters) {
+    public ResponseEntity<String> startTest(
+            @PathVariable String testPlanId, @RequestBody(required = false) Map<String, Object> parameters) {
         String executionId = jmeterService.startTest(testPlanId, parameters);
 
         var headers = new HttpHeaders();
@@ -126,9 +124,7 @@ public class JMeterController {
         InputStream stream = jmeterService.getLogFile(testExecutionId);
 
         var headers = HttpHeadersUtils.generateFileHeaders(JMeterService.LOG_FILE, MediaType.TEXT_PLAIN);
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(new InputStreamResource(stream));
+        return ResponseEntity.ok().headers(headers).body(new InputStreamResource(stream));
     }
 
     @PostMapping(value = "/test-executions/{testExecutionId}/generate-report")
@@ -141,10 +137,9 @@ public class JMeterController {
     public ResponseEntity<InputStreamResource> downloadReport(@PathVariable String testExecutionId) {
         InputStream stream = jmeterService.getReport(testExecutionId);
 
-        var headers = HttpHeadersUtils.generateFileHeaders(JMeterService.REPORT_FILE, MediaType.APPLICATION_OCTET_STREAM);
+        var headers =
+                HttpHeadersUtils.generateFileHeaders(JMeterService.REPORT_FILE, MediaType.APPLICATION_OCTET_STREAM);
 
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(new InputStreamResource(stream));
+        return ResponseEntity.ok().headers(headers).body(new InputStreamResource(stream));
     }
 }

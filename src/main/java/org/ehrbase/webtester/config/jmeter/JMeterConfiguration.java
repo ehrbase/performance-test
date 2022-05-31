@@ -1,5 +1,7 @@
 /*
- * Copyright 2022 vitasystems GmbH and Hannover Medical School.
+ * Copyright (c) 2022 vitasystems GmbH and Hannover Medical School.
+ *
+ * This file is part of project EHRbase
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.ehrbase.webtester.config.jmeter;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
+import javax.annotation.PostConstruct;
 import org.apache.jmeter.engine.JMeterEngine;
 import org.apache.jmeter.engine.StandardJMeterEngine;
 import org.apache.jmeter.util.JMeterUtils;
@@ -24,12 +30,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import javax.annotation.PostConstruct;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Locale;
 
 /**
  * {@link Configuration} for Apache JMeter.
@@ -54,7 +54,8 @@ public class JMeterConfiguration {
         log.info("Initializing Apache JMeter {}", JMeterUtils.getJMeterVersion());
 
         String jMeterDir = getJMeterDir();
-        JMeterUtils.loadJMeterProperties(Path.of(jMeterDir, "bin/jmeter.properties").toString());
+        JMeterUtils.loadJMeterProperties(
+                Path.of(jMeterDir, "bin/jmeter.properties").toString());
         JMeterUtils.setLocale(Locale.ENGLISH);
         JMeterUtils.setJMeterHome(jMeterDir);
 
@@ -68,8 +69,8 @@ public class JMeterConfiguration {
 
     private String getJMeterDir() {
         if (properties.getInstallDir() == null) {
-            throw new IllegalStateException("Either define JMETER_HOME environment variable " +
-                    "or specify jmeter.install-dir application property");
+            throw new IllegalStateException("Either define JMETER_HOME environment variable "
+                    + "or specify jmeter.install-dir application property");
         }
         return properties.getInstallDir();
     }

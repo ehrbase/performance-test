@@ -1,8 +1,24 @@
+/*
+ * Copyright (c) 2022 vitasystems GmbH and Hannover Medical School.
+ *
+ * This file is part of project EHRbase
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.ehrbase.webtester.config.jooq;
 
 import javax.sql.DataSource;
 import org.jooq.ExecuteContext;
-
 import org.jooq.SQLDialect;
 import org.jooq.impl.DataSourceConnectionProvider;
 import org.jooq.impl.DefaultConfiguration;
@@ -26,57 +42,55 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class PersistenceConfig {
 
-  @Value("${spring.jooq.sql-dialect}")
-  private String  sqlDialect;
+    @Value("${spring.jooq.sql-dialect}")
+    private String sqlDialect;
 
-  static class ExceptionTranslator extends DefaultExecuteListener {
-    @Override
-    public void exception(ExecuteContext context) {
-      SQLDialect dialect = context.configuration().dialect();
-      SQLExceptionTranslator translator
-          = new SQLErrorCodeSQLExceptionTranslator(dialect.name());
-      context.exception(translator
-          .translate("Access database using Jooq", context.sql(), context.sqlException()));
+    static class ExceptionTranslator extends DefaultExecuteListener {
+        @Override
+        public void exception(ExecuteContext context) {
+            SQLDialect dialect = context.configuration().dialect();
+            SQLExceptionTranslator translator = new SQLErrorCodeSQLExceptionTranslator(dialect.name());
+            context.exception(
+                    translator.translate("Access database using Jooq", context.sql(), context.sqlException()));
+        }
     }
-  }
 
+    @Autowired
+    private DataSource dataSource;
 
+    public TransactionAwareDataSourceProxy transactionAwareDataSource() {
+        return new TransactionAwareDataSourceProxy(dataSource);
+    }
 
-  @Autowired
-  private DataSource dataSource;
-  public TransactionAwareDataSourceProxy transactionAwareDataSource() {
-    return new TransactionAwareDataSourceProxy(dataSource);
-  }
+    @Bean
+    public DataSourceTransactionManager transactionManager() {
+        return new DataSourceTransactionManager(dataSource);
+    }
 
-  @Bean
-  public DataSourceTransactionManager transactionManager() {
-    return new DataSourceTransactionManager(dataSource);
-  }
+    @Bean
+    public DataSourceConnectionProvider connectionProvider() {
+        return new DataSourceConnectionProvider(transactionAwareDataSource());
+    }
 
-  @Bean
-  public DataSourceConnectionProvider connectionProvider() {
-    return new DataSourceConnectionProvider(transactionAwareDataSource());
-  }
+    @Bean
+    public ExceptionTranslator exceptionTransformer() {
+        return new ExceptionTranslator();
+    }
 
-  @Bean
-  public ExceptionTranslator exceptionTransformer() {
-    return new ExceptionTranslator();
-  }
+    @Bean
+    @Primary
+    public DefaultDSLContext dsl() {
+        return new DefaultDSLContext(configuration());
+    }
 
-  @Bean
-  @Primary
-  public DefaultDSLContext dsl() {
-    return new DefaultDSLContext(configuration());
-  }
-
-  @Bean
-  public DefaultConfiguration configuration() {
-    DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
-    jooqConfiguration.set(connectionProvider());
-    jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));
-//        jooqConfiguration.set(new PerformanceListener());
-    SQLDialect dialect = SQLDialect.valueOf(sqlDialect);
-    jooqConfiguration.set(dialect);
-    return jooqConfiguration;
-  }
+    @Bean
+    public DefaultConfiguration configuration() {
+        DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
+        jooqConfiguration.set(connectionProvider());
+        jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));
+        //        jooqConfiguration.set(new PerformanceListener());
+        SQLDialect dialect = SQLDialect.valueOf(sqlDialect);
+        jooqConfiguration.set(dialect);
+        return jooqConfiguration;
+    }
 }
