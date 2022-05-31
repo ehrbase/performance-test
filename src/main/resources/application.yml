@@ -19,7 +19,7 @@ spring:
     password: ehrbase
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20
+      maximum-pool-size: 5
   jooq:
     sql-dialect: POSTGRES
   flyway:
@@ -36,7 +36,7 @@ logging:
     org.hibernate: warn
     org.springframework: warn
 loader:
-  enabled: false
+  enabled: true
 
 management:
   health:
