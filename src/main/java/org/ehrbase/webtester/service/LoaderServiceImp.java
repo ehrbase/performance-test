@@ -56,13 +56,11 @@ import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAccessor;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -125,7 +123,6 @@ public class LoaderServiceImp implements LoaderService {
     private static final String[] COMPOSITIONS = {
         "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
     };
-    private static final Function<Integer, String> FACILITY_NUM_TO_ID = i -> "hcf" + i;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
 
     private final Random random = new SecureRandom();
@@ -194,16 +191,6 @@ public class LoaderServiceImp implements LoaderService {
                 .forEach(compositions::add);
     }
 
-    private static class EhrCreateDescriptor {
-        private long compositionCount;
-        private long facilityCount;
-
-        private EhrCreateDescriptor(long compositionCount, long facilityCount) {
-            this.compositionCount = compositionCount;
-            this.facilityCount = facilityCount;
-        }
-    }
-
     @Override
     public void load(LoaderRequestDto properties) {
         StopWatch stopWatch = new StopWatch();
@@ -227,7 +214,7 @@ public class LoaderServiceImp implements LoaderService {
         List<Integer> ehrFacilityCounts = IntStream.range(0, properties.getEhr())
                 .parallel()
                 .mapToObj(e -> (int) Math.max(1, Math.round(random.nextGaussian() * 3 + 7)))
-                .sorted(Comparator.comparingInt(i -> (int) i).reversed())
+                .sorted((i1, i2) -> -Integer.compare(i1, i2))
                 .collect(Collectors.toList());
 
         // Determine how many facilities should be assigned to each EHR (normal dist. m: 15,000 sd: 5000) and scale it
@@ -305,7 +292,7 @@ public class LoaderServiceImp implements LoaderService {
 
     private Pair<Integer, UUID> insertHealthcareFacility(int number) {
         var partyRecord = dsl.newRecord(PARTY_IDENTIFIED);
-        partyRecord.setPartyRefValue(FACILITY_NUM_TO_ID.apply(number));
+        partyRecord.setPartyRefValue("hcf" + number);
         partyRecord.setPartyRefScheme("id_scheme");
         partyRecord.setPartyRefNamespace("facilities");
         partyRecord.setPartyRefType("ORGANISATION");

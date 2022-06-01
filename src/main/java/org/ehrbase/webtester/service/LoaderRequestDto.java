@@ -42,9 +42,4 @@ public class LoaderRequestDto {
     public void setHealthcareFacilities(int healthcareFacilities) {
         this.healthcareFacilities = healthcareFacilities;
     }
-
-    // todo remove...
-    public int getCompositionPerEhr() {
-        return 0;
-    }
 }
