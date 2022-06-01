@@ -56,10 +56,13 @@ import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAccessor;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -70,6 +73,7 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
+import org.apache.commons.lang3.tuple.Pair;
 import org.ehrbase.jooq.pg.enums.ContributionChangeType;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.jooq.pg.enums.ContributionState;
@@ -121,6 +125,7 @@ public class LoaderServiceImp implements LoaderService {
     private static final String[] COMPOSITIONS = {
         "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
     };
+    private static final Function<Integer, String> FACILITY_NUM_TO_ID = i -> "hcf" + i;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
 
     private final Random random = new SecureRandom();
@@ -189,32 +194,136 @@ public class LoaderServiceImp implements LoaderService {
                 .forEach(compositions::add);
     }
 
+    private static class EhrCreateDescriptor {
+        private long compositionCount;
+        private long facilityCount;
+
+        private EhrCreateDescriptor(long compositionCount, long facilityCount) {
+            this.compositionCount = compositionCount;
+            this.facilityCount = facilityCount;
+        }
+    }
+
     @Override
-    public void load(LoaderRequestDto properties1) {
+    public void load(LoaderRequestDto properties) {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
 
-        log.info(
-                "Start loading test data... ({} EHRs, {} compositions)",
-                properties1.getEhr(),
-                properties1.getEhr() * properties1.getCompositionPerEhr());
+        if (properties.getHealthcareFacilities() < 1 || properties.getEhr() < properties.getHealthcareFacilities()) {
+            throw new IllegalArgumentException("");
+        }
 
-        IntStream.rangeClosed(1, properties1.getEhr()).parallel().forEach(i -> {
-            UUID ehrId = insertEhr();
-            insertCompositions(ehrId, properties1);
-        });
+        log.info("Preparing EHR distributions...");
+
+        // Create healthcare facilities in Table party_identified
+        Map<Integer, UUID> facilityNumberToUuid = IntStream.range(0, properties.getHealthcareFacilities())
+                .parallel()
+                .mapToObj(this::insertHealthcareFacility)
+                .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+
+        // Determine how many facilities should be assigned to each EHR (normal dist. m: 7 sd: 3)
+        // This Step will take a while for high EHR counts (i.e. 10,000,000) since the random number generation is
+        // synchronized
+        List<Integer> ehrFacilityCounts = IntStream.range(0, properties.getEhr())
+                .parallel()
+                .mapToObj(e -> (int) Math.max(1, Math.round(random.nextGaussian() * 3 + 7)))
+                .sorted(Comparator.comparingInt(i -> (int) i).reversed())
+                .collect(Collectors.toList());
+
+        // Determine how many facilities should be assigned to each EHR (normal dist. m: 15,000 sd: 5000) and scale it
+        // to match the total EHR count
+        Map<UUID, Double> ehrDistribution = IntStream.range(0, properties.getHealthcareFacilities())
+                .boxed()
+                .collect(Collectors.toMap(facilityNumberToUuid::get, i -> random.nextGaussian() * 5000 + 15000));
+        Double scaleFactor = ehrFacilityCounts.parallelStream()
+                        .mapToLong(i -> i)
+                        .sum()
+                / ehrDistribution.values().parallelStream().mapToDouble(v -> v).sum();
+        List<Pair<UUID, Integer>> scaledEhrDistribution = ehrDistribution.entrySet().stream()
+                .map(p -> Pair.of(p.getKey(), (int) Math.abs(Math.round(Math.ceil(p.getValue() * scaleFactor)))))
+                .sorted((i1, i2) -> -Integer.compare(i1.getRight(), i2.getRight()))
+                .collect(Collectors.toList());
+
+        // Correct for rounding/double precision errors in the scaling (only for Facility-to-EHR sum > EHR-to-facility
+        // sum case, to avoid unconnected facilities)
+        long scaledSum =
+                scaledEhrDistribution.stream().mapToLong(Pair::getRight).sum();
+        long ehrFacilityCountSum =
+                ehrFacilityCounts.parallelStream().mapToLong(i -> i).sum();
+        if (scaledSum > ehrFacilityCountSum) {
+            int remainder = (int) ((scaledSum - ehrFacilityCountSum) % scaledEhrDistribution.size());
+            int factor = (int) (scaledSum - ehrFacilityCountSum) / scaledEhrDistribution.size();
+
+            for (int i = 0; i < scaledEhrDistribution.size(); i++) {
+                Pair<UUID, Integer> toReplace = scaledEhrDistribution.remove(i);
+                scaledEhrDistribution.add(
+                        i,
+                        Pair.of(
+                                toReplace.getLeft(),
+                                i < remainder ? toReplace.getRight() - factor - 1 : toReplace.getRight() - factor));
+            }
+        }
+
+        // Link EHRs to be generated to concrete facilities and determine composition count for each EHR (m: 200 sd: 50)
+        List<Pair<Integer, List<UUID>>> ehrSettings = new ArrayList<>();
+        for (int facilityCount : ehrFacilityCounts) {
+            List<UUID> facilities = new ArrayList<>(facilityCount);
+            for (int f = 0; f < facilityCount; f++) {
+                if (f >= scaledEhrDistribution.size()) {
+                    // Fallback for Facility-to-EHR sum < EHR-to-facility sum case
+                    facilities.add(facilityNumberToUuid.get(f));
+                } else {
+                    Pair<UUID, Integer> facilityWithCount = scaledEhrDistribution.remove(f);
+                    facilities.add(facilityWithCount.getLeft());
+                    if (facilityWithCount.getRight() - 1 > 0) {
+                        scaledEhrDistribution.add(
+                                0, Pair.of(facilityWithCount.getLeft(), facilityWithCount.getRight() - 1));
+                    }
+                }
+            }
+            ehrSettings.add(Pair.of((int) Math.round(Math.ceil(random.nextGaussian() * 50 + 200)), facilities));
+        }
+
+        log.info(
+                "Start loading test data... ({} EHRs, {} Compositions, {} Healthcare Facilities)",
+                properties.getEhr(),
+                ehrSettings.stream().mapToLong(Pair::getLeft).sum(),
+                properties.getHealthcareFacilities());
+
+        // Actually insert EHRs and Compositions
+        IntStream.range(0, properties.getEhr())
+                .parallel()
+                .mapToObj(ehrSettings::get)
+                .forEach(ehrInfo -> {
+                    UUID ehrId = insertEhr();
+                    insertCompositions(ehrId, ehrInfo.getLeft(), ehrInfo.getRight());
+                });
 
         stopWatch.stop();
         log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
     }
 
-    public void insertCompositions(UUID ehrId, LoaderRequestDto properties1) {
-        IntStream.rangeClosed(1, properties1.getCompositionPerEhr()).forEach(i -> {
+    private Pair<Integer, UUID> insertHealthcareFacility(int number) {
+        var partyRecord = dsl.newRecord(PARTY_IDENTIFIED);
+        partyRecord.setPartyRefValue(FACILITY_NUM_TO_ID.apply(number));
+        partyRecord.setPartyRefScheme("id_scheme");
+        partyRecord.setPartyRefNamespace("facilities");
+        partyRecord.setPartyRefType("ORGANISATION");
+        partyRecord.setPartyType(PartyType.party_identified);
+        partyRecord.setObjectIdType(PartyRefIdType.generic_id);
+        partyRecord.store();
+        return Pair.of(number, partyRecord.getId());
+    }
+
+    public void insertCompositions(UUID ehrId, int compositionCount, List<UUID> facilities) {
+        IntStream.rangeClosed(1, compositionCount).forEach(i -> {
             var composition = getRandomComposition();
             var compositionId = createComposition(ehrId, composition);
             createEntry(compositionId, composition);
             if (composition.getContext() != null) {
-                var eventContextId = createEventContext(compositionId, composition.getContext());
+                int facilityIndex = i % facilities.size();
+                var eventContextId =
+                        createEventContext(compositionId, composition.getContext(), facilities.get(facilityIndex));
                 createParticipations(eventContextId, composition.getContext().getParticipations());
             }
         });
@@ -382,7 +491,7 @@ public class LoaderServiceImp implements LoaderService {
     /**
      * Creates an {@link EventContextRecord} for the given composition.
      */
-    private UUID createEventContext(UUID compositionId, EventContext eventContext) {
+    private UUID createEventContext(UUID compositionId, EventContext eventContext, UUID facilityId) {
         var eventContextRecord = dsl.newRecord(EVENT_CONTEXT);
         eventContextRecord.setCompositionId(compositionId);
 
@@ -393,7 +502,7 @@ public class LoaderServiceImp implements LoaderService {
         eventContextRecord.setSetting(createDvCodedText(eventContext.getSetting()));
         eventContextRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
         eventContextRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(OffsetDateTime.now(), null));
-        // Facility
+        eventContextRecord.setFacility(facilityId);
 
         if (eventContext.getEndTime() != null) {
             var endTime = eventContext.getEndTime().getValue();

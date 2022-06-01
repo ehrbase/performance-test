@@ -23,9 +23,9 @@ package org.ehrbase.webtester.service;
  */
 public class LoaderRequestDto {
 
-    private Integer ehr = 100;
+    private int ehr = 10000000;
 
-    private Integer compositionPerEhr = 200;
+    private int healthcareFacilities = 500;
 
     public Integer getEhr() {
         return ehr;
@@ -35,11 +35,16 @@ public class LoaderRequestDto {
         this.ehr = ehr;
     }
 
-    public Integer getCompositionPerEhr() {
-        return compositionPerEhr;
+    public int getHealthcareFacilities() {
+        return healthcareFacilities;
     }
 
-    public void setCompositionPerEhr(Integer compositionPerEhr) {
-        this.compositionPerEhr = compositionPerEhr;
+    public void setHealthcareFacilities(int healthcareFacilities) {
+        this.healthcareFacilities = healthcareFacilities;
+    }
+
+    // todo remove...
+    public int getCompositionPerEhr() {
+        return 0;
     }
 }
