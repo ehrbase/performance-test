@@ -58,9 +58,11 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.IntBinaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -71,6 +73,7 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
+import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.ehrbase.jooq.pg.enums.ContributionChangeType;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
@@ -194,100 +197,160 @@ public class LoaderServiceImp implements LoaderService {
     @Override
     public void load(LoaderRequestDto properties) {
         StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
+        stopWatch.start("prep");
 
         if (properties.getHealthcareFacilities() < 1 || properties.getEhr() < properties.getHealthcareFacilities()) {
             throw new IllegalArgumentException("");
         }
 
         log.info("Preparing EHR distributions...");
-
         // Create healthcare facilities in Table party_identified
         Map<Integer, UUID> facilityNumberToUuid = IntStream.range(0, properties.getHealthcareFacilities())
                 .parallel()
                 .mapToObj(this::insertHealthcareFacility)
                 .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
 
-        // Determine how many facilities should be assigned to each EHR (normal dist. m: 7 sd: 3)
-        // This Step will take a while for high EHR counts (i.e. 10,000,000) since the random number generation is
-        // synchronized
-        List<Integer> ehrFacilityCounts = IntStream.range(0, properties.getEhr())
+        /* Determine how many facilities should be assigned to each EHR (normal dist. m: 7 sd: 3)
+        This Step will take a while for high EHR counts (i.e. 10,000,000) since the random number generation is
+        synchronized */
+        List<MutablePair<Integer, Long>> facilityCountToEhrCountDistribution = IntStream.range(0, properties.getEhr())
                 .parallel()
                 .mapToObj(e -> (int) Math.max(1, Math.round(random.nextGaussian() * 3 + 7)))
-                .sorted((i1, i2) -> -Integer.compare(i1, i2))
+                .collect(Collectors.groupingBy(i -> i, Collectors.counting()))
+                .entrySet()
+                .stream()
+                .sorted((i1, i2) -> -Integer.compare(i1.getKey(), i2.getKey()))
+                .map(MutablePair::of)
                 .collect(Collectors.toList());
 
-        // Determine how many facilities should be assigned to each EHR (normal dist. m: 15,000 sd: 5000) and scale it
-        // to match the total EHR count
-        Map<UUID, Double> ehrDistribution = IntStream.range(0, properties.getHealthcareFacilities())
+        long ehrFacilityCountSum = facilityCountToEhrCountDistribution.parallelStream()
+                .mapToLong(i -> i.getKey() * i.getValue())
+                .sum();
+        List<MutablePair<UUID, Integer>> scaledEhrDistribution =
+                buildScaledFacilityToEhrDistribution(properties, facilityNumberToUuid, ehrFacilityCountSum);
+
+        stopWatch.stop();
+        log.info("Distributions prepared in {} s", stopWatch.getTotalTimeSeconds());
+        log.info(
+                "Start loading test data... ({} EHRs, {} Healthcare Facilities)",
+                properties.getEhr(),
+                properties.getHealthcareFacilities());
+
+        int batches = properties.getEhr() / 1000 + 1;
+        int lastBatchSize = properties.getEhr() % 1000;
+        for (int batch = 0; batch < batches; batch++) {
+            stopWatch.start("batch" + batch);
+            int batchSize = batch == batches - 1 ? lastBatchSize : 1000;
+            /* insert EHRs and Compositions */
+            getEhrSettingsBatch(
+                            facilityNumberToUuid, facilityCountToEhrCountDistribution, scaledEhrDistribution, batchSize)
+                    .parallelStream()
+                    .forEach(ehrInfo -> {
+                        UUID ehrId = insertEhr();
+                        insertCompositions(ehrId, ehrInfo.getLeft(), ehrInfo.getRight());
+                    });
+            stopWatch.stop();
+            log.info("Batch {} took {} ms, size {}", batch, stopWatch.getLastTaskTimeMillis(), batchSize);
+        }
+
+        log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
+    }
+
+    /**
+     * Determine how many facilities should be assigned to each EHR (normal dist. m: 15,000 sd: 5000) and scale it to match the total EHR count.
+     * Pair::getLeft -> Facility-UUID
+     * Pair::getRight -> EHR count
+     *
+     * @param properties
+     * @param facilityNumberToUuid
+     * @param ehrFacilityCountSum
+     * @return
+     */
+    private List<MutablePair<UUID, Integer>> buildScaledFacilityToEhrDistribution(
+            LoaderRequestDto properties, Map<Integer, UUID> facilityNumberToUuid, long ehrFacilityCountSum) {
+        List<Pair<UUID, Double>> ehrDistribution = IntStream.range(0, properties.getHealthcareFacilities())
                 .boxed()
-                .collect(Collectors.toMap(facilityNumberToUuid::get, i -> random.nextGaussian() * 5000 + 15000));
-        Double scaleFactor = ehrFacilityCounts.parallelStream()
-                        .mapToLong(i -> i)
-                        .sum()
-                / ehrDistribution.values().parallelStream().mapToDouble(v -> v).sum();
-        List<Pair<UUID, Integer>> scaledEhrDistribution = ehrDistribution.entrySet().stream()
-                .map(p -> Pair.of(p.getKey(), (int) Math.abs(Math.round(Math.ceil(p.getValue() * scaleFactor)))))
+                .map(i -> Pair.of(facilityNumberToUuid.get(i), random.nextGaussian() * 5000 + 15000))
+                .collect(Collectors.toList());
+        Double scaleFactor = ehrFacilityCountSum
+                / ehrDistribution.parallelStream().mapToDouble(Pair::getRight).sum();
+        List<MutablePair<UUID, Integer>> scaledEhrDistribution = ehrDistribution.stream()
+                .map(p -> MutablePair.of(p.getKey(), (int) Math.abs(Math.round(Math.ceil(p.getValue() * scaleFactor)))))
                 .sorted((i1, i2) -> -Integer.compare(i1.getRight(), i2.getRight()))
                 .collect(Collectors.toList());
 
-        // Correct for rounding/double precision errors in the scaling (only for Facility-to-EHR sum > EHR-to-facility
-        // sum case, to avoid unconnected facilities)
+        // Correct for rounding/double precision errors in scaling
         long scaledSum =
                 scaledEhrDistribution.stream().mapToLong(Pair::getRight).sum();
-        long ehrFacilityCountSum =
-                ehrFacilityCounts.parallelStream().mapToLong(i -> i).sum();
-        if (scaledSum > ehrFacilityCountSum) {
-            int remainder = (int) ((scaledSum - ehrFacilityCountSum) % scaledEhrDistribution.size());
-            int factor = (int) (scaledSum - ehrFacilityCountSum) / scaledEhrDistribution.size();
+        if (scaledSum != ehrFacilityCountSum) {
+            int remainder = (int) (Math.abs(scaledSum - ehrFacilityCountSum) % scaledEhrDistribution.size());
+            int factor = (int) Math.abs(scaledSum - ehrFacilityCountSum) / scaledEhrDistribution.size();
+
+            IntBinaryOperator op = scaledSum > ehrFacilityCountSum ? (i1, i2) -> i1 - i2 : Integer::sum;
 
             for (int i = 0; i < scaledEhrDistribution.size(); i++) {
-                Pair<UUID, Integer> toReplace = scaledEhrDistribution.remove(i);
-                scaledEhrDistribution.add(
-                        i,
-                        Pair.of(
-                                toReplace.getLeft(),
-                                i < remainder ? toReplace.getRight() - factor - 1 : toReplace.getRight() - factor));
+                Pair<UUID, Integer> toReplace = scaledEhrDistribution.get(i);
+                toReplace.setValue(
+                        i < remainder
+                                ? op.applyAsInt(op.applyAsInt(toReplace.getRight(), factor), 1)
+                                : op.applyAsInt(toReplace.getRight(), factor));
             }
         }
+        return scaledEhrDistribution;
+    }
 
-        // Link EHRs to be generated to concrete facilities and determine composition count for each EHR (m: 200 sd: 50)
+    /**
+     * Link EHRs to be generated to concrete facilities and determine composition count for each EHR (m: 200 sd: 50).
+     * Pair::getLeft -> Composition count
+     * Pair::getRight -> Facility-UUIDs to use
+     *
+     * @param facilityNumberToUuid
+     * @param ehrFacilityCounts
+     * @param scaledEhrDistribution
+     * @param batchSize
+     * @return
+     */
+    private List<Pair<Integer, List<UUID>>> getEhrSettingsBatch(
+            Map<Integer, UUID> facilityNumberToUuid,
+            List<MutablePair<Integer, Long>> ehrFacilityCounts,
+            List<MutablePair<UUID, Integer>> scaledEhrDistribution,
+            int batchSize) {
         List<Pair<Integer, List<UUID>>> ehrSettings = new ArrayList<>();
-        for (int facilityCount : ehrFacilityCounts) {
-            List<UUID> facilities = new ArrayList<>(facilityCount);
-            for (int f = 0; f < facilityCount; f++) {
-                if (f >= scaledEhrDistribution.size()) {
-                    // Fallback for Facility-to-EHR sum < EHR-to-facility sum case
-                    facilities.add(facilityNumberToUuid.get(f));
-                } else {
-                    Pair<UUID, Integer> facilityWithCount = scaledEhrDistribution.remove(f);
-                    facilities.add(facilityWithCount.getLeft());
-                    if (facilityWithCount.getRight() - 1 > 0) {
-                        scaledEhrDistribution.add(
-                                0, Pair.of(facilityWithCount.getLeft(), facilityWithCount.getRight() - 1));
+        long processedCount = 0;
+        // go through the facility count to number of EHRs mapping until we reach our batch-size or we run out of EHRs
+        for (Pair<Integer, Long> ehrFacilityCount : ehrFacilityCounts) {
+            // if we already have enough EHRs for this facility count skip it
+            if (ehrFacilityCount.getRight() < 1) continue;
+            long count = Math.min(batchSize - processedCount, ehrFacilityCount.getRight());
+
+            for (int c = 0; c < count; c++) {
+                // determine the facilities to use
+                List<UUID> facilities = new ArrayList<>(ehrFacilityCount.getLeft());
+                for (int f = 0; f < ehrFacilityCount.getLeft(); f++) {
+                    if (f >= scaledEhrDistribution.size()) {
+                        // Fallback if there are not enough facilities left
+                        // This shifts the distribution a bit, but in reality the distribution will not be perfect
+                        // anyway
+                        facilityNumberToUuid.entrySet().stream()
+                                .filter(p -> !facilities.contains(p.getValue()))
+                                .min((i1, i2) -> -Integer.compare(i1.getKey(), i2.getKey()))
+                                .map(Entry::getValue)
+                                .ifPresent(facilities::add);
+                    } else {
+                        MutablePair<UUID, Integer> facilityWithCount = scaledEhrDistribution.get(f);
+                        facilities.add(facilityWithCount.getLeft());
+                        facilityWithCount.setValue(facilityWithCount.getRight() - 1);
                     }
                 }
+                scaledEhrDistribution.removeIf(p -> p.getRight() == 0);
+                ehrSettings.add(Pair.of((int) Math.round(Math.ceil(random.nextGaussian() * 50 + 200)), facilities));
             }
-            ehrSettings.add(Pair.of((int) Math.round(Math.ceil(random.nextGaussian() * 50 + 200)), facilities));
+
+            ehrFacilityCount.setValue(ehrFacilityCount.getValue() - count);
+            processedCount += count;
+            if (processedCount == batchSize) break;
         }
-
-        log.info(
-                "Start loading test data... ({} EHRs, {} Compositions, {} Healthcare Facilities)",
-                properties.getEhr(),
-                ehrSettings.stream().mapToLong(Pair::getLeft).sum(),
-                properties.getHealthcareFacilities());
-
-        // Actually insert EHRs and Compositions
-        IntStream.range(0, properties.getEhr())
-                .parallel()
-                .mapToObj(ehrSettings::get)
-                .forEach(ehrInfo -> {
-                    UUID ehrId = insertEhr();
-                    insertCompositions(ehrId, ehrInfo.getLeft(), ehrInfo.getRight());
-                });
-
-        stopWatch.stop();
-        log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
+        return ehrSettings;
     }
 
     private Pair<Integer, UUID> insertHealthcareFacility(int number) {
