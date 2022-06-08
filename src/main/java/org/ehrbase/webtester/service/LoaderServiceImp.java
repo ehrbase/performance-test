@@ -133,8 +133,8 @@ public class LoaderServiceImp implements LoaderService {
     private final List<Composition> compositions = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
-
     private final DSLContext dsl;
+    private final Map<String, Integer> territories = new HashMap<>();
 
     private UUID systemId;
     private UUID committerId;
@@ -149,6 +149,10 @@ public class LoaderServiceImp implements LoaderService {
         zoneId = ZoneId.systemDefault().toString();
         systemId = getSystemId();
         committerId = getCommitterId();
+        territories.putAll(dsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE)
+                .from(TERRITORY)
+                .fetch()
+                .intoMap(String.class, Integer.class));
 
         initializeTemplates();
         initializeCompositions();
@@ -675,8 +679,7 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private Integer getTerritory(String code) {
-        return dsl.fetchOptional(TERRITORY, TERRITORY.TWOLETTER.eq(code))
-                .map(TerritoryRecord::getCode)
+        return Optional.ofNullable(territories.get(code))
                 .orElseThrow(() -> new IllegalArgumentException("Territory " + code + " not found"));
     }
 
