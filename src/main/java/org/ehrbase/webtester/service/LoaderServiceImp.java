@@ -126,11 +126,11 @@ public class LoaderServiceImp implements LoaderService {
     private static final String[] COMPOSITIONS = {
         "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
     };
+    private static final int BATCH_SIZE = 100;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
 
     private final Random random = new SecureRandom();
     private final List<Composition> compositions = new ArrayList<>();
-
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
 
@@ -236,11 +236,11 @@ public class LoaderServiceImp implements LoaderService {
                 properties.getEhr(),
                 properties.getHealthcareFacilities());
 
-        int batches = properties.getEhr() / 1000 + 1;
-        int lastBatchSize = properties.getEhr() % 1000;
+        int batches = properties.getEhr() / BATCH_SIZE + 1;
+        int lastBatchSize = properties.getEhr() % BATCH_SIZE;
         for (int batch = 0; batch < batches; batch++) {
             stopWatch.start("batch" + batch);
-            int batchSize = batch == batches - 1 ? lastBatchSize : 1000;
+            int batchSize = batch == batches - 1 ? lastBatchSize : BATCH_SIZE;
             /* insert EHRs and Compositions */
             getEhrSettingsBatch(
                             facilityNumberToUuid, facilityCountToEhrCountDistribution, scaledEhrDistribution, batchSize)
