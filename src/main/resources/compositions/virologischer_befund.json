@@ -49,6 +49,25 @@
     "_type": "PARTY_IDENTIFIED",
     "name": "Silvia Blake"
   },
+  "context": {
+    "_type": "EVENT_CONTEXT",
+    "start_time": {
+      "_type": "DV_DATE_TIME",
+      "value": "2020-05-11T22:53:12.039139+02:00"
+    },
+    "setting": {
+      "_type": "DV_CODED_TEXT",
+      "value": "other care",
+      "defining_code": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "openehr"
+        },
+        "code_string": "238"
+      }
+    }
+  },
   "content": [
     {
       "_type": "OBSERVATION",
