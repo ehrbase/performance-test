@@ -67,7 +67,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntBinaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -251,10 +250,9 @@ public class LoaderServiceImp implements LoaderService {
         /* Determine how many facilities should be assigned to each EHR (normal dist. m: 7 sd: 3)
         This Step will take a while for high EHR counts (i.e. 10,000,000) since the random number generation is
         synchronized */
-        // TODO: Bounds for random value
         List<MutablePair<Integer, Long>> facilityCountToEhrCountDistribution = IntStream.range(0, properties.getEhr())
                 .parallel()
-                .mapToObj(e -> (int) Math.max(1, Math.round(random.nextGaussian() * 3 + 7)))
+                .mapToObj(e -> (int) getRandomGaussianWithLimitsLong(7, 3, 1, 16))
                 .collect(Collectors.groupingBy(i -> i, Collectors.counting()))
                 .entrySet()
                 .stream()
@@ -275,73 +273,99 @@ public class LoaderServiceImp implements LoaderService {
                 properties.getEhr(),
                 properties.getHealthcareFacilities());
 
-        // TODO: Process batches async
+        // We do not insert multiple batches at once to limit memory usage
+        CompletableFuture<Void> currentInsertTask = null;
         int batches = properties.getEhr() / BATCH_SIZE + 1;
         int lastBatchSize = properties.getEhr() % BATCH_SIZE;
         for (int batch = 0; batch < batches; batch++) {
-            stopWatch.start("batch" + batch);
             int batchSize = batch == batches - 1 ? lastBatchSize : BATCH_SIZE;
-            int batchTmp = batch;
-            AtomicInteger dataBuildCount = new AtomicInteger();
-            /* insert EHRs and Compositions */
+            if (batch == batches - 1 && batchSize < 1) {
+                // if the last batch is of size 0 we don't need to build and start it
+                break;
+            }
+            // Prepare data to insert while current insert task is running
             List<EhrCreateDescriptor> ehrDescriptors = getEhrSettingsBatch(
                             facilityNumberToUuid, facilityCountToEhrCountDistribution, scaledEhrDistribution, batchSize)
-                    // .parallelStream()
                     .stream()
                     .map(ehrInfo -> buildEhrData(ehrInfo.getRight(), ehrInfo.getLeft()))
-                    .map(d -> {
-                        log.info("Batch {}. Generated EHR: {}", batchTmp, dataBuildCount.incrementAndGet());
-                        return d;
-                    })
                     .collect(Collectors.toList());
-            CompletableFuture<Void> noDependencyInsert = CompletableFuture.allOf(
-                    CompletableFuture.allOf(
-                                    CompletableFuture.runAsync(() -> bulkInsert(
-                                            Ehr.EHR_, ehrDescriptors.stream().map(e -> e.ehr))),
-                                    CompletableFuture.runAsync(() -> bulkInsert(
-                                            AUDIT_DETAILS,
-                                            ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream()))))
-                            .thenRun(() -> bulkInsert(
-                                    CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()))),
-                    CompletableFuture.runAsync(() -> bulkInsert(
-                            PARTY_IDENTIFIED, ehrDescriptors.stream().flatMap(e -> e.partyIdentifieds.stream()))));
 
-            CompletableFuture<Void> statusInsert = noDependencyInsert.thenRun(
-                    () -> bulkInsert(STATUS, ehrDescriptors.stream().map(e -> e.status)));
-            CompletableFuture<Void> compositionInsert = noDependencyInsert.thenRun(
-                    () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream())));
+            // Wait for the current insert batch to complete
+            if (currentInsertTask != null) {
+                waitForTaskToComplete(currentInsertTask);
+                stopWatch.stop();
+                log.info("Batch {} completed in {} ms", batch - 1, stopWatch.getLastTaskTimeMillis());
+            }
+            stopWatch.start("insert-batch" + batch);
+            // Insert the already prepared batch
+            currentInsertTask = insertEhrsAsync(ehrDescriptors);
+        }
 
+        // wait for the last insert batch to complete
+        waitForTaskToComplete(currentInsertTask);
+        if (stopWatch.isRunning()) {
+            stopWatch.stop();
+        }
+        log.info("Last Batch completed in {} ms", stopWatch.getLastTaskTimeMillis());
+        log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
+    }
+
+    private long getRandomGaussianWithLimitsLong(int mean, int standardDeviation, int lowerBound, int upperBound) {
+        return Math.min(
+                upperBound,
+                Math.max(
+                        lowerBound, Math.round(Math.ceil(Math.abs(random.nextGaussian() * standardDeviation + mean)))));
+    }
+
+    private double getRandomGaussianWithLimitsDouble(int mean, int standardDeviation, int lowerBound, int upperBound) {
+        return Math.min(upperBound, Math.max(lowerBound, Math.abs(random.nextGaussian() * standardDeviation + mean)));
+    }
+
+    private void waitForTaskToComplete(CompletableFuture<Void> insertTask) {
+        if (insertTask != null) {
             try {
-                CompletableFuture.allOf(
-                                statusInsert,
-                                compositionInsert
-                                        .thenRun(() -> bulkInsert(
-                                                EVENT_CONTEXT,
-                                                ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream())))
-                                        .thenRun(() -> bulkInsert(
-                                                PARTICIPATION,
-                                                ehrDescriptors.stream().flatMap(e -> e.participations.stream()))),
-                                compositionInsert.thenRun(() -> bulkInsert(
-                                        ENTRY, ehrDescriptors.stream().flatMap(e -> e.entries.stream()))))
-                        .get();
+                insertTask.get();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
             } catch (ExecutionException e) {
                 throw new RuntimeException(e);
             }
-
-            stopWatch.stop();
-            log.info("Batch {} took {} ms, size {}", batch, stopWatch.getLastTaskTimeMillis(), batchSize);
         }
-
-        log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
     }
 
-    private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(T table, Stream<TableRecord<R>> records) {
+    private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors) {
+
+        CompletableFuture<Void> noDependencyInsert = CompletableFuture.allOf(
+                CompletableFuture.runAsync(() -> bulkInsert(
+                                AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream())))
+                        .thenRunAsync(() -> bulkInsert(
+                                CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()))),
+                CompletableFuture.runAsync(
+                        () -> bulkInsert(Ehr.EHR_, ehrDescriptors.stream().map(e -> e.ehr))),
+                CompletableFuture.runAsync(() -> bulkInsert(
+                        PARTY_IDENTIFIED, ehrDescriptors.stream().flatMap(e -> e.partyIdentifieds.stream()))));
+
+        CompletableFuture<Void> compositionInsert = noDependencyInsert.thenRunAsync(
+                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream())));
+        CompletableFuture<Void> entryInsert = CompletableFuture.allOf(ehrDescriptors.stream()
+                .map(d -> d.entries.stream())
+                .map(e -> compositionInsert.thenRunAsync(() -> bulkInsert(ENTRY, e)))
+                .toArray(CompletableFuture[]::new));
+        CompletableFuture<Void> eventContextInsert = compositionInsert
+                .thenRunAsync(
+                        () -> bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream())))
+                .thenRunAsync(() ->
+                        bulkInsert(PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.participations.stream())));
+        CompletableFuture<Void> statusInsert = noDependencyInsert.thenRunAsync(
+                () -> bulkInsert(STATUS, ehrDescriptors.stream().map(e -> e.status)));
+
+        return CompletableFuture.allOf(statusInsert, entryInsert, eventContextInsert);
+    }
+
+    private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(T table, Stream<R> records) {
         StopWatch sw = new StopWatch();
         sw.start();
-        log.info("Insert {}", table.getName());
         List<LoaderError> errors;
         try {
             errors = dsl.loadInto(table)
@@ -377,10 +401,11 @@ public class LoaderServiceImp implements LoaderService {
      */
     private List<MutablePair<UUID, Integer>> buildScaledFacilityToEhrDistribution(
             LoaderRequestDto properties, Map<Integer, UUID> facilityNumberToUuid, long ehrFacilityCountSum) {
-        // TODO: Bounds for random value
+
         List<Pair<UUID, Double>> ehrDistribution = IntStream.range(0, properties.getHealthcareFacilities())
                 .boxed()
-                .map(i -> Pair.of(facilityNumberToUuid.get(i), random.nextGaussian() * 5000 + 15000))
+                .map(i -> Pair.of(
+                        facilityNumberToUuid.get(i), getRandomGaussianWithLimitsDouble(15_000, 5_000, 1, 30_000)))
                 .collect(Collectors.toList());
         Double scaleFactor = ehrFacilityCountSum
                 / ehrDistribution.parallelStream().mapToDouble(Pair::getRight).sum();
@@ -453,8 +478,7 @@ public class LoaderServiceImp implements LoaderService {
                     }
                 }
                 scaledEhrDistribution.removeIf(p -> p.getRight() == 0);
-                // TODO: Bounds for random value
-                ehrSettings.add(Pair.of((int) Math.round(Math.ceil(random.nextGaussian() * 50 + 200)), facilities));
+                ehrSettings.add(Pair.of((int) getRandomGaussianWithLimitsLong(200, 50, 50, 350), facilities));
             }
 
             ehrFacilityCount.setValue(ehrFacilityCount.getValue() - count);
