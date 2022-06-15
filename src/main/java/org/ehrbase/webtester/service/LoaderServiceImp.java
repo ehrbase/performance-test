@@ -141,7 +141,7 @@ public class LoaderServiceImp implements LoaderService {
     private static final int BATCH_SIZE = 10;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
 
-    // Try thread-loacal
+    // TODO: Try thread-local utilize parallel execution when generating distributions
     private final Random random = new SecureRandom();
     private final List<Composition> compositions = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
@@ -232,7 +232,7 @@ public class LoaderServiceImp implements LoaderService {
         });
     }
 
-    public void loadInternal(LoaderRequestDto properties) {
+    private void loadInternal(LoaderRequestDto properties) {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start("prep");
 
@@ -241,11 +241,12 @@ public class LoaderServiceImp implements LoaderService {
         }
 
         log.info("Preparing EHR distributions...");
-        // Create healthcare facilities in Table party_identified
+        // Create healthcare facilities and the assigned HCPs in Table party_identified
         Map<Integer, UUID> facilityNumberToUuid = IntStream.range(0, properties.getHealthcareFacilities())
                 .parallel()
                 .mapToObj(this::insertHealthcareFacility)
                 .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+        Map<UUID, List<UUID>> facilityIdToHcpId = insertHCPsForFacilities(facilityNumberToUuid);
 
         /* Determine how many facilities should be assigned to each EHR (normal dist. m: 7 sd: 3)
         This Step will take a while for high EHR counts (i.e. 10,000,000) since the random number generation is
@@ -287,7 +288,7 @@ public class LoaderServiceImp implements LoaderService {
             List<EhrCreateDescriptor> ehrDescriptors = getEhrSettingsBatch(
                             facilityNumberToUuid, facilityCountToEhrCountDistribution, scaledEhrDistribution, batchSize)
                     .stream()
-                    .map(ehrInfo -> buildEhrData(ehrInfo.getRight(), ehrInfo.getLeft()))
+                    .map(ehrInfo -> buildEhrData(ehrInfo.getRight(), ehrInfo.getLeft(), facilityIdToHcpId))
                     .collect(Collectors.toList());
 
             // Wait for the current insert batch to complete
@@ -308,6 +309,22 @@ public class LoaderServiceImp implements LoaderService {
         }
         log.info("Last Batch completed in {} ms", stopWatch.getLastTaskTimeMillis());
         log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
+    }
+
+    private Map<UUID, List<UUID>> insertHCPsForFacilities(Map<Integer, UUID> facilityNumberToUuid) {
+        Map<UUID, List<PartyIdentifiedRecord>> facilityIdToHcp = facilityNumberToUuid.entrySet().parallelStream()
+                .collect(Collectors.toMap(
+                        Entry::getValue, e -> IntStream.range(0, (int) getRandomGaussianWithLimitsLong(20, 5, 5, 35))
+                                .mapToObj(i -> createPartyWithRef("hcf" + e.getKey() + "hcp" + i, "hcp", "PERSON"))
+                                .collect(Collectors.toList())));
+
+        bulkInsert(
+                PARTY_IDENTIFIED,
+                facilityIdToHcp.entrySet().stream().map(Entry::getValue).flatMap(List::stream));
+
+        return facilityIdToHcp.entrySet().stream().collect(Collectors.toMap(Entry::getKey, e -> e.getValue().stream()
+                .map(PartyIdentifiedRecord::getId)
+                .collect(Collectors.toList())));
     }
 
     private long getRandomGaussianWithLimitsLong(int mean, int standardDeviation, int lowerBound, int upperBound) {
@@ -511,7 +528,8 @@ public class LoaderServiceImp implements LoaderService {
         List<PartyIdentifiedRecord> partyIdentifieds = new ArrayList<>();
     }
 
-    private EhrCreateDescriptor buildEhrData(List<UUID> facilities, int compositionCount) {
+    private EhrCreateDescriptor buildEhrData(
+            List<UUID> facilities, int compositionCount, Map<UUID, List<UUID>> facilityIdToHcpId) {
         EhrCreateDescriptor ehrDescriptor = new EhrCreateDescriptor();
         UUID ehrId = UUID.randomUUID();
 
@@ -608,7 +626,7 @@ public class LoaderServiceImp implements LoaderService {
             UUID ehrId, UUID contributionId) {
 
         AuditDetailsRecord auditDetails = createAuditDetails("Create EHR status");
-        PartyIdentifiedRecord patient = createPatientParty();
+        PartyIdentifiedRecord patient = createPartyWithRef(null, "patients", "PERSON");
         StatusRecord statusRecord = dsl.newRecord(STATUS);
         statusRecord.setEhrId(ehrId);
         statusRecord.setParty(patient.getId());
@@ -623,28 +641,23 @@ public class LoaderServiceImp implements LoaderService {
         return Triple.of(statusRecord, patient, auditDetails);
     }
 
-    private PartyIdentifiedRecord createPatientParty() {
-        PartyIdentifiedRecord patientPartyRecord = dsl.newRecord(PARTY_IDENTIFIED);
-        patientPartyRecord.setPartyRefValue(UUID.randomUUID().toString());
-        patientPartyRecord.setPartyRefScheme("id_scheme");
-        patientPartyRecord.setPartyRefNamespace("patients");
-        patientPartyRecord.setPartyRefType("PERSON");
-        patientPartyRecord.setPartyType(PartyType.party_self);
-        patientPartyRecord.setObjectIdType(PartyRefIdType.generic_id);
-        patientPartyRecord.setId(UUID.randomUUID());
-        return patientPartyRecord;
+    private PartyIdentifiedRecord createPartyWithRef(String name, String namespace, String type) {
+        PartyIdentifiedRecord hcpPartyRecord = dsl.newRecord(PARTY_IDENTIFIED);
+        hcpPartyRecord.setPartyRefValue(UUID.randomUUID().toString());
+        hcpPartyRecord.setPartyRefScheme("id_scheme");
+        hcpPartyRecord.setPartyRefNamespace(namespace);
+        hcpPartyRecord.setPartyRefType(type);
+        hcpPartyRecord.setName(name);
+        hcpPartyRecord.setPartyType(PartyType.party_self);
+        hcpPartyRecord.setObjectIdType(PartyRefIdType.generic_id);
+        hcpPartyRecord.setId(UUID.randomUUID());
+        return hcpPartyRecord;
     }
 
     private Pair<Integer, UUID> insertHealthcareFacility(int number) {
-        var partyRecord = dsl.newRecord(PARTY_IDENTIFIED);
-        partyRecord.setPartyRefValue("hcf" + number);
-        partyRecord.setPartyRefScheme("id_scheme");
-        partyRecord.setPartyRefNamespace("facilities");
-        partyRecord.setPartyRefType("ORGANISATION");
-        partyRecord.setPartyType(PartyType.party_identified);
-        partyRecord.setObjectIdType(PartyRefIdType.generic_id);
-        partyRecord.store();
-        return Pair.of(number, partyRecord.getId());
+        PartyIdentifiedRecord record = createPartyWithRef("hcf" + number, "facilities", "ORGANISATION");
+        record.store();
+        return Pair.of(number, record.getId());
     }
 
     private UUID getSystemId() {
