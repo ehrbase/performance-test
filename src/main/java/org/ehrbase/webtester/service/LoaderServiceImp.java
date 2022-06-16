@@ -140,9 +140,7 @@ public class LoaderServiceImp implements LoaderService {
     };
     private static final int BATCH_SIZE = 10;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
-
-    // TODO: Try thread-local utilize parallel execution when generating distributions
-    private final Random random = new SecureRandom();
+    private final ThreadLocal<Random> random = ThreadLocal.withInitial(SecureRandom::new);
     private final List<Composition> compositions = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
@@ -331,11 +329,13 @@ public class LoaderServiceImp implements LoaderService {
         return Math.min(
                 upperBound,
                 Math.max(
-                        lowerBound, Math.round(Math.ceil(Math.abs(random.nextGaussian() * standardDeviation + mean)))));
+                        lowerBound,
+                        Math.round(Math.ceil(Math.abs(random.get().nextGaussian() * standardDeviation + mean)))));
     }
 
     private double getRandomGaussianWithLimitsDouble(int mean, int standardDeviation, int lowerBound, int upperBound) {
-        return Math.min(upperBound, Math.max(lowerBound, Math.abs(random.nextGaussian() * standardDeviation + mean)));
+        return Math.min(
+                upperBound, Math.max(lowerBound, Math.abs(random.get().nextGaussian() * standardDeviation + mean)));
     }
 
     private void waitForTaskToComplete(CompletableFuture<Void> insertTask) {
