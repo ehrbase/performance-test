@@ -40,7 +40,6 @@ import com.nedap.archie.rm.datatypes.CodePhrase;
 import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.TermMapping;
-import com.nedap.archie.rm.generic.Participation;
 import com.nedap.archie.rm.generic.PartyIdentified;
 import com.nedap.archie.rm.generic.PartyProxy;
 import com.nedap.archie.rm.support.identification.TerminologyId;
@@ -360,8 +359,8 @@ public class LoaderServiceImp implements LoaderService {
                                 CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()))),
                 CompletableFuture.runAsync(
                         () -> bulkInsert(Ehr.EHR_, ehrDescriptors.stream().map(e -> e.ehr))),
-                CompletableFuture.runAsync(() -> bulkInsert(
-                        PARTY_IDENTIFIED, ehrDescriptors.stream().flatMap(e -> e.partyIdentifieds.stream()))));
+                CompletableFuture.runAsync(() ->
+                        bulkInsert(PARTY_IDENTIFIED, ehrDescriptors.stream().map(e -> e.subject))));
 
         CompletableFuture<Void> compositionInsert = noDependencyInsert.thenRunAsync(
                 () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream())));
@@ -508,9 +507,9 @@ public class LoaderServiceImp implements LoaderService {
     private class EhrCreateDescriptor {
         EhrRecord ehr;
         StatusRecord status;
+        PartyIdentifiedRecord subject;
         List<ContributionRecord> contributions = new ArrayList<>();
         List<AuditDetailsRecord> auditDetails = new ArrayList<>();
-        List<PartyIdentifiedRecord> partyIdentifieds = new ArrayList<>();
         List<CompositionRecord> compositions = new ArrayList<>();
         List<EntryRecord> entries = new ArrayList<>();
         List<EventContextRecord> eventContexts = new ArrayList<>();
@@ -525,7 +524,6 @@ public class LoaderServiceImp implements LoaderService {
         ContributionRecord contribution;
         AuditDetailsRecord contributionAudit;
         List<ParticipationRecord> participations = new ArrayList<>();
-        List<PartyIdentifiedRecord> partyIdentifieds = new ArrayList<>();
     }
 
     private EhrCreateDescriptor buildEhrData(
@@ -541,31 +539,25 @@ public class LoaderServiceImp implements LoaderService {
 
         ehrDescriptor.ehr = createEhr(ehrId);
         ehrDescriptor.status = status.getLeft();
-        ehrDescriptor.partyIdentifieds.add(status.getMiddle());
+        ehrDescriptor.subject = status.getMiddle();
         ehrDescriptor.contributions.add(statusContribution.getLeft());
         ehrDescriptor.auditDetails.add(status.getRight());
         ehrDescriptor.auditDetails.add(statusContribution.getRight());
-
-        // TODO: THIS IS TEMPORARY! Replace this with HCP distributions
-        PartyIdentifiedRecord composer = createPartyIdentified(
-                new PartyIdentified(null, UUID.randomUUID().toString(), null));
-        ehrDescriptor.partyIdentifieds.add(composer);
 
         // Compositions
         List<CompositionCreateDescriptor> compositions = IntStream.range(0, compositionCount)
                 .parallel()
                 .mapToObj(i -> buildCompositionData(
+                        i,
                         ehrId,
                         this.compositions.get(i % this.compositions.size()),
-                        composer.getId(),
+                        facilityIdToHcpId.get(facilities.get(i % facilities.size())),
                         facilities.get(i % facilities.size())))
                 .collect(Collectors.toList());
         ehrDescriptor.compositions =
                 compositions.stream().map(d -> d.composition).collect(Collectors.toList());
         ehrDescriptor.participations =
                 compositions.stream().flatMap(d -> d.participations.stream()).collect(Collectors.toList());
-        ehrDescriptor.partyIdentifieds.addAll(
-                compositions.stream().flatMap(d -> d.partyIdentifieds.stream()).collect(Collectors.toList()));
         ehrDescriptor.auditDetails.addAll(compositions.stream()
                 .flatMap(d -> Stream.of(d.compositionAudit, d.contributionAudit))
                 .collect(Collectors.toList()));
@@ -579,7 +571,10 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private CompositionCreateDescriptor buildCompositionData(
-            UUID ehrId, Composition compositionData, UUID composer, UUID facility) {
+            int compositionNumber, UUID ehrId, Composition compositionData, List<UUID> hcpIds, UUID facility) {
+
+        int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
+        UUID composerId = hcpIds.get(compositionNumber % hcpIds.size());
 
         CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
         Pair<ContributionRecord, AuditDetailsRecord> contribution =
@@ -587,21 +582,21 @@ public class LoaderServiceImp implements LoaderService {
         createDescriptor.contribution = contribution.getLeft();
         createDescriptor.contributionAudit = contribution.getRight();
         Pair<CompositionRecord, AuditDetailsRecord> composition = createComposition(
-                ehrId, compositionData, composer, contribution.getLeft().getId());
+                ehrId, compositionData, composerId, contribution.getLeft().getId());
         createDescriptor.composition = composition.getLeft();
         createDescriptor.compositionAudit = composition.getRight();
         createDescriptor.entry = createEntry(composition.getLeft().getId(), compositionData);
         createDescriptor.eventContext =
                 createEventContext(composition.getLeft().getId(), compositionData.getContext(), facility);
-        // TODO: use HCP distributions for participations
-        List<Pair<ParticipationRecord, PartyIdentifiedRecord>> participations =
-                CollectionUtils.emptyIfNull(compositionData.getContext().getParticipations()).stream()
-                        .map(p -> createParticipation(createDescriptor.eventContext.getId(), p))
-                        .collect(Collectors.toList());
-        createDescriptor.participations.addAll(
-                participations.stream().map(Pair::getLeft).collect(Collectors.toList()));
-        createDescriptor.partyIdentifieds.addAll(
-                participations.stream().map(Pair::getRight).collect(Collectors.toList()));
+        if (hcpCount > 1 && hcpIds.size() > 1) {
+            List<UUID> participationCandidates =
+                    CollectionUtils.selectRejected(hcpIds, composerId::equals, new ArrayList<>());
+            IntStream.range(0, hcpCount - 1)
+                    .mapToObj(i -> createHcpParticipation(
+                            createDescriptor.eventContext,
+                            participationCandidates.get(random.get().nextInt(participationCandidates.size()))))
+                    .forEach(createDescriptor.participations::add);
+        }
 
         return createDescriptor;
     }
@@ -809,29 +804,26 @@ public class LoaderServiceImp implements LoaderService {
      *
      * @return
      */
-    private Pair<ParticipationRecord, PartyIdentifiedRecord> createParticipation(
-            UUID eventContextId, Participation participation) {
-        PartyIdentifiedRecord partyIdentified = createPartyIdentified(participation.getPerformer());
+    private ParticipationRecord createHcpParticipation(EventContextRecord eventCtx, UUID hcpId) {
         ParticipationRecord participationRecord = dsl.newRecord(PARTICIPATION);
-        participationRecord.setEventContext(eventContextId);
-        participationRecord.setPerformer(partyIdentified.getId());
-        participationRecord.setFunction(createDvCodedText(participation.getFunction()));
-        participationRecord.setMode(createDvCodedText(participation.getMode()));
+        participationRecord.setEventContext(eventCtx.getId());
+        participationRecord.setPerformer(hcpId);
+        participationRecord.setFunction(createDvCodedText(new DvText("function")));
+        participationRecord.setMode(createDvCodedText(
+                new DvCodedText("not specified", new CodePhrase(new TerminologyId("openehr"), "193"))));
         participationRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
         participationRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(OffsetDateTime.now(), null));
-        if (participation.getTime() != null && participation.getTime().getLower() != null) {
-            var lower = participation.getTime().getLower().getValue();
-            participationRecord.setTimeLower(Timestamp.valueOf(LocalDateTime.from(lower)));
-            participationRecord.setTimeLowerTz(resolveTimeZone(lower));
+        if (eventCtx.getStartTime() != null) {
+            participationRecord.setTimeLower(eventCtx.getStartTime());
+            participationRecord.setTimeLowerTz(eventCtx.getEndTimeTzid());
         }
-        if (participation.getTime() != null && participation.getTime().getUpper() != null) {
-            var upper = participation.getTime().getUpper().getValue();
-            participationRecord.setTimeUpper(Timestamp.valueOf(LocalDateTime.from(upper)));
-            participationRecord.setTimeUpperTz(resolveTimeZone(upper));
+        if (eventCtx.getEndTime() != null) {
+            participationRecord.setTimeUpper(eventCtx.getEndTime());
+            participationRecord.setTimeUpperTz(eventCtx.getEndTimeTzid());
         }
         participationRecord.setId(UUID.randomUUID());
 
-        return Pair.of(participationRecord, partyIdentified);
+        return participationRecord;
     }
 
     /**
