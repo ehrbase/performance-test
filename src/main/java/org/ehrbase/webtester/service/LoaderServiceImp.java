@@ -54,6 +54,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAccessor;
 import java.util.AbstractMap;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -106,6 +107,7 @@ import org.jooq.JSONB;
 import org.jooq.LoaderError;
 import org.jooq.Record2;
 import org.jooq.Table;
+import org.jooq.TableField;
 import org.jooq.TableRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -376,7 +378,56 @@ public class LoaderServiceImp implements LoaderService {
         CompletableFuture<Void> statusInsert = noDependencyInsert.thenRunAsync(
                 () -> bulkInsert(STATUS, ehrDescriptors.stream().map(e -> e.status)));
 
-        return CompletableFuture.allOf(statusInsert, entryInsert, eventContextInsert);
+        return CompletableFuture.allOf(
+                statusInsert,
+                compositionInsert.thenRunAsync(() -> updateToAddVersions(
+                        COMPOSITION,
+                        COMPOSITION.ID,
+                        COMPOSITION.SYS_TRANSACTION,
+                        COMPOSITION.SYS_PERIOD,
+                        ehrDescriptors)),
+                // TODO: Maybe this can SAFELY run directly after the individual entry insert tasks
+                entryInsert.thenRunAsync(() -> updateToAddVersions(
+                        ENTRY, ENTRY.COMPOSITION_ID, ENTRY.SYS_TRANSACTION, ENTRY.SYS_PERIOD, ehrDescriptors)),
+                eventContextInsert.thenRunAsync(() -> updateToAddVersions(
+                        EVENT_CONTEXT,
+                        EVENT_CONTEXT.COMPOSITION_ID,
+                        EVENT_CONTEXT.SYS_TRANSACTION,
+                        EVENT_CONTEXT.SYS_PERIOD,
+                        ehrDescriptors)));
+    }
+
+    private <T extends Table<R>, R extends TableRecord<R>> void updateToAddVersions(
+            T table,
+            TableField<R, UUID> compositionIdField,
+            TableField<R, Timestamp> sysTransactionField,
+            TableField<R, SimpleEntry<OffsetDateTime, OffsetDateTime>> sysRangeField,
+            List<EhrCreateDescriptor> descriptors) {
+        StopWatch sw = new StopWatch();
+        sw.start();
+        OffsetDateTime additionalVersionBaseDateTime = OffsetDateTime.now();
+        dsl.update(table)
+                .set(sysTransactionField, Timestamp.from(additionalVersionBaseDateTime.toInstant()))
+                .set(sysRangeField, new AbstractMap.SimpleEntry<>(additionalVersionBaseDateTime, null))
+                .where(compositionIdField.in(descriptors.stream()
+                        .flatMap(e -> e.compositions.stream()
+                                .map(CompositionRecord::getId)
+                                .filter(id -> e.compositionIdToVersionCount.getOrDefault(id, 1) > 1))
+                        .collect(Collectors.toList())))
+                .execute();
+        dsl.update(table)
+                .set(
+                        sysTransactionField,
+                        Timestamp.from(additionalVersionBaseDateTime.toInstant().plusSeconds(1)))
+                .set(sysRangeField, new AbstractMap.SimpleEntry<>(additionalVersionBaseDateTime.plusSeconds(1), null))
+                .where(compositionIdField.in(descriptors.stream()
+                        .flatMap(e -> e.compositions.stream()
+                                .map(CompositionRecord::getId)
+                                .filter(id -> e.compositionIdToVersionCount.getOrDefault(id, 1) > 2))
+                        .collect(Collectors.toList())))
+                .execute();
+        sw.stop();
+        log.info("Update {} for versions took {}", table.getName(), sw.getTotalTimeSeconds());
     }
 
     private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(T table, Stream<R> records) {
@@ -514,6 +565,7 @@ public class LoaderServiceImp implements LoaderService {
         List<EntryRecord> entries = new ArrayList<>();
         List<EventContextRecord> eventContexts = new ArrayList<>();
         List<ParticipationRecord> participations = new ArrayList<>();
+        Map<UUID, Integer> compositionIdToVersionCount;
     }
 
     private class CompositionCreateDescriptor {
@@ -524,6 +576,7 @@ public class LoaderServiceImp implements LoaderService {
         ContributionRecord contribution;
         AuditDetailsRecord contributionAudit;
         List<ParticipationRecord> participations = new ArrayList<>();
+        int versions;
     }
 
     private EhrCreateDescriptor buildEhrData(
@@ -567,6 +620,10 @@ public class LoaderServiceImp implements LoaderService {
         ehrDescriptor.contributions.addAll(
                 compositions.stream().map(d -> d.contribution).collect(Collectors.toList()));
 
+        ehrDescriptor.compositionIdToVersionCount = compositions.stream()
+                .filter(c -> c.versions > 1)
+                .collect(Collectors.toMap(c -> c.composition.getId(), c -> c.versions));
+
         return ehrDescriptor;
     }
 
@@ -577,6 +634,7 @@ public class LoaderServiceImp implements LoaderService {
         UUID composerId = hcpIds.get(compositionNumber % hcpIds.size());
 
         CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
+        createDescriptor.versions = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
         Pair<ContributionRecord, AuditDetailsRecord> contribution =
                 createContribution(ehrId, ContributionDataType.composition, "Create COMPOSITION");
         createDescriptor.contribution = contribution.getLeft();
