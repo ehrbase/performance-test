@@ -23,9 +23,9 @@ package org.ehrbase.webtester.service;
  */
 public class LoaderRequestDto {
 
-    private int ehr = 10000000;
+    private int ehr = 100;
 
-    private int healthcareFacilities = 500;
+    private int healthcareFacilities = 5;
 
     public Integer getEhr() {
         return ehr;
