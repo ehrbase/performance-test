@@ -65,6 +65,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
+import java.util.function.BiFunction;
 import java.util.function.IntBinaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -138,6 +139,9 @@ public class LoaderServiceImp implements LoaderService {
         "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
     };
     private static final int BATCH_SIZE = 10;
+    private static final int MAX_COMPOSITION_VERSIONS = 3;
+    private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
+    private static final String SYS_PERIOD_FIELD_NAME = "sys_period";
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
     // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
     // otherwise
@@ -367,6 +371,10 @@ public class LoaderServiceImp implements LoaderService {
                 CompletableFuture.runAsync(() ->
                         bulkInsert(PARTY_IDENTIFIED, ehrDescriptors.stream().map(e -> e.subject))));
 
+        // We need a fixed timestamp for version updates because ehrbase uses it for fetching related objects
+        OffsetDateTime additionalVersionBaseDateTime = OffsetDateTime.now();
+
+        // We want the entry inserts to start as early as possible since these take the longest
         CompletableFuture<Void> compositionInsert = noDependencyInsert.thenRunAsync(
                 () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream())));
         CompletableFuture<Void> entryInsert = CompletableFuture.allOf(ehrDescriptors.stream()
@@ -386,51 +394,56 @@ public class LoaderServiceImp implements LoaderService {
                 compositionInsert.thenRunAsync(() -> updateToAddVersions(
                         COMPOSITION,
                         COMPOSITION.ID,
-                        COMPOSITION.SYS_TRANSACTION,
-                        COMPOSITION.SYS_PERIOD,
-                        ehrDescriptors)),
+                        ehrDescriptors,
+                        EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
+                        additionalVersionBaseDateTime)),
                 // TODO: Maybe this can SAFELY run directly after the individual entry insert tasks
                 entryInsert.thenRunAsync(() -> updateToAddVersions(
-                        ENTRY, ENTRY.COMPOSITION_ID, ENTRY.SYS_TRANSACTION, ENTRY.SYS_PERIOD, ehrDescriptors)),
+                        ENTRY,
+                        ENTRY.COMPOSITION_ID,
+                        ehrDescriptors,
+                        EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
+                        additionalVersionBaseDateTime)),
                 eventContextInsert.thenRunAsync(() -> updateToAddVersions(
                         EVENT_CONTEXT,
                         EVENT_CONTEXT.COMPOSITION_ID,
-                        EVENT_CONTEXT.SYS_TRANSACTION,
-                        EVENT_CONTEXT.SYS_PERIOD,
-                        ehrDescriptors)));
+                        ehrDescriptors,
+                        EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
+                        additionalVersionBaseDateTime)),
+                eventContextInsert.thenRunAsync(() -> updateToAddVersions(
+                        PARTICIPATION,
+                        PARTICIPATION.EVENT_CONTEXT,
+                        ehrDescriptors,
+                        EhrCreateDescriptor::getEventCtxIdStreamForVersionCount,
+                        additionalVersionBaseDateTime)));
     }
 
     private <T extends Table<R>, R extends TableRecord<R>> void updateToAddVersions(
             T table,
-            TableField<R, UUID> compositionIdField,
-            TableField<R, Timestamp> sysTransactionField,
-            TableField<R, SimpleEntry<OffsetDateTime, OffsetDateTime>> sysRangeField,
-            List<EhrCreateDescriptor> descriptors) {
+            TableField<R, UUID> idField,
+            List<EhrCreateDescriptor> descriptors,
+            BiFunction<EhrCreateDescriptor, Integer, Stream<UUID>> descriptorToIdsForVersionCountStreamFunc,
+            OffsetDateTime additionalVersionBaseDateTime) {
         StopWatch sw = new StopWatch();
         sw.start();
-        OffsetDateTime additionalVersionBaseDateTime = OffsetDateTime.now();
-        dsl.update(table)
-                .set(sysTransactionField, Timestamp.from(additionalVersionBaseDateTime.toInstant()))
-                .set(sysRangeField, new AbstractMap.SimpleEntry<>(additionalVersionBaseDateTime, null))
-                .where(compositionIdField.in(descriptors.stream()
-                        .flatMap(e -> e.compositions.stream()
-                                .map(CompositionRecord::getId)
-                                .filter(id -> e.compositionIdToVersionCount.getOrDefault(id, 1) > 1))
-                        .collect(Collectors.toList())))
-                .execute();
-        dsl.update(table)
-                .set(
-                        sysTransactionField,
-                        Timestamp.from(additionalVersionBaseDateTime.toInstant().plusSeconds(1)))
-                .set(sysRangeField, new AbstractMap.SimpleEntry<>(additionalVersionBaseDateTime.plusSeconds(1), null))
-                .where(compositionIdField.in(descriptors.stream()
-                        .flatMap(e -> e.compositions.stream()
-                                .map(CompositionRecord::getId)
-                                .filter(id -> e.compositionIdToVersionCount.getOrDefault(id, 1) > 2))
-                        .collect(Collectors.toList())))
-                .execute();
-        sw.stop();
-        log.info("Update {} for versions took {}", table.getName(), sw.getTotalTimeSeconds());
+
+        for (int i = 2; i <= MAX_COMPOSITION_VERSIONS; i++) {
+            int versionCount = i;
+            dsl.update(table)
+                    .set(
+                            table.field(SYS_TRANSACTION_FIELD_NAME, Timestamp.class),
+                            Timestamp.from(
+                                    additionalVersionBaseDateTime.plusSeconds(i).toInstant()))
+                    .set(
+                            table.field(SYS_PERIOD_FIELD_NAME, SimpleEntry.class),
+                            new AbstractMap.SimpleEntry<>(additionalVersionBaseDateTime.plusSeconds(i), null))
+                    .where(idField.in(descriptors.stream()
+                            .flatMap(e -> descriptorToIdsForVersionCountStreamFunc.apply(e, versionCount))
+                            .collect(Collectors.toList())))
+                    .execute();
+        }
+
+        log.info("Updates {} for versions took {}", table.getName(), sw.getTotalTimeSeconds());
     }
 
     private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(T table, Stream<R> records) {
@@ -548,6 +561,8 @@ public class LoaderServiceImp implements LoaderService {
                     }
                 }
                 scaledEhrDistribution.removeIf(p -> p.getRight() == 0);
+                // Determine how many compositions this EHR shall hold according to a normal distribution (m: 200,
+                // sd:50)
                 ehrSettings.add(Pair.of((int) getRandomGaussianWithLimitsLong(200, 50, 50, 350), facilities));
             }
 
@@ -568,7 +583,20 @@ public class LoaderServiceImp implements LoaderService {
         List<EntryRecord> entries = new ArrayList<>();
         List<EventContextRecord> eventContexts = new ArrayList<>();
         List<ParticipationRecord> participations = new ArrayList<>();
-        Map<UUID, Integer> compositionIdToVersionCount;
+        Map<UUID, Integer> compositionIdToVersionCount = new HashMap<>();
+        Map<UUID, Integer> eventCtxIdToVersionCount = new HashMap<>();
+
+        Stream<UUID> getCompositionIdStreamForVersionCount(int version) {
+            return this.compositions.stream()
+                    .map(CompositionRecord::getId)
+                    .filter(id -> this.compositionIdToVersionCount.getOrDefault(id, 1) >= version);
+        }
+
+        Stream<UUID> getEventCtxIdStreamForVersionCount(int version) {
+            return this.eventContexts.stream()
+                    .map(EventContextRecord::getId)
+                    .filter(id -> this.eventCtxIdToVersionCount.getOrDefault(id, 1) >= version);
+        }
     }
 
     private class CompositionCreateDescriptor {
@@ -626,6 +654,9 @@ public class LoaderServiceImp implements LoaderService {
         ehrDescriptor.compositionIdToVersionCount = compositions.stream()
                 .filter(c -> c.versions > 1)
                 .collect(Collectors.toMap(c -> c.composition.getId(), c -> c.versions));
+        ehrDescriptor.eventCtxIdToVersionCount = compositions.stream()
+                .filter(c -> c.versions > 1)
+                .collect(Collectors.toMap(c -> c.eventContext.getId(), c -> c.versions));
 
         return ehrDescriptor;
     }
@@ -633,7 +664,7 @@ public class LoaderServiceImp implements LoaderService {
     private CompositionCreateDescriptor buildCompositionData(
             int compositionNumber, UUID ehrId, Composition compositionData, List<UUID> hcpIds, UUID facility) {
 
-        int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
+        int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, MAX_COMPOSITION_VERSIONS);
         UUID composerId = hcpIds.get(compositionNumber % hcpIds.size());
 
         CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
