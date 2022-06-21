@@ -321,7 +321,8 @@ public class LoaderServiceImp implements LoaderService {
         Map<UUID, List<PartyIdentifiedRecord>> facilityIdToHcp = facilityNumberToUuid.entrySet().parallelStream()
                 .collect(Collectors.toMap(
                         Entry::getValue, e -> IntStream.range(0, (int) getRandomGaussianWithLimitsLong(20, 5, 5, 35))
-                                .mapToObj(i -> createPartyWithRef("hcf" + e.getKey() + "hcp" + i, "hcp", "PERSON"))
+                                .mapToObj(i -> createPartyWithRef(
+                                        "hcf" + e.getKey() + "hcp" + i, "hcp", "PERSON", PartyType.party_identified))
                                 .collect(Collectors.toList())));
 
         bulkInsert(
@@ -443,6 +444,7 @@ public class LoaderServiceImp implements LoaderService {
                     .execute();
         }
 
+        sw.stop();
         log.info("Updates {} for versions took {}", table.getName(), sw.getTotalTimeSeconds());
     }
 
@@ -713,7 +715,7 @@ public class LoaderServiceImp implements LoaderService {
             UUID ehrId, UUID contributionId) {
 
         AuditDetailsRecord auditDetails = createAuditDetails("Create EHR status");
-        PartyIdentifiedRecord patient = createPartyWithRef(null, "patients", "PERSON");
+        PartyIdentifiedRecord patient = createPartyWithRef(null, "patients", "PERSON", PartyType.party_self);
         StatusRecord statusRecord = dsl.newRecord(STATUS);
         statusRecord.setEhrId(ehrId);
         statusRecord.setParty(patient.getId());
@@ -728,21 +730,22 @@ public class LoaderServiceImp implements LoaderService {
         return Triple.of(statusRecord, patient, auditDetails);
     }
 
-    private PartyIdentifiedRecord createPartyWithRef(String name, String namespace, String type) {
+    private PartyIdentifiedRecord createPartyWithRef(String name, String namespace, String type, PartyType partyType) {
         PartyIdentifiedRecord hcpPartyRecord = dsl.newRecord(PARTY_IDENTIFIED);
         hcpPartyRecord.setPartyRefValue(UUID.randomUUID().toString());
         hcpPartyRecord.setPartyRefScheme("id_scheme");
         hcpPartyRecord.setPartyRefNamespace(namespace);
         hcpPartyRecord.setPartyRefType(type);
         hcpPartyRecord.setName(name);
-        hcpPartyRecord.setPartyType(PartyType.party_self);
+        hcpPartyRecord.setPartyType(partyType);
         hcpPartyRecord.setObjectIdType(PartyRefIdType.generic_id);
         hcpPartyRecord.setId(UUID.randomUUID());
         return hcpPartyRecord;
     }
 
     private Pair<Integer, UUID> insertHealthcareFacility(int number) {
-        PartyIdentifiedRecord record = createPartyWithRef("hcf" + number, "facilities", "ORGANISATION");
+        PartyIdentifiedRecord record =
+                createPartyWithRef("hcf" + number, "facilities", "ORGANISATION", PartyType.party_identified);
         record.store();
         return Pair.of(number, record.getId());
     }
