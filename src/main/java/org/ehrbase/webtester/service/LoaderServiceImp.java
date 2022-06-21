@@ -40,8 +40,6 @@ import com.nedap.archie.rm.datatypes.CodePhrase;
 import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.TermMapping;
-import com.nedap.archie.rm.generic.PartyIdentified;
-import com.nedap.archie.rm.generic.PartyProxy;
 import com.nedap.archie.rm.support.identification.TerminologyId;
 import java.io.IOException;
 import java.io.InputStream;
@@ -141,6 +139,8 @@ public class LoaderServiceImp implements LoaderService {
     };
     private static final int BATCH_SIZE = 10;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
+    // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
+    // otherwise
     private final ThreadLocal<Random> random = ThreadLocal.withInitial(SecureRandom::new);
     private final List<Composition> compositions = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
@@ -236,7 +236,8 @@ public class LoaderServiceImp implements LoaderService {
         stopWatch.start("prep");
 
         if (properties.getHealthcareFacilities() < 1 || properties.getEhr() < properties.getHealthcareFacilities()) {
-            throw new IllegalArgumentException("");
+            throw new IllegalArgumentException(
+                    "EHR count must be higher or equal to the number of healthcareFacilities and greater than 0");
         }
 
         log.info("Preparing EHR distributions...");
@@ -267,7 +268,7 @@ public class LoaderServiceImp implements LoaderService {
                 buildScaledFacilityToEhrDistribution(properties, facilityNumberToUuid, ehrFacilityCountSum);
 
         stopWatch.stop();
-        log.info("Distributions prepared in {} s", stopWatch.getTotalTimeSeconds());
+        log.info("EHR Distributions prepared in {} s", stopWatch.getTotalTimeSeconds());
         log.info(
                 "Start loading test data... ({} EHRs, {} Healthcare Facilities)",
                 properties.getEhr(),
@@ -311,6 +312,8 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private Map<UUID, List<UUID>> insertHCPsForFacilities(Map<Integer, UUID> facilityNumberToUuid) {
+        // Generate HCPs according to a normal distribution (m: 20 sd: 5)
+        // Names are following a schema of "hcf<facilitynumber>hcp<hcp-number-in-facility>"
         Map<UUID, List<PartyIdentifiedRecord>> facilityIdToHcp = facilityNumberToUuid.entrySet().parallelStream()
                 .collect(Collectors.toMap(
                         Entry::getValue, e -> IntStream.range(0, (int) getRandomGaussianWithLimitsLong(20, 5, 5, 35))
@@ -762,20 +765,6 @@ public class LoaderServiceImp implements LoaderService {
             templateStoreRecord.setContent(ResourceUtils.getContent(resourceLocation));
             templateStoreRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
             templateStoreRecord.store();
-        }
-    }
-
-    private PartyIdentifiedRecord createPartyIdentified(PartyProxy composer) {
-        var partyIdentifiedRecord = dsl.newRecord(PARTY_IDENTIFIED);
-
-        if (composer instanceof PartyIdentified) {
-            partyIdentifiedRecord.setName(((PartyIdentified) composer).getName());
-            partyIdentifiedRecord.setPartyType(PartyType.party_identified);
-            partyIdentifiedRecord.setObjectIdType(PartyRefIdType.undefined);
-            partyIdentifiedRecord.setId(UUID.randomUUID());
-            return partyIdentifiedRecord;
-        } else {
-            throw new IllegalArgumentException("Unsupported PartyProxy implementation");
         }
     }
 
