@@ -616,14 +616,15 @@ public class LoaderServiceImp implements LoaderService {
             List<UUID> facilities, int compositionCount, Map<UUID, List<UUID>> facilityIdToHcpId) {
         EhrCreateDescriptor ehrDescriptor = new EhrCreateDescriptor();
         UUID ehrId = UUID.randomUUID();
+        OffsetDateTime sysTransaction = OffsetDateTime.now();
 
         // EHR and status
         Pair<ContributionRecord, AuditDetailsRecord> statusContribution =
-                createContribution(ehrId, ContributionDataType.ehr, "Create EHR_STATUS");
+                createContribution(ehrId, ContributionDataType.ehr, "Create EHR_STATUS", sysTransaction);
         Triple<StatusRecord, PartyIdentifiedRecord, AuditDetailsRecord> status =
-                createStatus(ehrId, statusContribution.getLeft().getId());
+                createStatus(ehrId, statusContribution.getLeft().getId(), sysTransaction);
 
-        ehrDescriptor.ehr = createEhr(ehrId);
+        ehrDescriptor.ehr = createEhr(ehrId, sysTransaction);
         ehrDescriptor.status = status.getLeft();
         ehrDescriptor.subject = status.getMiddle();
         ehrDescriptor.contributions.add(statusContribution.getLeft());
@@ -669,26 +670,29 @@ public class LoaderServiceImp implements LoaderService {
         int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, MAX_COMPOSITION_VERSIONS);
         UUID composerId = hcpIds.get(compositionNumber % hcpIds.size());
 
+        OffsetDateTime sysTransaction = OffsetDateTime.now();
+
         CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
         createDescriptor.versions = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
         Pair<ContributionRecord, AuditDetailsRecord> contribution =
-                createContribution(ehrId, ContributionDataType.composition, "Create COMPOSITION");
+                createContribution(ehrId, ContributionDataType.composition, "Create COMPOSITION", sysTransaction);
         createDescriptor.contribution = contribution.getLeft();
         createDescriptor.contributionAudit = contribution.getRight();
         Pair<CompositionRecord, AuditDetailsRecord> composition = createComposition(
-                ehrId, compositionData, composerId, contribution.getLeft().getId());
+                ehrId, compositionData, composerId, contribution.getLeft().getId(), sysTransaction);
         createDescriptor.composition = composition.getLeft();
         createDescriptor.compositionAudit = composition.getRight();
-        createDescriptor.entry = createEntry(composition.getLeft().getId(), compositionData);
-        createDescriptor.eventContext =
-                createEventContext(composition.getLeft().getId(), compositionData.getContext(), facility);
+        createDescriptor.entry = createEntry(composition.getLeft().getId(), compositionData, sysTransaction);
+        createDescriptor.eventContext = createEventContext(
+                composition.getLeft().getId(), compositionData.getContext(), facility, sysTransaction);
         if (hcpCount > 1 && hcpIds.size() > 1) {
             List<UUID> participationCandidates =
                     CollectionUtils.selectRejected(hcpIds, composerId::equals, new ArrayList<>());
             IntStream.range(0, hcpCount - 1)
                     .mapToObj(i -> createHcpParticipation(
                             createDescriptor.eventContext,
-                            participationCandidates.get(random.get().nextInt(participationCandidates.size()))))
+                            participationCandidates.get(random.get().nextInt(participationCandidates.size())),
+                            sysTransaction))
                     .forEach(createDescriptor.participations::add);
         }
 
@@ -698,9 +702,9 @@ public class LoaderServiceImp implements LoaderService {
     /**
      * Creates an {@link EhrRecord}.
      */
-    private EhrRecord createEhr(UUID ehrId) {
+    private EhrRecord createEhr(UUID ehrId, OffsetDateTime sysTransaction) {
         var ehrRecord = dsl.newRecord(Ehr.EHR_);
-        ehrRecord.setDateCreated(Timestamp.valueOf(LocalDateTime.now()));
+        ehrRecord.setDateCreated(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
         ehrRecord.setDateCreatedTzid(zoneId);
         ehrRecord.setSystemId(systemId);
         ehrRecord.setId(ehrId);
@@ -712,15 +716,15 @@ public class LoaderServiceImp implements LoaderService {
      * Creates an {@link StatusRecord} for the given EHR.
      */
     private Triple<StatusRecord, PartyIdentifiedRecord, AuditDetailsRecord> createStatus(
-            UUID ehrId, UUID contributionId) {
+            UUID ehrId, UUID contributionId, OffsetDateTime sysTransaction) {
 
-        AuditDetailsRecord auditDetails = createAuditDetails("Create EHR status");
+        AuditDetailsRecord auditDetails = createAuditDetails("Create EHR status", sysTransaction);
         PartyIdentifiedRecord patient = createPartyWithRef(null, "patients", "PERSON", PartyType.party_self);
         StatusRecord statusRecord = dsl.newRecord(STATUS);
         statusRecord.setEhrId(ehrId);
         statusRecord.setParty(patient.getId());
-        statusRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
-        statusRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(OffsetDateTime.now(), null));
+        statusRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
+        statusRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
         statusRecord.setHasAudit(auditDetails.getId());
         statusRecord.setInContribution(contributionId);
         statusRecord.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
@@ -806,8 +810,8 @@ public class LoaderServiceImp implements LoaderService {
      * Creates a {@link CompositionRecord} for the given EHR.
      */
     private Pair<CompositionRecord, AuditDetailsRecord> createComposition(
-            UUID ehrId, Composition composition, UUID composerId, UUID contributionId) {
-        AuditDetailsRecord auditDetails = createAuditDetails("Create COMPOSITION");
+            UUID ehrId, Composition composition, UUID composerId, UUID contributionId, OffsetDateTime sysTransaction) {
+        AuditDetailsRecord auditDetails = createAuditDetails("Create COMPOSITION", sysTransaction);
 
         var compositionRecord = dsl.newRecord(COMPOSITION);
         compositionRecord.setEhrId(ehrId);
@@ -815,8 +819,8 @@ public class LoaderServiceImp implements LoaderService {
         compositionRecord.setLanguage(composition.getLanguage().getCodeString());
         compositionRecord.setTerritory(getTerritory(composition.getTerritory().getCodeString()));
         compositionRecord.setComposer(composerId);
-        compositionRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
-        compositionRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(OffsetDateTime.now(), null));
+        compositionRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
+        compositionRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
         compositionRecord.setHasAudit(auditDetails.getId());
         // AttestationRef
         // FeederAudit
@@ -828,7 +832,7 @@ public class LoaderServiceImp implements LoaderService {
     /**
      * Creates an {@link EntryRecord} for the given composition.
      */
-    private EntryRecord createEntry(UUID compositionId, Composition composition) {
+    private EntryRecord createEntry(UUID compositionId, Composition composition, OffsetDateTime sysTransaction) {
         Assert.notNull(composition.getArchetypeDetails().getTemplateId(), "Template Id must not be null");
 
         EntryRecord entryRecord = dsl.newRecord(ENTRY);
@@ -840,8 +844,8 @@ public class LoaderServiceImp implements LoaderService {
         entryRecord.setArchetypeId(composition.getArchetypeNodeId());
         entryRecord.setCategory(createDvCodedText(composition.getCategory()));
         entryRecord.setEntry(JSONB.jsonb(rawJson.marshal(composition)));
-        entryRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
-        entryRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(OffsetDateTime.now(), null));
+        entryRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
+        entryRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
         entryRecord.setRmVersion(composition.getArchetypeDetails().getRmVersion());
         entryRecord.setName(createDvCodedText(composition.getName()));
         entryRecord.setId(UUID.randomUUID());
@@ -852,7 +856,8 @@ public class LoaderServiceImp implements LoaderService {
     /**
      * Creates an {@link EventContextRecord} for the given composition.
      */
-    private EventContextRecord createEventContext(UUID compositionId, EventContext eventContext, UUID facilityId) {
+    private EventContextRecord createEventContext(
+            UUID compositionId, EventContext eventContext, UUID facilityId, OffsetDateTime sysTransaction) {
         var eventContextRecord = dsl.newRecord(EVENT_CONTEXT);
         eventContextRecord.setCompositionId(compositionId);
 
@@ -861,8 +866,8 @@ public class LoaderServiceImp implements LoaderService {
         eventContextRecord.setStartTimeTzid(resolveTimeZone(startTime));
         eventContextRecord.setLocation(eventContext.getLocation());
         eventContextRecord.setSetting(createDvCodedText(eventContext.getSetting()));
-        eventContextRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
-        eventContextRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(OffsetDateTime.now(), null));
+        eventContextRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
+        eventContextRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
         eventContextRecord.setFacility(facilityId);
 
         if (eventContext.getEndTime() != null) {
@@ -885,15 +890,16 @@ public class LoaderServiceImp implements LoaderService {
      *
      * @return
      */
-    private ParticipationRecord createHcpParticipation(EventContextRecord eventCtx, UUID hcpId) {
+    private ParticipationRecord createHcpParticipation(
+            EventContextRecord eventCtx, UUID hcpId, OffsetDateTime sysTransaction) {
         ParticipationRecord participationRecord = dsl.newRecord(PARTICIPATION);
         participationRecord.setEventContext(eventCtx.getId());
         participationRecord.setPerformer(hcpId);
         participationRecord.setFunction(createDvCodedText(new DvText("function")));
         participationRecord.setMode(createDvCodedText(
                 new DvCodedText("not specified", new CodePhrase(new TerminologyId("openehr"), "193"))));
-        participationRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
-        participationRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(OffsetDateTime.now(), null));
+        participationRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
+        participationRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
         if (eventCtx.getStartTime() != null) {
             participationRecord.setTimeLower(eventCtx.getStartTime());
             participationRecord.setTimeLowerTz(eventCtx.getEndTimeTzid());
@@ -911,8 +917,11 @@ public class LoaderServiceImp implements LoaderService {
      * Creates a {@link ContributionRecord} of the given EHR.
      */
     private Pair<ContributionRecord, AuditDetailsRecord> createContribution(
-            UUID ehrId, ContributionDataType contributionType, String auditDetailsDescription) {
-        AuditDetailsRecord auditDetails = createAuditDetails(auditDetailsDescription);
+            UUID ehrId,
+            ContributionDataType contributionType,
+            String auditDetailsDescription,
+            OffsetDateTime sysTransaction) {
+        AuditDetailsRecord auditDetails = createAuditDetails(auditDetailsDescription, sysTransaction);
 
         ContributionRecord contributionRecord = dsl.newRecord(CONTRIBUTION);
         contributionRecord.setEhrId(ehrId);
@@ -927,11 +936,11 @@ public class LoaderServiceImp implements LoaderService {
     /**
      * Creates an {@link AuditDetailsRecord} with the given description.
      */
-    private AuditDetailsRecord createAuditDetails(String description) {
+    private AuditDetailsRecord createAuditDetails(String description, OffsetDateTime sysTransaction) {
         var auditDetailsRecord = dsl.newRecord(AUDIT_DETAILS);
         auditDetailsRecord.setSystemId(systemId);
         auditDetailsRecord.setCommitter(committerId);
-        auditDetailsRecord.setTimeCommitted(Timestamp.valueOf(LocalDateTime.now()));
+        auditDetailsRecord.setTimeCommitted(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
         auditDetailsRecord.setTimeCommittedTzid(zoneId);
         auditDetailsRecord.setChangeType(ContributionChangeType.creation);
         auditDetailsRecord.setDescription(description);
