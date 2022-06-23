@@ -730,6 +730,8 @@ public class LoaderServiceImp implements LoaderService {
         statusRecord.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
         statusRecord.setName(new DvCodedTextRecord("EHR Status", null, null, null, null, null));
         statusRecord.setId(UUID.randomUUID());
+        statusRecord.setIsModifiable(true);
+        statusRecord.setIsQueryable(true);
 
         return Triple.of(statusRecord, patient, auditDetails);
     }
