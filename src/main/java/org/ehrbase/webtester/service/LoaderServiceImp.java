@@ -667,13 +667,13 @@ public class LoaderServiceImp implements LoaderService {
     private CompositionCreateDescriptor buildCompositionData(
             int compositionNumber, UUID ehrId, Composition compositionData, List<UUID> hcpIds, UUID facility) {
 
-        int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, MAX_COMPOSITION_VERSIONS);
+        int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
         UUID composerId = hcpIds.get(compositionNumber % hcpIds.size());
 
         OffsetDateTime sysTransaction = OffsetDateTime.now();
 
         CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
-        createDescriptor.versions = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
+        createDescriptor.versions = (int) getRandomGaussianWithLimitsLong(0, 1, 1, MAX_COMPOSITION_VERSIONS);
         Pair<ContributionRecord, AuditDetailsRecord> contribution =
                 createContribution(ehrId, ContributionDataType.composition, "Create COMPOSITION", sysTransaction);
         createDescriptor.contribution = contribution.getLeft();
