@@ -17,7 +17,12 @@
  */
 package org.ehrbase.webtester.service;
 
+import static org.ehrbase.jooq.pg.Tables.COMPOSITION_HISTORY;
+import static org.ehrbase.jooq.pg.Tables.ENTRY_HISTORY;
+import static org.ehrbase.jooq.pg.Tables.EVENT_CONTEXT_HISTORY;
+import static org.ehrbase.jooq.pg.Tables.PARTICIPATION_HISTORY;
 import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
+import static org.ehrbase.jooq.pg.Tables.STATUS_HISTORY;
 import static org.ehrbase.jooq.pg.Tables.SYSTEM;
 import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
 import static org.ehrbase.jooq.pg.tables.Composition.COMPOSITION;
@@ -54,6 +59,7 @@ import java.time.temporal.TemporalAccessor;
 import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +87,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
+import org.ehrbase.jooq.pg.Indexes;
 import org.ehrbase.jooq.pg.enums.ContributionChangeType;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.jooq.pg.enums.ContributionState;
@@ -138,6 +145,23 @@ public class LoaderServiceImp implements LoaderService {
     private static final String[] COMPOSITIONS = {
         "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
     };
+    private static final Table[] RELEVANT_TABLES = {
+        PARTY_IDENTIFIED,
+        SYSTEM,
+        AUDIT_DETAILS,
+        COMPOSITION,
+        COMPOSITION_HISTORY,
+        CONTRIBUTION,
+        ENTRY,
+        ENTRY_HISTORY,
+        EVENT_CONTEXT,
+        EVENT_CONTEXT_HISTORY,
+        PARTICIPATION,
+        PARTICIPATION_HISTORY,
+        STATUS,
+        STATUS_HISTORY
+    };
+    private static final Table[] RELEVANT_VERSIONED_TABLES = {COMPOSITION, ENTRY, EVENT_CONTEXT, PARTICIPATION, STATUS};
     private static final int BATCH_SIZE = 10;
     private static final int MAX_COMPOSITION_VERSIONS = 3;
     private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
@@ -226,11 +250,39 @@ public class LoaderServiceImp implements LoaderService {
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
+                log.info("Dropping GIN index on ehr.entry.entry...");
+                dsl.execute(String.format(
+                        "DROP INDEX IF EXISTS %s.%s;",
+                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), Indexes.GIN_ENTRY_PATH_IDX.getName()));
+                log.info("Disabling all non-versioning triggers...");
+                // We assume Postgres or Yugabyte as DB vendor -> disabling triggers will also disable foreign key
+                // constraints
+                Arrays.stream(RELEVANT_TABLES)
+                        .forEach(table -> dsl.execute(String.format(
+                                "ALTER TABLE %s.%s DISABLE TRIGGER ALL;",
+                                org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
+                Arrays.stream(RELEVANT_VERSIONED_TABLES)
+                        .forEach(table -> dsl.execute(String.format(
+                                "ALTER TABLE %s.%s ENABLE TRIGGER versioning_trigger;",
+                                org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
                 loadInternal(properties);
             } catch (RuntimeException e) {
                 isRunning = false;
                 throw e;
             }
+            log.info("Re-enabling triggers...");
+            Arrays.stream(RELEVANT_TABLES)
+                    .forEach(table -> dsl.execute(String.format(
+                            "ALTER TABLE %s.%s ENABLE TRIGGER ALL;",
+                            org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
+            log.info("Recreating GIN index on ehr.entry.entry...");
+            // We use a timeout of 0 since index creation can take a long time
+            dsl.query(String.format(
+                            "CREATE INDEX gin_entry_path_idx ON %s.%s USING gin (%s jsonb_path_ops);",
+                            org.ehrbase.jooq.pg.Ehr.EHR.getName(), ENTRY.getName(), ENTRY.ENTRY_.getName()))
+                    .queryTimeout(0)
+                    .execute();
+            log.info("Done!");
             isRunning = false;
         });
     }
