@@ -255,7 +255,7 @@ public class LoaderServiceImp implements LoaderService {
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
-                preLoadOperations();
+                preLoadOperations(properties);
                 loadInternal(properties);
                 postLoadOperations();
             } catch (RuntimeException e) {
@@ -282,7 +282,7 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Done!");
     }
 
-    private void preLoadOperations() {
+    private void preLoadOperations(LoaderRequestDto properties) {
         log.info("Dropping GIN index on ehr.entry.entry...");
         dsl.execute(String.format(
                 "DROP INDEX IF EXISTS %s.%s;",
@@ -294,10 +294,12 @@ public class LoaderServiceImp implements LoaderService {
                 .forEach(table -> dsl.execute(String.format(
                         "ALTER TABLE %s.%s DISABLE TRIGGER ALL;",
                         org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
-        Arrays.stream(RELEVANT_VERSIONED_TABLES)
-                .forEach(table -> dsl.execute(String.format(
-                        "ALTER TABLE %s.%s ENABLE TRIGGER versioning_trigger;",
-                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
+        if (properties.isInsertVersions()) {
+            Arrays.stream(RELEVANT_VERSIONED_TABLES)
+                    .forEach(table -> dsl.execute(String.format(
+                            "ALTER TABLE %s.%s ENABLE TRIGGER versioning_trigger;",
+                            org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
+        }
     }
 
     private void loadInternal(LoaderRequestDto properties) {
