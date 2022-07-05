@@ -245,6 +245,13 @@ public class LoaderServiceImp implements LoaderService {
                     "A test data loading request is currently being processed. Please try again later...");
         }
 
+        log.info(
+                "Test data loading options [EHRs: {}, Facilities: {}, Bulk insert size {}, EHRs per batch: {}, Create versions: {}]",
+                properties.getEhr(),
+                properties.getHealthcareFacilities(),
+                properties.getBulkSize(),
+                properties.getEhrsPerBatch(),
+                properties.isInsertVersions());
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
@@ -362,7 +369,8 @@ public class LoaderServiceImp implements LoaderService {
             }
             stopWatch.start("insert-batch" + batch);
             // Insert the already prepared batch
-            currentInsertTask = insertEhrsAsync(ehrDescriptors, properties.getBulkSize());
+            currentInsertTask =
+                    insertEhrsAsync(ehrDescriptors, properties.getBulkSize(), properties.isInsertVersions());
         }
 
         // wait for the last insert batch to complete
@@ -420,52 +428,54 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, int bulkSize) {
-        // We need a fixed timestamp for version updates because ehrbase uses it for fetching related objects
-        OffsetDateTime additionalVersionBaseDateTime = OffsetDateTime.now();
+    private CompletableFuture<Void> insertEhrsAsync(
+            List<EhrCreateDescriptor> ehrDescriptors, int bulkSize, boolean runVersionUpdates) {
         // We want the entry inserts to start as early as possible since these take the longest
-        CompletableFuture<Void> entry = CompletableFuture.allOf(ehrDescriptors.stream()
-                        .map(d -> d.entries.stream())
-                        .map(e -> CompletableFuture.runAsync(() -> bulkInsert(ENTRY, e, bulkSize)))
-                        .toArray(CompletableFuture[]::new))
-                .thenRunAsync(() -> updateToAddVersions(
-                        ENTRY,
-                        ENTRY.COMPOSITION_ID,
-                        ehrDescriptors,
-                        EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
-                        additionalVersionBaseDateTime));
-        CompletableFuture<Void> composition = CompletableFuture.runAsync(() -> bulkInsert(
-                        COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize))
-                .thenRunAsync(() -> updateToAddVersions(
-                        COMPOSITION,
-                        COMPOSITION.ID,
-                        ehrDescriptors,
-                        EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
-                        additionalVersionBaseDateTime));
-        CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() -> bulkInsert(
-                        EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream()), bulkSize))
-                .thenRunAsync(() -> updateToAddVersions(
-                        EVENT_CONTEXT,
-                        EVENT_CONTEXT.COMPOSITION_ID,
-                        ehrDescriptors,
-                        EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
-                        additionalVersionBaseDateTime));
-        CompletableFuture<Void> participations = CompletableFuture.runAsync(() -> bulkInsert(
-                        PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.participations.stream()), bulkSize))
-                .thenRunAsync(() -> updateToAddVersions(
-                        PARTICIPATION,
-                        PARTICIPATION.EVENT_CONTEXT,
-                        ehrDescriptors,
-                        EhrCreateDescriptor::getEventCtxIdStreamForVersionCount,
-                        additionalVersionBaseDateTime));
+        CompletableFuture<Void> entry = CompletableFuture.runAsync(
+                () -> bulkInsert(ENTRY, ehrDescriptors.stream().flatMap(d -> d.entries.stream()), bulkSize));
+        CompletableFuture<Void> composition = CompletableFuture.runAsync(
+                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
+        CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() ->
+                bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream()), bulkSize));
+        CompletableFuture<Void> participations = CompletableFuture.runAsync(() ->
+                bulkInsert(PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.participations.stream()), bulkSize));
+        if (runVersionUpdates) {
+            // We need a fixed timestamp for version updates because ehrbase uses it for fetching related objects
+            OffsetDateTime additionalVersionBaseDateTime = OffsetDateTime.now();
+
+            entry = entry.thenRunAsync(() -> updateToAddVersions(
+                    ENTRY,
+                    ENTRY.COMPOSITION_ID,
+                    ehrDescriptors,
+                    EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
+                    additionalVersionBaseDateTime));
+            composition = composition.thenRunAsync(() -> updateToAddVersions(
+                    COMPOSITION,
+                    COMPOSITION.ID,
+                    ehrDescriptors,
+                    EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
+                    additionalVersionBaseDateTime));
+            eventContext = eventContext.thenRunAsync(() -> updateToAddVersions(
+                    EVENT_CONTEXT,
+                    EVENT_CONTEXT.COMPOSITION_ID,
+                    ehrDescriptors,
+                    EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
+                    additionalVersionBaseDateTime));
+            participations = participations.thenRunAsync(() -> updateToAddVersions(
+                    PARTICIPATION,
+                    PARTICIPATION.EVENT_CONTEXT,
+                    ehrDescriptors,
+                    EhrCreateDescriptor::getEventCtxIdStreamForVersionCount,
+                    additionalVersionBaseDateTime));
+        }
         CompletableFuture<Void> auditDetails = CompletableFuture.runAsync(() ->
                 bulkInsert(AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream()), bulkSize));
+        CompletableFuture<Void> contribution = CompletableFuture.runAsync(() ->
+                bulkInsert(CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()), bulkSize));
         CompletableFuture<Void> partyIdentified = CompletableFuture.runAsync(
                 () -> bulkInsert(PARTY_IDENTIFIED, ehrDescriptors.stream().map(e -> e.subject), bulkSize));
         CompletableFuture<Void> status = CompletableFuture.runAsync(
                 () -> bulkInsert(STATUS, ehrDescriptors.stream().map(e -> e.status), bulkSize));
-        CompletableFuture<Void> contribution = CompletableFuture.runAsync(() ->
-                bulkInsert(CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()), bulkSize));
         CompletableFuture<Void> ehr = CompletableFuture.runAsync(
                 () -> bulkInsert(Ehr.EHR_, ehrDescriptors.stream().map(e -> e.ehr), bulkSize));
 

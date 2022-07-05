@@ -27,6 +27,7 @@ public class LoaderRequestDto {
     private int healthcareFacilities = 5;
     private int bulkSize = 200;
     private int ehrsPerBatch = 10;
+    private boolean insertVersions = false;
 
     public Integer getEhr() {
         return ehr;
@@ -58,5 +59,13 @@ public class LoaderRequestDto {
 
     public void setEhrsPerBatch(int ehrsPerBatch) {
         this.ehrsPerBatch = ehrsPerBatch;
+    }
+
+    public boolean isInsertVersions() {
+        return insertVersions;
+    }
+
+    public void setInsertVersions(boolean insertVersions) {
+        this.insertVersions = insertVersions;
     }
 }
