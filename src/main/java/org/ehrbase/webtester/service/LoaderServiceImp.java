@@ -17,7 +17,12 @@
  */
 package org.ehrbase.webtester.service;
 
+import static org.ehrbase.jooq.pg.Tables.COMPOSITION_HISTORY;
+import static org.ehrbase.jooq.pg.Tables.ENTRY_HISTORY;
+import static org.ehrbase.jooq.pg.Tables.EVENT_CONTEXT_HISTORY;
+import static org.ehrbase.jooq.pg.Tables.PARTICIPATION_HISTORY;
 import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
+import static org.ehrbase.jooq.pg.Tables.STATUS_HISTORY;
 import static org.ehrbase.jooq.pg.Tables.SYSTEM;
 import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
 import static org.ehrbase.jooq.pg.tables.Composition.COMPOSITION;
@@ -54,6 +59,7 @@ import java.time.temporal.TemporalAccessor;
 import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +87,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
+import org.ehrbase.jooq.pg.Indexes;
 import org.ehrbase.jooq.pg.enums.ContributionChangeType;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.jooq.pg.enums.ContributionState;
@@ -138,7 +145,23 @@ public class LoaderServiceImp implements LoaderService {
     private static final String[] COMPOSITIONS = {
         "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
     };
-    private static final int BATCH_SIZE = 10;
+    private static final Table[] RELEVANT_TABLES = {
+        PARTY_IDENTIFIED,
+        SYSTEM,
+        AUDIT_DETAILS,
+        COMPOSITION,
+        COMPOSITION_HISTORY,
+        CONTRIBUTION,
+        ENTRY,
+        ENTRY_HISTORY,
+        EVENT_CONTEXT,
+        EVENT_CONTEXT_HISTORY,
+        PARTICIPATION,
+        PARTICIPATION_HISTORY,
+        STATUS,
+        STATUS_HISTORY
+    };
+    private static final Table[] RELEVANT_VERSIONED_TABLES = {COMPOSITION, ENTRY, EVENT_CONTEXT, PARTICIPATION, STATUS};
     private static final int MAX_COMPOSITION_VERSIONS = 3;
     private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
     private static final String SYS_PERIOD_FIELD_NAME = "sys_period";
@@ -155,7 +178,6 @@ public class LoaderServiceImp implements LoaderService {
     private UUID systemId;
     private UUID committerId;
     private String zoneId;
-
     private boolean isRunning = false;
 
     public LoaderServiceImp(DSLContext dsl) {
@@ -223,16 +245,59 @@ public class LoaderServiceImp implements LoaderService {
                     "A test data loading request is currently being processed. Please try again later...");
         }
 
+        log.info(
+                "Test data loading options [EHRs: {}, Facilities: {}, Bulk insert size {}, EHRs per batch: {}, Create versions: {}]",
+                properties.getEhr(),
+                properties.getHealthcareFacilities(),
+                properties.getBulkSize(),
+                properties.getEhrsPerBatch(),
+                properties.isInsertVersions());
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
+                preLoadOperations();
                 loadInternal(properties);
+                postLoadOperations();
             } catch (RuntimeException e) {
                 isRunning = false;
                 throw e;
             }
             isRunning = false;
         });
+    }
+
+    private void postLoadOperations() {
+        log.info("Re-enabling triggers...");
+        Arrays.stream(RELEVANT_TABLES)
+                .forEach(table -> dsl.execute(String.format(
+                        "ALTER TABLE %s.%s ENABLE TRIGGER ALL;",
+                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
+        log.info("Recreating GIN index on ehr.entry.entry...");
+        // We use a timeout of 0 since index creation can take a long time
+        dsl.query(String.format(
+                        "CREATE INDEX gin_entry_path_idx ON %s.%s USING gin (%s jsonb_path_ops);",
+                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), ENTRY.getName(), ENTRY.ENTRY_.getName()))
+                .queryTimeout(0)
+                .execute();
+        log.info("Done!");
+    }
+
+    private void preLoadOperations() {
+        log.info("Dropping GIN index on ehr.entry.entry...");
+        dsl.execute(String.format(
+                "DROP INDEX IF EXISTS %s.%s;",
+                org.ehrbase.jooq.pg.Ehr.EHR.getName(), Indexes.GIN_ENTRY_PATH_IDX.getName()));
+        log.info("Disabling all non-versioning triggers...");
+        // We assume Postgres or Yugabyte as DB vendor -> disabling triggers will also disable foreign key
+        // constraints
+        Arrays.stream(RELEVANT_TABLES)
+                .forEach(table -> dsl.execute(String.format(
+                        "ALTER TABLE %s.%s DISABLE TRIGGER ALL;",
+                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
+        Arrays.stream(RELEVANT_VERSIONED_TABLES)
+                .forEach(table -> dsl.execute(String.format(
+                        "ALTER TABLE %s.%s ENABLE TRIGGER versioning_trigger;",
+                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
     }
 
     private void loadInternal(LoaderRequestDto properties) {
@@ -250,7 +315,8 @@ public class LoaderServiceImp implements LoaderService {
                 .parallel()
                 .mapToObj(this::insertHealthcareFacility)
                 .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-        Map<UUID, List<UUID>> facilityIdToHcpId = insertHCPsForFacilities(facilityNumberToUuid);
+        Map<UUID, List<UUID>> facilityIdToHcpId =
+                insertHCPsForFacilities(facilityNumberToUuid, properties.getBulkSize());
 
         /* Determine how many facilities should be assigned to each EHR (normal dist. m: 7 sd: 3)
         This Step will take a while for high EHR counts (i.e. 10,000,000) since the random number generation is
@@ -280,10 +346,10 @@ public class LoaderServiceImp implements LoaderService {
 
         // We do not insert multiple batches at once to limit memory usage
         CompletableFuture<Void> currentInsertTask = null;
-        int batches = properties.getEhr() / BATCH_SIZE + 1;
-        int lastBatchSize = properties.getEhr() % BATCH_SIZE;
+        int batches = properties.getEhr() / properties.getEhrsPerBatch() + 1;
+        int lastBatchSize = properties.getEhr() % properties.getEhrsPerBatch();
         for (int batch = 0; batch < batches; batch++) {
-            int batchSize = batch == batches - 1 ? lastBatchSize : BATCH_SIZE;
+            int batchSize = batch == batches - 1 ? lastBatchSize : properties.getEhrsPerBatch();
             if (batch == batches - 1 && batchSize < 1) {
                 // if the last batch is of size 0 we don't need to build and start it
                 break;
@@ -303,7 +369,8 @@ public class LoaderServiceImp implements LoaderService {
             }
             stopWatch.start("insert-batch" + batch);
             // Insert the already prepared batch
-            currentInsertTask = insertEhrsAsync(ehrDescriptors);
+            currentInsertTask =
+                    insertEhrsAsync(ehrDescriptors, properties.getBulkSize(), properties.isInsertVersions());
         }
 
         // wait for the last insert batch to complete
@@ -315,7 +382,7 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
     }
 
-    private Map<UUID, List<UUID>> insertHCPsForFacilities(Map<Integer, UUID> facilityNumberToUuid) {
+    private Map<UUID, List<UUID>> insertHCPsForFacilities(Map<Integer, UUID> facilityNumberToUuid, int bulkSize) {
         // Generate HCPs according to a normal distribution (m: 20 sd: 5)
         // Names are following a schema of "hcf<facilitynumber>hcp<hcp-number-in-facility>"
         Map<UUID, List<PartyIdentifiedRecord>> facilityIdToHcp = facilityNumberToUuid.entrySet().parallelStream()
@@ -327,7 +394,8 @@ public class LoaderServiceImp implements LoaderService {
 
         bulkInsert(
                 PARTY_IDENTIFIED,
-                facilityIdToHcp.entrySet().stream().map(Entry::getValue).flatMap(List::stream));
+                facilityIdToHcp.entrySet().stream().map(Entry::getValue).flatMap(List::stream),
+                bulkSize);
 
         return facilityIdToHcp.entrySet().stream().collect(Collectors.toMap(Entry::getKey, e -> e.getValue().stream()
                 .map(PartyIdentifiedRecord::getId)
@@ -360,63 +428,67 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors) {
-
-        CompletableFuture<Void> noDependencyInsert = CompletableFuture.allOf(
-                CompletableFuture.runAsync(() -> bulkInsert(
-                                AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream())))
-                        .thenRunAsync(() -> bulkInsert(
-                                CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()))),
-                CompletableFuture.runAsync(
-                        () -> bulkInsert(Ehr.EHR_, ehrDescriptors.stream().map(e -> e.ehr))),
-                CompletableFuture.runAsync(() ->
-                        bulkInsert(PARTY_IDENTIFIED, ehrDescriptors.stream().map(e -> e.subject))));
-
-        // We need a fixed timestamp for version updates because ehrbase uses it for fetching related objects
-        OffsetDateTime additionalVersionBaseDateTime = OffsetDateTime.now();
-
+    private CompletableFuture<Void> insertEhrsAsync(
+            List<EhrCreateDescriptor> ehrDescriptors, int bulkSize, boolean runVersionUpdates) {
         // We want the entry inserts to start as early as possible since these take the longest
-        CompletableFuture<Void> compositionInsert = noDependencyInsert.thenRunAsync(
-                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream())));
-        CompletableFuture<Void> entryInsert = CompletableFuture.allOf(ehrDescriptors.stream()
-                .map(d -> d.entries.stream())
-                .map(e -> compositionInsert.thenRunAsync(() -> bulkInsert(ENTRY, e)))
-                .toArray(CompletableFuture[]::new));
-        CompletableFuture<Void> eventContextInsert = compositionInsert
-                .thenRunAsync(
-                        () -> bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream())))
-                .thenRunAsync(() ->
-                        bulkInsert(PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.participations.stream())));
-        CompletableFuture<Void> statusInsert = noDependencyInsert.thenRunAsync(
-                () -> bulkInsert(STATUS, ehrDescriptors.stream().map(e -> e.status)));
+        CompletableFuture<Void> entry = CompletableFuture.runAsync(
+                () -> bulkInsert(ENTRY, ehrDescriptors.stream().flatMap(d -> d.entries.stream()), bulkSize));
+        CompletableFuture<Void> composition = CompletableFuture.runAsync(
+                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
+        CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() ->
+                bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream()), bulkSize));
+        CompletableFuture<Void> participations = CompletableFuture.runAsync(() ->
+                bulkInsert(PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.participations.stream()), bulkSize));
+        if (runVersionUpdates) {
+            // We need a fixed timestamp for version updates because ehrbase uses it for fetching related objects
+            OffsetDateTime additionalVersionBaseDateTime = OffsetDateTime.now();
+
+            entry = entry.thenRunAsync(() -> updateToAddVersions(
+                    ENTRY,
+                    ENTRY.COMPOSITION_ID,
+                    ehrDescriptors,
+                    EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
+                    additionalVersionBaseDateTime));
+            composition = composition.thenRunAsync(() -> updateToAddVersions(
+                    COMPOSITION,
+                    COMPOSITION.ID,
+                    ehrDescriptors,
+                    EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
+                    additionalVersionBaseDateTime));
+            eventContext = eventContext.thenRunAsync(() -> updateToAddVersions(
+                    EVENT_CONTEXT,
+                    EVENT_CONTEXT.COMPOSITION_ID,
+                    ehrDescriptors,
+                    EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
+                    additionalVersionBaseDateTime));
+            participations = participations.thenRunAsync(() -> updateToAddVersions(
+                    PARTICIPATION,
+                    PARTICIPATION.EVENT_CONTEXT,
+                    ehrDescriptors,
+                    EhrCreateDescriptor::getEventCtxIdStreamForVersionCount,
+                    additionalVersionBaseDateTime));
+        }
+        CompletableFuture<Void> auditDetails = CompletableFuture.runAsync(() ->
+                bulkInsert(AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream()), bulkSize));
+        CompletableFuture<Void> contribution = CompletableFuture.runAsync(() ->
+                bulkInsert(CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()), bulkSize));
+        CompletableFuture<Void> partyIdentified = CompletableFuture.runAsync(
+                () -> bulkInsert(PARTY_IDENTIFIED, ehrDescriptors.stream().map(e -> e.subject), bulkSize));
+        CompletableFuture<Void> status = CompletableFuture.runAsync(
+                () -> bulkInsert(STATUS, ehrDescriptors.stream().map(e -> e.status), bulkSize));
+        CompletableFuture<Void> ehr = CompletableFuture.runAsync(
+                () -> bulkInsert(Ehr.EHR_, ehrDescriptors.stream().map(e -> e.ehr), bulkSize));
 
         return CompletableFuture.allOf(
-                statusInsert,
-                compositionInsert.thenRunAsync(() -> updateToAddVersions(
-                        COMPOSITION,
-                        COMPOSITION.ID,
-                        ehrDescriptors,
-                        EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
-                        additionalVersionBaseDateTime)),
-                // TODO: Maybe this can SAFELY run directly after the individual entry insert tasks
-                entryInsert.thenRunAsync(() -> updateToAddVersions(
-                        ENTRY,
-                        ENTRY.COMPOSITION_ID,
-                        ehrDescriptors,
-                        EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
-                        additionalVersionBaseDateTime)),
-                eventContextInsert.thenRunAsync(() -> updateToAddVersions(
-                        EVENT_CONTEXT,
-                        EVENT_CONTEXT.COMPOSITION_ID,
-                        ehrDescriptors,
-                        EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
-                        additionalVersionBaseDateTime)),
-                eventContextInsert.thenRunAsync(() -> updateToAddVersions(
-                        PARTICIPATION,
-                        PARTICIPATION.EVENT_CONTEXT,
-                        ehrDescriptors,
-                        EhrCreateDescriptor::getEventCtxIdStreamForVersionCount,
-                        additionalVersionBaseDateTime)));
+                entry,
+                auditDetails,
+                composition,
+                eventContext,
+                participations,
+                status,
+                partyIdentified,
+                contribution,
+                ehr);
     }
 
     private <T extends Table<R>, R extends TableRecord<R>> void updateToAddVersions(
@@ -448,13 +520,13 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Updates {} for versions took {}", table.getName(), sw.getTotalTimeSeconds());
     }
 
-    private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(T table, Stream<R> records) {
+    private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(T table, Stream<R> records, int bulkSize) {
         StopWatch sw = new StopWatch();
         sw.start();
         List<LoaderError> errors;
         try {
             errors = dsl.loadInto(table)
-                    .bulkAfter(200)
+                    .bulkAfter(bulkSize)
                     .commitNone()
                     .loadRecords(records)
                     .fields(table.fields())

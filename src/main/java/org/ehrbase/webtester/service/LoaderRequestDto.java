@@ -24,8 +24,10 @@ package org.ehrbase.webtester.service;
 public class LoaderRequestDto {
 
     private int ehr = 100;
-
     private int healthcareFacilities = 5;
+    private int bulkSize = 200;
+    private int ehrsPerBatch = 10;
+    private boolean insertVersions = false;
 
     public Integer getEhr() {
         return ehr;
@@ -41,5 +43,29 @@ public class LoaderRequestDto {
 
     public void setHealthcareFacilities(int healthcareFacilities) {
         this.healthcareFacilities = healthcareFacilities;
+    }
+
+    public int getBulkSize() {
+        return bulkSize;
+    }
+
+    public void setBulkSize(int bulkSize) {
+        this.bulkSize = bulkSize;
+    }
+
+    public int getEhrsPerBatch() {
+        return ehrsPerBatch;
+    }
+
+    public void setEhrsPerBatch(int ehrsPerBatch) {
+        this.ehrsPerBatch = ehrsPerBatch;
+    }
+
+    public boolean isInsertVersions() {
+        return insertVersions;
+    }
+
+    public void setInsertVersions(boolean insertVersions) {
+        this.insertVersions = insertVersions;
     }
 }
