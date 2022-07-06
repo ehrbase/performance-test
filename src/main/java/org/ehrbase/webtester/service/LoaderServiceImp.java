@@ -263,6 +263,7 @@ public class LoaderServiceImp implements LoaderService {
                 throw e;
             }
             isRunning = false;
+            log.info("Done!");
         });
     }
 
@@ -272,14 +273,9 @@ public class LoaderServiceImp implements LoaderService {
                 .forEach(table -> dsl.execute(String.format(
                         "ALTER TABLE %s.%s ENABLE TRIGGER ALL;",
                         org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
-        log.info("Recreating GIN index on ehr.entry.entry...");
-        // We use a timeout of 0 since index creation can take a long time
-        dsl.query(String.format(
-                        "CREATE INDEX gin_entry_path_idx ON %s.%s USING gin (%s jsonb_path_ops);",
-                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), ENTRY.getName(), ENTRY.ENTRY_.getName()))
-                .queryTimeout(0)
-                .execute();
-        log.info("Done!");
+
+        log.info(
+                "GIN index on ehr.entry.entry will not be recreated automatically, because it is a very long running operation. Please add it manually! Statement: CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
     }
 
     private void preLoadOperations(LoaderRequestDto properties) {
@@ -381,6 +377,11 @@ public class LoaderServiceImp implements LoaderService {
             stopWatch.stop();
         }
         log.info("Last Batch completed in {} ms", stopWatch.getLastTaskTimeMillis());
+        log.info("Updating ehr.entry.entry with JSONB data...");
+        stopWatch.start("update");
+        waitForTaskToComplete(updateEntryWithJsonb());
+        stopWatch.stop();
+        log.info("JSONB data update completed in {} ms", stopWatch.getLastTaskTimeMillis());
         log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
     }
 
@@ -491,6 +492,20 @@ public class LoaderServiceImp implements LoaderService {
                 partyIdentified,
                 contribution,
                 ehr);
+    }
+
+    private CompletableFuture<Void> updateEntryWithJsonb() {
+
+        return CompletableFuture.allOf(IntStream.range(0, compositions.size())
+                .mapToObj(i -> CompletableFuture.runAsync(() -> log.info(
+                        "comp {} update count: {}",
+                        i,
+                        dsl.update(ENTRY)
+                                .set(ENTRY.ENTRY_, JSONB.jsonb(rawJson.marshal(compositions.get(i))))
+                                .where(ENTRY.SEQUENCE.eq(i))
+                                .queryTimeout(0)
+                                .execute())))
+                .toArray(CompletableFuture[]::new));
     }
 
     private <T extends Table<R>, R extends TableRecord<R>> void updateToAddVersions(
@@ -756,7 +771,11 @@ public class LoaderServiceImp implements LoaderService {
                 ehrId, compositionData, composerId, contribution.getLeft().getId(), sysTransaction);
         createDescriptor.composition = composition.getLeft();
         createDescriptor.compositionAudit = composition.getRight();
-        createDescriptor.entry = createEntry(composition.getLeft().getId(), compositionData, sysTransaction);
+        createDescriptor.entry = createEntry(
+                composition.getLeft().getId(),
+                compositionData,
+                sysTransaction,
+                compositionNumber % compositions.size());
         createDescriptor.eventContext = createEventContext(
                 composition.getLeft().getId(), compositionData.getContext(), facility, sysTransaction);
         if (hcpCount > 1 && hcpIds.size() > 1) {
@@ -908,18 +927,19 @@ public class LoaderServiceImp implements LoaderService {
     /**
      * Creates an {@link EntryRecord} for the given composition.
      */
-    private EntryRecord createEntry(UUID compositionId, Composition composition, OffsetDateTime sysTransaction) {
+    private EntryRecord createEntry(
+            UUID compositionId, Composition composition, OffsetDateTime sysTransaction, int compositionIndex) {
         Assert.notNull(composition.getArchetypeDetails().getTemplateId(), "Template Id must not be null");
 
         EntryRecord entryRecord = dsl.newRecord(ENTRY);
         entryRecord.setCompositionId(compositionId);
-        entryRecord.setSequence(0);
+        entryRecord.setSequence(compositionIndex);
         entryRecord.setItemType(resolveEntryType(composition));
         entryRecord.setTemplateId(
                 composition.getArchetypeDetails().getTemplateId().getValue());
         entryRecord.setArchetypeId(composition.getArchetypeNodeId());
         entryRecord.setCategory(createDvCodedText(composition.getCategory()));
-        entryRecord.setEntry(JSONB.jsonb(rawJson.marshal(composition)));
+        // entryRecord.setEntry(JSONB.jsonb(rawJson.marshal(composition)));
         entryRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
         entryRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
         entryRecord.setRmVersion(composition.getArchetypeDetails().getRmVersion());
