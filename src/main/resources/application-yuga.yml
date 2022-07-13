@@ -4,6 +4,7 @@ spring:
     driver-class-name: com.yugabyte.Driver
     hikari:
       maximum-pool-size: 20
+      connection-init-sql: 'SET yb_disable_transactional_writes=true'
   jooq:
     sql-dialect: YUGABYTEDB
 

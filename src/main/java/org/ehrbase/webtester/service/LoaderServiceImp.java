@@ -17,12 +17,7 @@
  */
 package org.ehrbase.webtester.service;
 
-import static org.ehrbase.jooq.pg.Tables.COMPOSITION_HISTORY;
-import static org.ehrbase.jooq.pg.Tables.ENTRY_HISTORY;
-import static org.ehrbase.jooq.pg.Tables.EVENT_CONTEXT_HISTORY;
-import static org.ehrbase.jooq.pg.Tables.PARTICIPATION_HISTORY;
 import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
-import static org.ehrbase.jooq.pg.Tables.STATUS_HISTORY;
 import static org.ehrbase.jooq.pg.Tables.SYSTEM;
 import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
 import static org.ehrbase.jooq.pg.tables.Composition.COMPOSITION;
@@ -50,6 +45,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.security.SecureRandom;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -61,12 +60,14 @@ import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -87,7 +88,6 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
-import org.ehrbase.jooq.pg.Indexes;
 import org.ehrbase.jooq.pg.enums.ContributionChangeType;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.jooq.pg.enums.ContributionState;
@@ -145,22 +145,6 @@ public class LoaderServiceImp implements LoaderService {
     private static final String[] COMPOSITIONS = {
         "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
     };
-    private static final Table[] RELEVANT_TABLES = {
-        PARTY_IDENTIFIED,
-        SYSTEM,
-        AUDIT_DETAILS,
-        COMPOSITION,
-        COMPOSITION_HISTORY,
-        CONTRIBUTION,
-        ENTRY,
-        ENTRY_HISTORY,
-        EVENT_CONTEXT,
-        EVENT_CONTEXT_HISTORY,
-        PARTICIPATION,
-        PARTICIPATION_HISTORY,
-        STATUS,
-        STATUS_HISTORY
-    };
     private static final Table[] RELEVANT_VERSIONED_TABLES = {COMPOSITION, ENTRY, EVENT_CONTEXT, PARTICIPATION, STATUS};
     private static final int MAX_COMPOSITION_VERSIONS = 3;
     private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
@@ -174,6 +158,7 @@ public class LoaderServiceImp implements LoaderService {
     private final RawJson rawJson = new RawJson();
     private final DSLContext dsl;
     private final Map<String, Integer> territories = new HashMap<>();
+    private final Set<String> tableNames = new HashSet<>();
 
     private UUID systemId;
     private UUID committerId;
@@ -186,14 +171,26 @@ public class LoaderServiceImp implements LoaderService {
 
     @PostConstruct
     public void initialize() {
+        // Initialize everything that does not require DB inserts,
+        // because inserts with indexes present are likely to fail with non-transactional writes
         zoneId = ZoneId.systemDefault().toString();
-        systemId = getSystemId();
-        committerId = getCommitterId();
         territories.putAll(dsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE).from(TERRITORY).fetch().stream()
                 .collect(Collectors.toMap(Record2::value1, Record2::value2)));
-
-        initializeTemplates();
         initializeCompositions();
+        dsl.connection(this::initTableNames);
+    }
+
+    private void initTableNames(Connection c) {
+        try (Statement s = c.createStatement()) {
+            s.execute("SELECT tablename FROM pg_tables WHERE schemaname='ehr';");
+            try (ResultSet resultSet = s.getResultSet()) {
+                while (resultSet.next()) {
+                    tableNames.add(resultSet.getString(1));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void initializeTemplates() {
@@ -255,9 +252,14 @@ public class LoaderServiceImp implements LoaderService {
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
-                preLoadOperations(properties);
+                // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
+                List<Constraint> indexConstraints = dsl.connectionResult(this::findConstraints);
+                List<Triple<String, String, String>> indexes = dsl.connectionResult(connection -> findIndexes(
+                        connection,
+                        indexConstraints.stream().map(c -> c.constraintName).collect(Collectors.toList())));
+                preLoadOperations(properties, indexes, indexConstraints);
                 loadInternal(properties);
-                postLoadOperations();
+                postLoadOperations(indexes, indexConstraints);
             } catch (RuntimeException e) {
                 isRunning = false;
                 throw e;
@@ -267,35 +269,125 @@ public class LoaderServiceImp implements LoaderService {
         });
     }
 
-    private void postLoadOperations() {
-        log.info("Re-enabling triggers...");
-        Arrays.stream(RELEVANT_TABLES)
-                .forEach(table -> dsl.execute(String.format(
-                        "ALTER TABLE %s.%s ENABLE TRIGGER ALL;",
-                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
-
-        log.info(
-                "GIN index on ehr.entry.entry will not be recreated automatically, because it is a very long running operation. Please add it manually! Statement: CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
+    private List<Triple<String, String, String>> findIndexes(Connection c, List<String> constraintNames) {
+        try (Statement s = c.createStatement()) {
+            s.execute(String.format(
+                    "SELECT schemaname, indexname, indexdef\n" + "FROM pg_indexes\n"
+                            + "WHERE schemaname = 'ehr'"
+                            + "AND indexname NOT IN (%s)",
+                    constraintNames.stream().map(t -> "'" + t + "'").collect(Collectors.joining(","))));
+            List<Triple<String, String, String>> parsed = new ArrayList<>();
+            try (ResultSet resultSet = s.getResultSet()) {
+                while (resultSet.next()) {
+                    parsed.add(Triple.of(resultSet.getString(1), resultSet.getString(2), resultSet.getString(3)));
+                }
+            }
+            return parsed;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    private void preLoadOperations(LoaderRequestDto properties) {
-        log.info("Dropping GIN index on ehr.entry.entry...");
-        dsl.execute(String.format(
-                "DROP INDEX IF EXISTS %s.%s;",
-                org.ehrbase.jooq.pg.Ehr.EHR.getName(), Indexes.GIN_ENTRY_PATH_IDX.getName()));
-        log.info("Disabling all non-versioning triggers...");
+    private static class Constraint {
+        private String schema;
+        private String table;
+        private String constraintName;
+        private String type;
+        private String definition;
+
+        private Constraint(String schema, String table, String constraintName, String type, String definition) {
+            this.schema = schema;
+            this.table = table;
+            this.constraintName = constraintName;
+            this.type = type;
+            this.definition = definition;
+        }
+    }
+
+    private List<Constraint> findConstraints(Connection c) {
+        try (Statement s = c.createStatement()) {
+            s.execute("SELECT nsp.nspname,rel.relname,con.conname, con.contype, pg_get_constraintdef(con.oid)"
+                    + "       FROM pg_catalog.pg_constraint con"
+                    + "            INNER JOIN pg_catalog.pg_class rel"
+                    + "                       ON rel.oid = con.conrelid"
+                    + "            INNER JOIN pg_catalog.pg_namespace nsp"
+                    + "                       ON nsp.oid = connamespace"
+                    + "       WHERE nsp.nspname = 'ehr' AND con.contype IN ('u','p');");
+            List<Constraint> parsed = new ArrayList<>();
+            try (ResultSet resultSet = s.getResultSet()) {
+                while (resultSet.next()) {
+                    parsed.add(new Constraint(
+                            resultSet.getString(1),
+                            resultSet.getString(2),
+                            resultSet.getString(3),
+                            resultSet.getString(4),
+                            resultSet.getString(5)));
+                }
+            }
+            return parsed;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void preLoadOperations(
+            LoaderRequestDto properties, List<Triple<String, String, String>> indexes, List<Constraint> constraints) {
+        log.info("Dropping indexes (including unique constraints) on relevant tables: {}", tableNames);
+        constraints.stream().filter(c -> "u".equalsIgnoreCase(c.type)).forEach(c -> {
+            log.info("Dropping unique constraint {} on table {}", c.constraintName, c.table);
+            dsl.execute(String.format(
+                    "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", c.schema, c.table, c.constraintName));
+        });
+        indexes.forEach(indexInfo -> {
+            log.info("Dropping index {}.{}", indexInfo.getLeft(), indexInfo.getMiddle());
+            dsl.execute(String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getLeft(), indexInfo.getMiddle()));
+        });
+
+        log.info("Disabling all triggers...");
         // We assume Postgres or Yugabyte as DB vendor -> disabling triggers will also disable foreign key
         // constraints
-        Arrays.stream(RELEVANT_TABLES)
-                .forEach(table -> dsl.execute(String.format(
-                        "ALTER TABLE %s.%s DISABLE TRIGGER ALL;",
-                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
+        tableNames.forEach(table -> dsl.execute(
+                String.format("ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
         if (properties.isInsertVersions()) {
+            log.info("Re-Enabling versioning_trigger");
             Arrays.stream(RELEVANT_VERSIONED_TABLES)
                     .forEach(table -> dsl.execute(String.format(
                             "ALTER TABLE %s.%s ENABLE TRIGGER versioning_trigger;",
                             org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
         }
+
+        // We initialize the following stuff, because they might perform DB inserts.
+        // These will fail if indexes are present, because our connections are set for non-transactional writes
+        if (systemId == null) {
+            systemId = getSystemId();
+        }
+        if (committerId == null) {
+            committerId = getCommitterId();
+        }
+        initializeTemplates();
+    }
+
+    private void postLoadOperations(List<Triple<String, String, String>> indexes, List<Constraint> constraints) {
+        log.info("Re-enabling triggers...");
+        tableNames.forEach(table -> dsl.execute(
+                String.format("ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
+        log.info("Re-Creating indexes...");
+        indexes.stream()
+                .filter(i -> "gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
+                .forEach(indexInfo -> {
+                    log.info("Re-Creating index {}.{}", indexInfo.getLeft(), indexInfo.getMiddle());
+                    dsl.execute(indexInfo.getRight());
+                });
+        log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
+                + "because it is a very long running operation. "
+                + "Please add it manually! "
+                + "Statement: CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
+        log.info("Re-Creating unique constraints...");
+        constraints.stream().filter(c -> "u".equalsIgnoreCase(c.type)).forEach(c -> {
+            log.info("Re-Creating unique constraint {} on table {}.{}", c.constraintName, c.schema, c.table);
+            dsl.execute(String.format(
+                    "ALTER TABLE %s.%s ADD CONSTRAINT %s %s", c.schema, c.table, c.constraintName, c.definition));
+        });
     }
 
     private void loadInternal(LoaderRequestDto properties) {
