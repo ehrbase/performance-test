@@ -373,7 +373,7 @@ public class LoaderServiceImp implements LoaderService {
                 String.format("ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
         log.info("Re-Creating indexes...");
         indexes.stream()
-                .filter(i -> "gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
+                .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
                 .forEach(indexInfo -> {
                     log.info("Re-Creating index {}.{}", indexInfo.getLeft(), indexInfo.getMiddle());
                     dsl.execute(indexInfo.getRight());
