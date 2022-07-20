@@ -372,12 +372,11 @@ public class LoaderServiceImp implements LoaderService {
         tableNames.forEach(table -> dsl.execute(
                 String.format("ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
         log.info("Re-Creating indexes...");
-        indexes.stream()
-                .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
-                .forEach(indexInfo -> {
-                    log.info("Re-Creating index {}.{}", indexInfo.getLeft(), indexInfo.getMiddle());
-                    dsl.execute(indexInfo.getRight());
-                });
+        dsl.connection(c -> createIndexes(c,
+                                          indexes.stream()
+                                              .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
+                                              .map(Triple::getRight)
+                                              .collect(Collectors.toList())));
         log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
                 + "because it is a very long running operation. "
                 + "Please add it manually! "
@@ -388,6 +387,23 @@ public class LoaderServiceImp implements LoaderService {
             dsl.execute(String.format(
                     "ALTER TABLE %s.%s ADD CONSTRAINT %s %s", c.schema, c.table, c.constraintName, c.definition));
         });
+    }
+
+    private void createIndexes(Connection c, List<String> createStatements){
+        try(Statement s = c.createStatement()){
+            if("yugabytedb".equalsIgnoreCase(dsl.configuration().dialect().getNameLC())) {
+                //This is only supported on yugabyte
+                createStatements.add(0, "SET yb_disable_transactional_writes=false");
+                createStatements.add("SET yb_disable_transactional_writes=true");
+            }
+            s.setQueryTimeout(0);
+            for (String createStatement : createStatements) {
+                s.addBatch(createStatement + ";");
+            }
+            s.executeBatch();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void loadInternal(LoaderRequestDto properties) {
