@@ -372,11 +372,12 @@ public class LoaderServiceImp implements LoaderService {
         tableNames.forEach(table -> dsl.execute(
                 String.format("ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
         log.info("Re-Creating indexes...");
-        dsl.connection(c -> createIndexes(c,
-                                          indexes.stream()
-                                              .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
-                                              .map(Triple::getRight)
-                                              .collect(Collectors.toList())));
+        dsl.connection(c -> createIndexes(
+                c,
+                indexes.stream()
+                        .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
+                        .map(Triple::getRight)
+                        .collect(Collectors.toList())));
         log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
                 + "because it is a very long running operation. "
                 + "Please add it manually! "
@@ -389,10 +390,10 @@ public class LoaderServiceImp implements LoaderService {
         });
     }
 
-    private void createIndexes(Connection c, List<String> createStatements){
-        try(Statement s = c.createStatement()){
-            if("yugabytedb".equalsIgnoreCase(dsl.configuration().dialect().getNameLC())) {
-                //This is only supported on yugabyte
+    private void createIndexes(Connection c, List<String> createStatements) {
+        try (Statement s = c.createStatement()) {
+            if ("yugabytedb".equalsIgnoreCase(dsl.configuration().dialect().getNameLC())) {
+                // This is only supported on yugabyte
                 createStatements.add(0, "SET yb_disable_transactional_writes=false");
                 createStatements.add("SET yb_disable_transactional_writes=true");
             }
