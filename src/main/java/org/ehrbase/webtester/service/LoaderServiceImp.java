@@ -369,10 +369,14 @@ public class LoaderServiceImp implements LoaderService {
 
     private void postLoadOperations(List<Triple<String, String, String>> indexes, List<Constraint> constraints) {
         log.info("Re-enabling triggers...");
-        tableNames.forEach(table -> dsl.execute(
-                String.format("ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
+        dsl.connection(c -> runStatementsWithTransactionalWrites(
+                c,
+                tableNames.stream()
+                        .map(table -> String.format(
+                                "ALTER TABLE %s.%s ENABLE TRIGGER ALL", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
+                        .collect(Collectors.toList())));
         log.info("Re-Creating indexes...");
-        dsl.connection(c -> createIndexes(
+        dsl.connection(c -> runStatementsWithTransactionalWrites(
                 c,
                 indexes.stream()
                         .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
@@ -383,14 +387,17 @@ public class LoaderServiceImp implements LoaderService {
                 + "Please add it manually! "
                 + "Statement: CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
         log.info("Re-Creating unique constraints...");
-        constraints.stream().filter(c -> "u".equalsIgnoreCase(c.type)).forEach(c -> {
-            log.info("Re-Creating unique constraint {} on table {}.{}", c.constraintName, c.schema, c.table);
-            dsl.execute(String.format(
-                    "ALTER TABLE %s.%s ADD CONSTRAINT %s %s", c.schema, c.table, c.constraintName, c.definition));
-        });
+        dsl.connection(c -> runStatementsWithTransactionalWrites(
+                c,
+                constraints.stream()
+                        .filter(cs -> "u".equalsIgnoreCase(cs.type))
+                        .map(cs -> String.format(
+                                "ALTER TABLE %s.%s ADD CONSTRAINT %s %s",
+                                cs.schema, cs.table, cs.constraintName, cs.definition))
+                        .collect(Collectors.toList())));
     }
 
-    private void createIndexes(Connection c, List<String> createStatements) {
+    private void runStatementsWithTransactionalWrites(Connection c, List<String> createStatements) {
         try (Statement s = c.createStatement()) {
             if ("yugabytedb".equalsIgnoreCase(dsl.configuration().dialect().getNameLC())) {
                 // This is only supported on yugabyte
