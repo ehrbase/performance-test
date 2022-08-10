@@ -1,0 +1,745 @@
+{
+    "_type": "COMPOSITION",
+    "name": {
+        "_type": "DV_TEXT",
+        "value": "medication_order"
+    },
+    "archetype_details": {
+        "archetype_id": {
+            "value": "openEHR-EHR-COMPOSITION.encounter.v1"
+        },
+        "template_id": {
+            "value": "medication_order"
+        },
+        "rm_version": "1.0.4"
+    },
+    "language": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "ISO_639-1"
+        },
+        "code_string": "en"
+    },
+    "territory": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "ISO_3166-1"
+        },
+        "code_string": "DE"
+    },
+    "category": {
+        "_type": "DV_CODED_TEXT",
+        "value": "event",
+        "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+                "_type": "TERMINOLOGY_ID",
+                "value": "openehr"
+            },
+            "code_string": "433"
+        }
+    },
+    "composer": {
+        "_type": "PARTY_IDENTIFIED",
+        "name": "Max Mustermann"
+    },
+    "context": {
+        "_type": "EVENT_CONTEXT",
+        "start_time": {
+            "_type": "DV_DATE_TIME",
+            "value": "2022-02-03T04:05:06.000"
+        },
+        "end_time": {
+            "_type": "DV_DATE_TIME",
+            "value": "2022-02-03T04:05:06.000"
+        },
+        "setting": {
+            "_type": "DV_CODED_TEXT",
+            "value": "home",
+            "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "openehr"
+                },
+                "code_string": "225"
+            }
+        },
+        "health_care_facility": {
+            "_type": "PARTY_IDENTIFIED",
+            "name": "DOE, John"
+        }
+    },
+    "content": [
+        {
+            "_type": "INSTRUCTION",
+            "name": {
+                "_type": "DV_TEXT",
+                "value": "Medication order"
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-EHR-INSTRUCTION.medication_order.v3"
+                },
+                "template_id": {
+                    "value": "medication_order"
+                },
+                "rm_version": "1.0.4"
+            },
+            "language": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "ISO_639-1"
+                },
+                "code_string": "en"
+            },
+            "encoding": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "IANA_character-sets"
+                },
+                "code_string": "ISO-10646-UTF-1"
+            },
+            "workflow_id": {
+                "_type": "OBJECT_REF",
+                "namespace": "unknown",
+                "type": "ANY",
+                "id": {
+                    "_type": "GENERIC_ID",
+                    "value": "3db43522-c1bf-34fe-9a03-b063ae37cdb7",
+                    "scheme": "scheme"
+                }
+            },
+            "subject": {
+                "_type": "PARTY_SELF"
+            },
+            "provider": {
+                "_type": "PARTY_SELF"
+            },
+            "protocol": {
+                "_type": "ITEM_TREE",
+                "name": {
+                    "_type": "DV_TEXT",
+                    "value": "Dose amount description"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "name": {
+                            "_type": "DV_TEXT",
+                            "value": "Order identifier"
+                        },
+                        "value": {
+                            "_type": "DV_IDENTIFIER",
+                            "id": "dev/null"
+                        },
+                        "archetype_node_id": "at0004"
+                    }
+                ],
+                "archetype_node_id": "at0005",
+                "uid": {
+                    "_type": "HIER_OBJECT_ID",
+                    "value": "290d0f4f-ab20-372e-8afc-d70b710b865e"
+                }
+            },
+            "guideline_id": {
+                "_type": "OBJECT_REF",
+                "namespace": "unknown",
+                "type": "ANY",
+                "id": {
+                    "_type": "GENERIC_ID",
+                    "value": "a217d528-787b-3c0f-9e95-53d8c09dc303",
+                    "scheme": "scheme"
+                }
+            },
+            "narrative": {
+                "_type": "DV_TEXT",
+                "value": "Lorem ipsum"
+            },
+            "wf_definition": {
+                "_type": "DV_PARSABLE",
+                "value": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Hello World</title></head><body>Hello World!</body></html>",
+                "formalism": "text/html"
+            },
+            "activities": [
+                {
+                    "_type": "ACTIVITY",
+                    "name": {
+                        "_type": "DV_TEXT",
+                        "value": "Order"
+                    },
+                    "description": {
+                        "_type": "ITEM_TREE",
+                        "name": {
+                            "_type": "DV_TEXT",
+                            "value": "Tree"
+                        },
+                        "items": [
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Medication item"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0070"
+                            },
+                            {
+                                "_type": "CLUSTER",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Medication"
+                                },
+                                "archetype_details": {
+                                    "archetype_id": {
+                                        "value": "openEHR-EHR-CLUSTER.medication.v1"
+                                    },
+                                    "template_id": {
+                                        "value": "medication_order"
+                                    },
+                                    "rm_version": "1.0.4"
+                                },
+                                "items": [
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Form"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0071"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Category"
+                                        },
+                                        "value": {
+                                            "_type": "DV_CODED_TEXT",
+                                            "value": "Ad-hoc mixture",
+                                            "defining_code": {
+                                                "_type": "CODE_PHRASE",
+                                                "terminology_id": {
+                                                    "_type": "TERMINOLOGY_ID",
+                                                    "value": "local"
+                                                },
+                                                "code_string": "at0143"
+                                            }
+                                        },
+                                        "archetype_node_id": "at0142"
+                                    },
+                                    {
+                                        "_type": "CLUSTER",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Strength (presentation)"
+                                        },
+                                        "items": [
+                                            {
+                                                "_type": "ELEMENT",
+                                                "name": {
+                                                    "_type": "DV_TEXT",
+                                                    "value": "Strength numerator"
+                                                },
+                                                "value": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "units": "1",
+                                                    "magnitude": 21.0
+                                                },
+                                                "archetype_node_id": "at0153"
+                                            },
+                                            {
+                                                "_type": "ELEMENT",
+                                                "name": {
+                                                    "_type": "DV_TEXT",
+                                                    "value": "Strength numerator unit"
+                                                },
+                                                "value": {
+                                                    "_type": "DV_TEXT",
+                                                    "value": "Lorem ipsum"
+                                                },
+                                                "archetype_node_id": "at0004"
+                                            },
+                                            {
+                                                "_type": "ELEMENT",
+                                                "name": {
+                                                    "_type": "DV_TEXT",
+                                                    "value": "Strength denominator"
+                                                },
+                                                "value": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "units": "1",
+                                                    "magnitude": 21.0
+                                                },
+                                                "archetype_node_id": "at0157"
+                                            },
+                                            {
+                                                "_type": "ELEMENT",
+                                                "name": {
+                                                    "_type": "DV_TEXT",
+                                                    "value": "Strength denominator unit"
+                                                },
+                                                "value": {
+                                                    "_type": "DV_TEXT",
+                                                    "value": "Lorem ipsum"
+                                                },
+                                                "archetype_node_id": "at0005"
+                                            }
+                                        ],
+                                        "archetype_node_id": "at0152",
+                                        "uid": {
+                                            "_type": "HIER_OBJECT_ID",
+                                            "value": "2f1a0624-baa0-32c5-8080-87ee80e0156f"
+                                        }
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Unit of presentation"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0158"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Strength (concentration)"
+                                        },
+                                        "value": {
+                                            "_type": "DV_QUANTITY",
+                                            "units": "mm",
+                                            "magnitude": 22.0
+                                        },
+                                        "archetype_node_id": "at0115"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Amount"
+                                        },
+                                        "value": {
+                                            "_type": "DV_QUANTITY",
+                                            "units": "1",
+                                            "magnitude": 21.0
+                                        },
+                                        "archetype_node_id": "at0139"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Amount unit"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0008"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Alternate amount"
+                                        },
+                                        "value": {
+                                            "_type": "DV_QUANTITY",
+                                            "units": "1",
+                                            "magnitude": 21.0
+                                        },
+                                        "archetype_node_id": "at0148"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Alternate amount unit"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0007"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Description"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0133"
+                                    }
+                                ],
+                                "archetype_node_id": "openEHR-EHR-CLUSTER.medication.v1",
+                                "uid": {
+                                    "_type": "HIER_OBJECT_ID",
+                                    "value": "c4b3a844-ffe6-3a7f-aa60-3dede699ad3c"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Route"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0091"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Body site"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0092"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Administration method"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0094"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Overall directions description"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0009"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Parsable directions"
+                                },
+                                "value": {
+                                    "_type": "DV_PARSABLE",
+                                    "value": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Hello World</title></head><body>Hello World!</body></html>",
+                                    "formalism": "text/html"
+                                },
+                                "archetype_node_id": "at0047"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Specific directions description"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0173"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Dosage justification"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0174"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Clinical indication"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0018"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Therapeutic intent"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0148"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Clinician guidance"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0179"
+                            },
+                            {
+                                "_type": "CLUSTER",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Order details"
+                                },
+                                "items": [
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Order start date/time"
+                                        },
+                                        "value": {
+                                            "_type": "DV_DATE_TIME",
+                                            "value": "2022-02-03T04:05:06.000"
+                                        },
+                                        "archetype_node_id": "at0012"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Order stop date/time"
+                                        },
+                                        "value": {
+                                            "_type": "DV_DATE_TIME",
+                                            "value": "2022-02-03T04:05:06.000"
+                                        },
+                                        "archetype_node_id": "at0013"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Order start criterion"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0011"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Order stop criterion"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0016"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Administrations completed"
+                                        },
+                                        "value": {
+                                            "_type": "DV_COUNT",
+                                            "magnitude": 21
+                                        },
+                                        "archetype_node_id": "at0060"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Duration of order completed"
+                                        },
+                                        "value": {
+                                            "_type": "DV_DURATION",
+                                            "value": "PT0S"
+                                        },
+                                        "archetype_node_id": "at0050"
+                                    }
+                                ],
+                                "archetype_node_id": "at0113",
+                                "uid": {
+                                    "_type": "HIER_OBJECT_ID",
+                                    "value": "778ef72e-1cb4-32d4-a5f1-2c60eb7cb51a"
+                                }
+                            },
+                            {
+                                "_type": "CLUSTER",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Dispense directions"
+                                },
+                                "items": [
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Dispense instruction"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0106"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Substitution direction"
+                                        },
+                                        "value": {
+                                            "_type": "DV_CODED_TEXT",
+                                            "value": "Permitted",
+                                            "defining_code": {
+                                                "_type": "CODE_PHRASE",
+                                                "terminology_id": {
+                                                    "_type": "TERMINOLOGY_ID",
+                                                    "value": "local"
+                                                },
+                                                "code_string": "at0168"
+                                            }
+                                        },
+                                        "archetype_node_id": "at0132"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Non-substitution reason"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0154"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Priority"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Lorem ipsum"
+                                        },
+                                        "archetype_node_id": "at0139"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Dispensing start date"
+                                        },
+                                        "value": {
+                                            "_type": "DV_DATE_TIME",
+                                            "value": "2022-02-03T04:05:06.000"
+                                        },
+                                        "archetype_node_id": "at0155"
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Dispensing expiry date"
+                                        },
+                                        "value": {
+                                            "_type": "DV_DATE_TIME",
+                                            "value": "2022-02-03T04:05:06.000"
+                                        },
+                                        "archetype_node_id": "at0161"
+                                    }
+                                ],
+                                "archetype_node_id": "at0129",
+                                "uid": {
+                                    "_type": "HIER_OBJECT_ID",
+                                    "value": "4e35d8a7-a43e-32aa-98b5-6d75f5da486c"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Comment"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Lorem ipsum"
+                                },
+                                "archetype_node_id": "at0167"
+                            }
+                        ],
+                        "archetype_node_id": "at0002",
+                        "uid": {
+                            "_type": "HIER_OBJECT_ID",
+                            "value": "7297c415-52c5-351d-9b71-5af4393e263b"
+                        }
+                    },
+                    "timing": {
+                        "_type": "DV_PARSABLE",
+                        "value": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Hello World</title></head><body>Hello World!</body></html>",
+                        "formalism": "text/html"
+                    },
+                    "action_archetype_id": "/.*/",
+                    "archetype_node_id": "at0001",
+                    "uid": {
+                        "_type": "HIER_OBJECT_ID",
+                        "value": "eeef2f5d-be4f-3217-9e63-937b99c9bc91"
+                    }
+                }
+            ],
+            "archetype_node_id": "openEHR-EHR-INSTRUCTION.medication_order.v3",
+            "uid": {
+                "_type": "HIER_OBJECT_ID",
+                "value": "56346e17-1a49-36fe-a5d3-a34b19cafd36"
+            }
+        }
+    ],
+    "archetype_node_id": "openEHR-EHR-COMPOSITION.encounter.v1",
+    "uid": {
+        "_type": "HIER_OBJECT_ID",
+        "value": "60506a97-c96d-311d-8ac6-87882a186ac7"
+    }
+}

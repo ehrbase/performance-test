@@ -42,9 +42,13 @@ import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.TermMapping;
 import com.nedap.archie.rm.support.identification.TerminologyId;
 import com.zaxxer.hikari.HikariDataSource;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -59,6 +63,7 @@ import java.time.temporal.TemporalAccessor;
 import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -137,21 +142,12 @@ import org.xml.sax.SAXException;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class LoaderServiceImp implements LoaderService {
 
-    private static final String TEMPLATES_BASE = "templates/";
-    private static final String[] TEMPLATES = {
-        "corona_anamnese.opt",
-        "ehrbase_blood_pressure.opt",
-        "virologischer_befund.opt",
-        "international_patient_summary.opt"
-    };
-    private static final String COMPOSITIONS_BASE = "compositions/";
-    private static final String[] COMPOSITIONS = {
-        "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
-    };
+    private static final String TEMPLATES_BASE = "classpath:templates/";
+    private static final String COMPOSITIONS_BASE = "classpath:compositions/";
     private static final int MAX_COMPOSITION_VERSIONS = 3;
     private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
     private static final String SYS_PERIOD_FIELD_NAME = "sys_period";
-    private static final int JSONB_INSERT_BATCH_SIZE = 10000;
+    private static final int JSONB_INSERT_BATCH_SIZE = 1000;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
     // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
     // otherwise
@@ -160,6 +156,7 @@ public class LoaderServiceImp implements LoaderService {
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
     private final DSLContext dsl;
+    private final HikariDataSource primaryDataSource;
     private final HikariDataSource secondaryDataSource;
     private final Map<String, Integer> territories = new HashMap<>();
 
@@ -168,9 +165,10 @@ public class LoaderServiceImp implements LoaderService {
     private String zoneId;
     private boolean isRunning = false;
 
-    public LoaderServiceImp(DSLContext dsl, @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource) {
+    public LoaderServiceImp(DSLContext dsl, @Qualifier("primaryDataSource") HikariDataSource primaryDataSource, @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource) {
         this.dsl = dsl;
         this.secondaryDataSource = secondaryDataSource;
+        this.primaryDataSource = primaryDataSource;
     }
 
     @PostConstruct
@@ -178,9 +176,9 @@ public class LoaderServiceImp implements LoaderService {
         // Initialize everything that does not require DB inserts,
         // because inserts with indexes present are likely to fail with non-transactional writes
         zoneId = ZoneId.systemDefault().toString();
+        initializeCompositions();
         territories.putAll(dsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE).from(TERRITORY).fetch().stream()
                 .collect(Collectors.toMap(Record2::value1, Record2::value2)));
-        initializeCompositions();
     }
 
     private Set<String> getTableNames() {
@@ -200,15 +198,22 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void initializeTemplates() {
-        Stream.of(TEMPLATES).map(p -> TEMPLATES_BASE + p).forEach(p -> {
-            String templateId;
-            try (var in = ResourceUtils.getInputStream(p); ) {
-                templateId = xpath(in, "//template/template_id/value/text()");
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            createTemplate(templateId, p);
-        });
+        try {
+            Arrays.stream(org.springframework.util.ResourceUtils.getFile(TEMPLATES_BASE).listFiles())
+                .filter(File::isFile)
+                .map(File::toPath)
+                .forEach(f -> {
+                    String templateId;
+                    try (InputStream in = Files.newInputStream(f)) {
+                        templateId = xpath(in, "//template/template_id/value/text()");
+                        createTemplate(templateId, f);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String xpath(InputStream document, String xpathExpression) {
@@ -226,18 +231,22 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void initializeCompositions() {
-        Stream.of(COMPOSITIONS)
-                .map(p -> COMPOSITIONS_BASE + p)
-                .map(ResourceUtils::getContent)
-                .map(p -> {
-                    try {
-                        return objectMapper.readValue(p, Composition.class);
-                    } catch (IOException e) {
-                        throw new LoaderException("Failed to read composition file", e);
-                    }
-                })
-                .map(c -> Pair.of(c, JSONB.jsonb(rawJson.marshal(c))))
-                .forEach(compositions::add);
+        try {
+            Arrays.stream(org.springframework.util.ResourceUtils.getFile(COMPOSITIONS_BASE).listFiles())
+                .filter(File::isFile)
+                .map(File::toPath)
+                    .map(p -> {
+                        try {
+                            return objectMapper.readValue(Files.readString(p), Composition.class);
+                        } catch (IOException e) {
+                            throw new LoaderException("Failed to read composition file", e);
+                        }
+                    })
+                    .map(c -> Pair.of(c, JSONB.jsonb(rawJson.marshal(c))))
+                    .forEach(compositions::add);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -634,15 +643,22 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Count comp {} took {}ms",compositionNumber,sw.getLastTaskTimeMillis());
         for (long i = 0; i < loops; i++) {
             sw.start("batch"+i);
-            Integer insertCount = dsl.connectionResult(c -> copyBatchIntoEntryTableWithJsonb(c, compositionNumber));
-            sw.stop();
-            log.info("Copy comp {} batch: {}, count: {}, time: {}ms", compositionNumber, i, insertCount,sw.getLastTaskTimeMillis());
+            try {
+                int insertCount;
+                insertCount = copyBatchIntoEntryTableWithJsonb(compositionNumber);
+                sw.stop();
+                log.info("Copy comp {} batch: {}, count: {}, time: {}ms", compositionNumber, i, insertCount,sw.getLastTaskTimeMillis());
+            } catch (SQLException e) {
+                sw.stop();
+                log.error("Error while processing comp "+compositionNumber+" batch: "+i, e);
+                i--;
+            }
         }
         log.info("Copying comp {} done in {}s",compositionNumber,sw.getTotalTimeSeconds());
     }
 
-    private int copyBatchIntoEntryTableWithJsonb(Connection c, int compositionNumber) {
-        try (Statement s = c.createStatement()) {
+    private int copyBatchIntoEntryTableWithJsonb( int compositionNumber) throws SQLException {
+        try (Connection c = primaryDataSource.getConnection(); Statement s = c.createStatement()) {
             s.setQueryTimeout(0);
             String statement = String.format(
                 "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
@@ -666,10 +682,7 @@ public class LoaderServiceImp implements LoaderService {
                 JSONB_INSERT_BATCH_SIZE,
                 compositions.get(compositionNumber).getValue().data());
             return s.executeUpdate(statement);
-        } catch (SQLException e) {
-            log.error("Error while copying entries with JSONB", e);
         }
-        return 0;
     }
 
     private long entryTableSize(int compositionNumber) {
@@ -1065,7 +1078,7 @@ public class LoaderServiceImp implements LoaderService {
         return committerRecord.getId();
     }
 
-    private void createTemplate(String templateId, String resourceLocation) {
+    private void createTemplate(String templateId, Path file) throws IOException {
         var existingTemplateStore = dsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
 
         if (existingTemplateStore.isPresent()) {
@@ -1074,7 +1087,7 @@ public class LoaderServiceImp implements LoaderService {
             var templateStoreRecord = dsl.newRecord(TEMPLATE_STORE);
             templateStoreRecord.setId(UUID.randomUUID());
             templateStoreRecord.setTemplateId(templateId);
-            templateStoreRecord.setContent(ResourceUtils.getContent(resourceLocation));
+            templateStoreRecord.setContent(Files.readString(file));
             templateStoreRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
             templateStoreRecord.store();
         }

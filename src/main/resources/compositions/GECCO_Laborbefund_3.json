@@ -1,0 +1,309 @@
+{
+                "uid": {
+                    "_type": "OBJECT_VERSION_ID",
+                    "value": "3c54f796-c1d1-4847-a635-240a5a755cc8::local.ehrbase.org::1"
+                },
+                "name": {
+                    "_type": "DV_TEXT",
+                    "value": "Laborbefund"
+                },
+                "_type": "COMPOSITION",
+                "context": {
+                    "_type": "EVENT_CONTEXT",
+                    "setting": {
+                        "_type": "DV_CODED_TEXT",
+                        "value": "secondary medical care",
+                        "defining_code": {
+                            "_type": "CODE_PHRASE",
+                            "code_string": "232",
+                            "terminology_id": {
+                                "_type": "TERMINOLOGY_ID",
+                                "value": "openehr"
+                            }
+                        }
+                    },
+                    "start_time": {
+                        "_type": "DV_DATE_TIME",
+                        "value": "2021-01-18T11:05:52.000+01:00"
+                    },
+                    "other_context": {
+                        "name": {
+                            "value": "Baum",
+                            "_type": "DV_TEXT"
+                        },
+                        "archetype_node_id": "at0001",
+                        "_type": "ITEM_TREE",
+                        "items": [
+                            {
+                                "name": {
+                                    "value": "Status",
+                                    "_type": "DV_TEXT"
+                                },
+                                "value": {
+                                    "_type": "DV_CODED_TEXT",
+                                    "value": "final",
+                                    "defining_code": {
+                                        "_type": "CODE_PHRASE",
+                                        "code_string": "at0012",
+                                        "terminology_id": {
+                                            "_type": "TERMINOLOGY_ID",
+                                            "value": "local"
+                                        }
+                                    }
+                                },
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at0004"
+                            },
+                            {
+                                "name": {
+                                    "value": "Kategorie",
+                                    "_type": "DV_TEXT"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "laboratory"
+                                },
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at0005"
+                            }
+                        ]
+                    }
+                },
+                "category": {
+                    "_type": "DV_CODED_TEXT",
+                    "value": "event",
+                    "defining_code": {
+                        "_type": "CODE_PHRASE",
+                        "code_string": "433",
+                        "terminology_id": {
+                            "_type": "TERMINOLOGY_ID",
+                            "value": "openehr"
+                        }
+                    }
+                },
+                "composer": {
+                    "_type": "PARTY_SELF"
+                },
+                "language": {
+                    "_type": "CODE_PHRASE",
+                    "code_string": "de",
+                    "terminology_id": {
+                        "_type": "TERMINOLOGY_ID",
+                        "value": "ISO_639-1"
+                    }
+                },
+                "territory": {
+                    "_type": "CODE_PHRASE",
+                    "code_string": "DE",
+                    "terminology_id": {
+                        "_type": "TERMINOLOGY_ID",
+                        "value": "ISO_3166-1"
+                    }
+                },
+                "feeder_audit": {
+                    "originating_system_audit": {
+                        "_type": "FEEDER_AUDIT_DETAILS",
+                        "system_id": "FHIR-Bridge"
+                    },
+                    "originating_system_item_ids": [
+                        {
+                            "id": "Observation/cc89cf2e-7953-41d3-aaca-953218cc640c/_history/1",
+                            "type": "fhir_logical_id",
+                            "_type": "DV_IDENTIFIER"
+                        },
+                        {
+                            "id": "Patient/b3f5d4e0-f0d3-4b09-8bb5-36e313c625b5/_history/1",
+                            "_type": "DV_IDENTIFIER",
+                            "assigner": "fhir_patient_id"
+                        },
+                        {
+                            "id": "b775d069-547a-42f0-b24c-f3708ad49acc",
+                            "type": "fhir_patient_identifier",
+                            "_type": "DV_IDENTIFIER"
+                        }
+                    ],
+                    "_type": "FEEDER_AUDIT"
+                },
+                "archetype_details": {
+                    "_type": "ARCHETYPED",
+                    "rm_version": "1.0.4",
+                    "template_id": {
+                        "_type": "TEMPLATE_ID",
+                        "value": "GECCO_Laborbefund"
+                    },
+                    "archetype_id": {
+                        "_type": "ARCHETYPE_ID",
+                        "value": "openEHR-EHR-COMPOSITION.registereintrag.v1"
+                    }
+                },
+                "archetype_node_id": "openEHR-EHR-COMPOSITION.registereintrag.v1",
+                "content": [
+                    {
+                        "name": {
+                            "value": "Laborergebnis",
+                            "_type": "DV_TEXT"
+                        },
+                        "_type": "OBSERVATION",
+                        "subject": {
+                            "_type": "PARTY_SELF"
+                        },
+                        "encoding": {
+                            "_type": "CODE_PHRASE",
+                            "code_string": "UTF-8",
+                            "terminology_id": {
+                                "_type": "TERMINOLOGY_ID",
+                                "value": "IANA_character-sets"
+                            }
+                        },
+                        "language": {
+                            "_type": "CODE_PHRASE",
+                            "code_string": "de",
+                            "terminology_id": {
+                                "_type": "TERMINOLOGY_ID",
+                                "value": "ISO_639-1"
+                            }
+                        },
+                        "data": {
+                            "name": {
+                                "value": "Event Series",
+                                "_type": "DV_TEXT"
+                            },
+                            "origin": {
+                                "value": "2021-01-18T11:05:52.000+01:00",
+                                "_type": "DV_DATE_TIME"
+                            },
+                            "events": [
+                                {
+                                    "name": {
+                                        "value": "Jedes Ereignis",
+                                        "_type": "DV_TEXT"
+                                    },
+                                    "time": {
+                                        "value": "2021-01-18T11:05:52.000+01:00",
+                                        "_type": "DV_DATE_TIME"
+                                    },
+                                    "_type": "POINT_EVENT",
+                                    "data": {
+                                        "name": {
+                                            "value": "Tree",
+                                            "_type": "DV_TEXT"
+                                        },
+                                        "archetype_node_id": "at0003",
+                                        "_type": "ITEM_TREE",
+                                        "items": [
+                                            {
+                                                "name": {
+                                                    "value": "Labortest-Kategorie",
+                                                    "_type": "DV_TEXT"
+                                                },
+                                                "value": {
+                                                    "_type": "DV_CODED_TEXT",
+                                                    "value": "labordaten",
+                                                    "defining_code": {
+                                                        "_type": "CODE_PHRASE",
+                                                        "code_string": "26436-6",
+                                                        "terminology_id": {
+                                                            "_type": "TERMINOLOGY_ID",
+                                                            "value": "http://loinc.org"
+                                                        }
+                                                    }
+                                                },
+                                                "_type": "ELEMENT",
+                                                "archetype_node_id": "at0005"
+                                            },
+                                            {
+                                                "name": {
+                                                    "value": "Pro Laboranalyt",
+                                                    "_type": "DV_TEXT"
+                                                },
+                                                "archetype_node_id": "openEHR-EHR-CLUSTER.laboratory_test_analyte.v1",
+                                                "_type": "CLUSTER",
+                                                "items": [
+                                                    {
+                                                        "name": {
+                                                            "value": "Messwert",
+                                                            "_type": "DV_TEXT"
+                                                        },
+                                                        "value": {
+                                                            "_type": "DV_QUANTITY",
+                                                            "units": "mg/dL",
+                                                            "magnitude": 285.0
+                                                        },
+                                                        "_type": "ELEMENT",
+                                                        "archetype_node_id": "at0001"
+                                                    },
+                                                    {
+                                                        "name": {
+                                                            "value": "Ergebnis-Status",
+                                                            "_type": "DV_TEXT"
+                                                        },
+                                                        "value": {
+                                                            "_type": "DV_CODED_TEXT",
+                                                            "value": "Endbefund",
+                                                            "defining_code": {
+                                                                "_type": "CODE_PHRASE",
+                                                                "code_string": "at0018",
+                                                                "terminology_id": {
+                                                                    "_type": "TERMINOLOGY_ID",
+                                                                    "value": "local"
+                                                                }
+                                                            }
+                                                        },
+                                                        "_type": "ELEMENT",
+                                                        "archetype_node_id": "at0005"
+                                                    },
+                                                    {
+                                                        "name": {
+                                                            "value": "Bezeichnung des Analyts",
+                                                            "_type": "DV_TEXT"
+                                                        },
+                                                        "value": {
+                                                            "_type": "DV_CODED_TEXT",
+                                                            "value": "Fibrinogen [Mass/volume] in Platelet poor plasma by Coagulation assay",
+                                                            "defining_code": {
+                                                                "_type": "CODE_PHRASE",
+                                                                "code_string": "3255-7",
+                                                                "terminology_id": {
+                                                                    "_type": "TERMINOLOGY_ID",
+                                                                    "value": "http://loinc.org"
+                                                                }
+                                                            }
+                                                        },
+                                                        "_type": "ELEMENT",
+                                                        "archetype_node_id": "at0024"
+                                                    },
+                                                    {
+                                                        "name": {
+                                                            "value": "Zeitpunkt der Validierung",
+                                                            "_type": "DV_TEXT"
+                                                        },
+                                                        "value": {
+                                                            "_type": "DV_DATE_TIME",
+                                                            "value": "2021-01-18T11:05:52.000+01:00"
+                                                        },
+                                                        "_type": "ELEMENT",
+                                                        "archetype_node_id": "at0025"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "archetype_node_id": "at0002"
+                                }
+                            ],
+                            "_type": "HISTORY",
+                            "archetype_node_id": "at0001"
+                        },
+                        "archetype_details": {
+                            "rm_version": "1.0.4",
+                            "template_id": {
+                                "value": "GECCO_Laborbefund"
+                            },
+                            "archetype_id": {
+                                "value": "openEHR-EHR-OBSERVATION.laboratory_test_result.v1"
+                            }
+                        },
+                        "archetype_node_id": "openEHR-EHR-OBSERVATION.laboratory_test_result.v1"
+                    }
+                ]
+            }
