@@ -17,6 +17,7 @@
  */
 package org.ehrbase.webtester.config.jooq;
 
+import com.zaxxer.hikari.HikariDataSource;
 import javax.sql.DataSource;
 import org.jooq.ExecuteContext;
 import org.jooq.SQLDialect;
@@ -25,9 +26,10 @@ import org.jooq.impl.DefaultConfiguration;
 import org.jooq.impl.DefaultDSLContext;
 import org.jooq.impl.DefaultExecuteListener;
 import org.jooq.impl.DefaultExecuteListenerProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -55,21 +57,41 @@ public class PersistenceConfig {
         }
     }
 
-    @Autowired
-    private DataSource dataSource;
+    protected static <T> T createDataSource(DataSourceProperties properties, Class<? extends DataSource> type) {
+        return (T) properties.initializeDataSourceBuilder().type(type).build();
+    }
 
-    public TransactionAwareDataSourceProxy transactionAwareDataSource() {
+    @Primary
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource.hikari")
+    HikariDataSource primaryDataSource(DataSourceProperties properties) {
+        HikariDataSource dataSource = (HikariDataSource) createDataSource(properties, HikariDataSource.class);
+        dataSource.setPoolName("primary-pool");
+
+        return dataSource;
+    }
+
+    @Bean("secondaryDataSource")
+    @ConfigurationProperties(prefix = "spring.datasource.hikarisecond")
+    HikariDataSource secondaryDataSource(DataSourceProperties properties) {
+        HikariDataSource dataSource = (HikariDataSource) createDataSource(properties, HikariDataSource.class);
+        dataSource.setPoolName("secondary-pool");
+
+        return dataSource;
+    }
+
+    public TransactionAwareDataSourceProxy transactionAwareDataSource(DataSource dataSource) {
         return new TransactionAwareDataSourceProxy(dataSource);
     }
 
     @Bean
-    public DataSourceTransactionManager transactionManager() {
+    public DataSourceTransactionManager transactionManager(DataSource dataSource) {
         return new DataSourceTransactionManager(dataSource);
     }
 
     @Bean
-    public DataSourceConnectionProvider connectionProvider() {
-        return new DataSourceConnectionProvider(transactionAwareDataSource());
+    public DataSourceConnectionProvider connectionProvider(DataSource dataSource) {
+        return new DataSourceConnectionProvider(transactionAwareDataSource(dataSource));
     }
 
     @Bean
@@ -79,14 +101,14 @@ public class PersistenceConfig {
 
     @Bean
     @Primary
-    public DefaultDSLContext dsl() {
-        return new DefaultDSLContext(configuration());
+    public DefaultDSLContext dsl(DefaultConfiguration cfg) {
+        return new DefaultDSLContext(cfg);
     }
 
     @Bean
-    public DefaultConfiguration configuration() {
+    public DefaultConfiguration configuration(DataSourceConnectionProvider dataSource) {
         DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
-        jooqConfiguration.set(connectionProvider());
+        jooqConfiguration.set(dataSource);
         jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));
         //        jooqConfiguration.set(new PerformanceListener());
         SQLDialect dialect = SQLDialect.valueOf(sqlDialect);
