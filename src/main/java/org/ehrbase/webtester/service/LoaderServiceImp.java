@@ -627,20 +627,25 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void copyIntoEntryTableWithJsonb(int compositionNumber) {
+        StopWatch sw = new StopWatch();
+        sw.start("count");
         long loops = (entryTableSize(compositionNumber) / JSONB_INSERT_BATCH_SIZE) + 1;
-
+        sw.stop();
+        log.info("Count comp {} took {}ms",compositionNumber,sw.getLastTaskTimeMillis());
         for (long i = 0; i < loops; i++) {
+            sw.start("batch"+i);
             Integer insertCount = dsl.connectionResult(c -> copyBatchIntoEntryTableWithJsonb(c, compositionNumber));
-            log.info("comp {} inserted: {}", compositionNumber, insertCount);
+            sw.stop();
+            log.info("Copy comp {} batch: {}, count: {}, time: {}ms", i, compositionNumber, insertCount,sw.getLastTaskTimeMillis());
         }
+        log.info("Copying comp {} done in {}s",compositionNumber,sw.getTotalTimeSeconds());
     }
 
     private int copyBatchIntoEntryTableWithJsonb(Connection c, int compositionNumber) {
         try (Statement s = c.createStatement()) {
             s.setQueryTimeout(0);
             String statement = String.format(
-                "SET yb_disable_transactional_writes=true;\n"
-                + "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
+                "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
                 + "INSERT INTO ehr.entry "
                 + "  SELECT \"id\","
                 + "  \"composition_id\","
