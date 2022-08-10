@@ -67,6 +67,7 @@ public class PersistenceConfig {
     HikariDataSource primaryDataSource(DataSourceProperties properties) {
         HikariDataSource dataSource = (HikariDataSource) createDataSource(properties, HikariDataSource.class);
         dataSource.setPoolName("primary-pool");
+        dataSource.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
 
         return dataSource;
     }
@@ -76,6 +77,7 @@ public class PersistenceConfig {
     HikariDataSource secondaryDataSource(DataSourceProperties properties) {
         HikariDataSource dataSource = (HikariDataSource) createDataSource(properties, HikariDataSource.class);
         dataSource.setPoolName("secondary-pool");
+        dataSource.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
 
         return dataSource;
     }

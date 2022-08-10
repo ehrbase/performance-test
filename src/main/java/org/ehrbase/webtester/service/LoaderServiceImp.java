@@ -420,7 +420,7 @@ public class LoaderServiceImp implements LoaderService {
 
         log.info("Removing temporary entry tables...");
         IntStream.range(0, compositions.size())
-                .forEach(i -> runStatementWithTransactionalWrites(String.format("DROP TABLE ehr.entry_%d;", i)));
+                .forEach(i -> runStatementWithTransactionalWrites(String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
 
         log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
                 + "because it is a very long running operation. \n"
