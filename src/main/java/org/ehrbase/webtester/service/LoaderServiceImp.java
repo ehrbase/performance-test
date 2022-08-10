@@ -59,7 +59,6 @@ import java.time.temporal.TemporalAccessor;
 import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -152,11 +151,12 @@ public class LoaderServiceImp implements LoaderService {
     private static final int MAX_COMPOSITION_VERSIONS = 3;
     private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
     private static final String SYS_PERIOD_FIELD_NAME = "sys_period";
+    private static final int JSONB_INSERT_BATCH_SIZE = 10000;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
     // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
     // otherwise
     private final ThreadLocal<Random> random = ThreadLocal.withInitial(SecureRandom::new);
-    private final List<Composition> compositions = new ArrayList<>();
+    private final List<Pair<Composition, JSONB>> compositions = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
     private final DSLContext dsl;
@@ -236,6 +236,7 @@ public class LoaderServiceImp implements LoaderService {
                         throw new LoaderException("Failed to read composition file", e);
                     }
                 })
+                .map(c -> Pair.of(c, JSONB.jsonb(rawJson.marshal(c))))
                 .forEach(compositions::add);
     }
 
@@ -258,6 +259,7 @@ public class LoaderServiceImp implements LoaderService {
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
+                prepareEntryTables();
                 Set<String> tableNames = getTableNames();
                 // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
                 List<Constraint> indexConstraints = findConstraints();
@@ -273,6 +275,27 @@ public class LoaderServiceImp implements LoaderService {
             isRunning = false;
             log.info("Done!");
         });
+    }
+
+    private void prepareEntryTables() {
+        // We will use temporary entry tables for each composition number for faster JSONB inserts in the end
+        IntStream.range(0, compositions.size())
+                .forEach(i -> runStatementWithTransactionalWrites(String.format(
+                        "CREATE TABLE ehr.entry_%d("
+                                + "    id uuid,"
+                                + "    composition_id uuid,"
+                                + "    sequence integer,"
+                                + "    item_type ehr.entry_type,"
+                                + "    template_id text COLLATE pg_catalog.\"default\","
+                                + "    template_uuid uuid,"
+                                + "    archetype_id text COLLATE pg_catalog.\"default\","
+                                + "    category ehr.dv_coded_text,"
+                                + "    entry jsonb,"
+                                + "    sys_transaction timestamp without time zone,"
+                                + "    sys_period tstzrange,"
+                                + "    rm_version text COLLATE pg_catalog.\"default\","
+                                + "    name ehr.dv_coded_text);",
+                        i)));
     }
 
     private List<Triple<String, String, String>> findIndexes(List<String> constraintNames) {
@@ -394,6 +417,11 @@ public class LoaderServiceImp implements LoaderService {
                         "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
                         cs.schema, cs.table, cs.constraintName, cs.definition))
                 .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+
+        log.info("Removing temporary entry tables...");
+        IntStream.range(0, compositions.size())
+                .forEach(i -> runStatementWithTransactionalWrites(String.format("DROP TABLE ehr.entry_%d;", i)));
+
         log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
                 + "because it is a very long running operation. \n"
                 + "Please add it manually! Statement: \n"
@@ -503,9 +531,11 @@ public class LoaderServiceImp implements LoaderService {
             stopWatch.stop();
         }
         log.info("Last Batch completed in {} ms", stopWatch.getLastTaskTimeMillis());
-        log.info("Updating ehr.entry.entry with JSONB data...");
-        stopWatch.start("update");
-        waitForTaskToComplete(updateEntryWithJsonb());
+        log.info("Copying to ehr.entry with JSONB data...");
+        stopWatch.start("jsonb");
+        waitForTaskToComplete(CompletableFuture.allOf(IntStream.range(0, compositions.size())
+                .mapToObj(i -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(i)))
+                .toArray(CompletableFuture[]::new)));
         stopWatch.stop();
         log.info("JSONB data update completed in {} ms", stopWatch.getLastTaskTimeMillis());
         log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
@@ -559,8 +589,14 @@ public class LoaderServiceImp implements LoaderService {
 
     private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, int bulkSize) {
         // We want the entry inserts to start as early as possible since these take the longest
-        CompletableFuture<Void> entry = CompletableFuture.runAsync(
-                () -> bulkInsert(ENTRY, ehrDescriptors.stream().flatMap(d -> d.entries.stream()), bulkSize));
+        CompletableFuture<Void> entry = CompletableFuture.allOf(ehrDescriptors.stream()
+                .flatMap(d -> d.entries.stream())
+                .collect(Collectors.groupingBy(EntryRecord::getSequence))
+                .entrySet()
+                .stream()
+                .map(e -> CompletableFuture.runAsync(() ->
+                        bulkInsert(ENTRY.rename(ENTRY.getName() + "_" + e.getKey()), e.getValue().stream(), bulkSize)))
+                .toArray(CompletableFuture[]::new));
         CompletableFuture<Void> composition = CompletableFuture.runAsync(
                 () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
         CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() ->
@@ -590,18 +626,49 @@ public class LoaderServiceImp implements LoaderService {
                 ehr);
     }
 
-    private CompletableFuture<Void> updateEntryWithJsonb() {
+    private void copyIntoEntryTableWithJsonb(int compositionNumber) {
+        long loops = (entryTableSize(compositionNumber) / JSONB_INSERT_BATCH_SIZE) + 1;
 
-        return CompletableFuture.allOf(IntStream.range(0, compositions.size())
-                .mapToObj(i -> CompletableFuture.runAsync(() -> log.info(
-                        "comp {} update count: {}",
-                        i,
-                        dsl.update(ENTRY)
-                                .set(ENTRY.ENTRY_, JSONB.jsonb(rawJson.marshal(compositions.get(i))))
-                                .where(ENTRY.SEQUENCE.eq(i))
-                                .queryTimeout(0)
-                                .execute())))
-                .toArray(CompletableFuture[]::new));
+        for (long i = 0; i < loops; i++) {
+            Integer insertCount = dsl.connectionResult(c -> copyBatchIntoEntryTableWithJsonb(c, compositionNumber));
+            log.info("comp {} inserted: {}", compositionNumber, insertCount);
+        }
+    }
+
+    private int copyBatchIntoEntryTableWithJsonb(Connection c, int compositionNumber) {
+        try (Statement s = c.createStatement()) {
+            s.setQueryTimeout(0);
+            String statement = String.format(
+                "SET yb_disable_transactional_writes=true;\n"
+                + "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
+                + "INSERT INTO ehr.entry "
+                + "  SELECT \"id\","
+                + "  \"composition_id\","
+                + "  \"sequence\","
+                + "  \"item_type\","
+                + "  \"template_id\","
+                + "  \"template_uuid\","
+                + "  \"archetype_id\","
+                + "  \"category\","
+                + "  '%s'::JSONB,"
+                + "  \"sys_transaction\","
+                + "  \"sys_period\","
+                + "  \"rm_version\","
+                + "  \"name\""
+                + "FROM del;",
+                compositionNumber,
+                compositionNumber,
+                JSONB_INSERT_BATCH_SIZE,
+                compositions.get(compositionNumber).getValue().data());
+            return s.executeUpdate(statement);
+        } catch (SQLException e) {
+            log.error("Error while copying entries with JSONB", e);
+        }
+        return 0;
+    }
+
+    private long entryTableSize(int compositionNumber) {
+        return dsl.select(DSL.aggregate("count", Long.class, ENTRY.rename(ENTRY.getName()+"_"+compositionNumber).ID)).from(ENTRY.rename(ENTRY.getName()+"_"+compositionNumber)).fetchOptional(0, Long.class).orElse(0L);
     }
 
     private <T extends Table<R>, R extends TableRecord<R>> void updateToAddVersions(
@@ -852,7 +919,11 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private CompositionCreateDescriptor buildCompositionData(
-            int compositionNumber, UUID ehrId, Composition compositionData, List<UUID> hcpIds, UUID facility) {
+            int compositionNumber,
+            UUID ehrId,
+            Pair<Composition, JSONB> compositionData,
+            List<UUID> hcpIds,
+            UUID facility) {
 
         int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
         UUID composerId = hcpIds.get(compositionNumber % hcpIds.size());
@@ -866,16 +937,21 @@ public class LoaderServiceImp implements LoaderService {
         createDescriptor.contribution = contribution.getLeft();
         createDescriptor.contributionAudit = contribution.getRight();
         Pair<CompositionRecord, AuditDetailsRecord> composition = createComposition(
-                ehrId, compositionData, composerId, contribution.getLeft().getId(), sysTransaction);
+                ehrId,
+                compositionData.getLeft(),
+                composerId,
+                contribution.getLeft().getId(),
+                sysTransaction);
         createDescriptor.composition = composition.getLeft();
         createDescriptor.compositionAudit = composition.getRight();
         createDescriptor.entry = createEntry(
                 composition.getLeft().getId(),
-                compositionData,
+                compositionData.getLeft(),
+                compositionData.getRight(),
                 sysTransaction,
                 compositionNumber % compositions.size());
         createDescriptor.eventContext = createEventContext(
-                composition.getLeft().getId(), compositionData.getContext(), facility, sysTransaction);
+                composition.getLeft().getId(), compositionData.getLeft().getContext(), facility, sysTransaction);
         if (hcpCount > 1 && hcpIds.size() > 1) {
             List<UUID> participationCandidates =
                     CollectionUtils.selectRejected(hcpIds, composerId::equals, new ArrayList<>());
@@ -1026,7 +1102,11 @@ public class LoaderServiceImp implements LoaderService {
      * Creates an {@link EntryRecord} for the given composition.
      */
     private EntryRecord createEntry(
-            UUID compositionId, Composition composition, OffsetDateTime sysTransaction, int compositionIndex) {
+            UUID compositionId,
+            Composition composition,
+            JSONB jsonb,
+            OffsetDateTime sysTransaction,
+            int compositionIndex) {
         Assert.notNull(composition.getArchetypeDetails().getTemplateId(), "Template Id must not be null");
 
         EntryRecord entryRecord = dsl.newRecord(ENTRY);
@@ -1037,7 +1117,7 @@ public class LoaderServiceImp implements LoaderService {
                 composition.getArchetypeDetails().getTemplateId().getValue());
         entryRecord.setArchetypeId(composition.getArchetypeNodeId());
         entryRecord.setCategory(createDvCodedText(composition.getCategory()));
-        // entryRecord.setEntry(JSONB.jsonb(rawJson.marshal(composition)));
+        // entryRecord.setEntry(jsonb);
         entryRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
         entryRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
         entryRecord.setRmVersion(composition.getArchetypeDetails().getRmVersion());
