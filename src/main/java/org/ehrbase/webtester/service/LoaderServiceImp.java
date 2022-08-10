@@ -636,7 +636,7 @@ public class LoaderServiceImp implements LoaderService {
             sw.start("batch"+i);
             Integer insertCount = dsl.connectionResult(c -> copyBatchIntoEntryTableWithJsonb(c, compositionNumber));
             sw.stop();
-            log.info("Copy comp {} batch: {}, count: {}, time: {}ms", i, compositionNumber, insertCount,sw.getLastTaskTimeMillis());
+            log.info("Copy comp {} batch: {}, count: {}, time: {}ms", compositionNumber, i, insertCount,sw.getLastTaskTimeMillis());
         }
         log.info("Copying comp {} done in {}s",compositionNumber,sw.getTotalTimeSeconds());
     }
