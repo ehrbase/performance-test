@@ -165,7 +165,10 @@ public class LoaderServiceImp implements LoaderService {
     private String zoneId;
     private boolean isRunning = false;
 
-    public LoaderServiceImp(DSLContext dsl, @Qualifier("primaryDataSource") HikariDataSource primaryDataSource, @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource) {
+    public LoaderServiceImp(
+            DSLContext dsl,
+            @Qualifier("primaryDataSource") HikariDataSource primaryDataSource,
+            @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource) {
         this.dsl = dsl;
         this.secondaryDataSource = secondaryDataSource;
         this.primaryDataSource = primaryDataSource;
@@ -199,18 +202,19 @@ public class LoaderServiceImp implements LoaderService {
 
     private void initializeTemplates() {
         try {
-            Arrays.stream(org.springframework.util.ResourceUtils.getFile(TEMPLATES_BASE).listFiles())
-                .filter(File::isFile)
-                .map(File::toPath)
-                .forEach(f -> {
-                    String templateId;
-                    try (InputStream in = Files.newInputStream(f)) {
-                        templateId = xpath(in, "//template/template_id/value/text()");
-                        createTemplate(templateId, f);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                });
+            Arrays.stream(org.springframework.util.ResourceUtils.getFile(TEMPLATES_BASE)
+                            .listFiles())
+                    .filter(File::isFile)
+                    .map(File::toPath)
+                    .forEach(f -> {
+                        String templateId;
+                        try (InputStream in = Files.newInputStream(f)) {
+                            templateId = xpath(in, "//template/template_id/value/text()");
+                            createTemplate(templateId, f);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         }
@@ -232,9 +236,10 @@ public class LoaderServiceImp implements LoaderService {
 
     private void initializeCompositions() {
         try {
-            Arrays.stream(org.springframework.util.ResourceUtils.getFile(COMPOSITIONS_BASE).listFiles())
-                .filter(File::isFile)
-                .map(File::toPath)
+            Arrays.stream(org.springframework.util.ResourceUtils.getFile(COMPOSITIONS_BASE)
+                            .listFiles())
+                    .filter(File::isFile)
+                    .map(File::toPath)
                     .map(p -> {
                         try {
                             return objectMapper.readValue(Files.readString(p), Composition.class);
@@ -429,7 +434,8 @@ public class LoaderServiceImp implements LoaderService {
 
         log.info("Removing temporary entry tables...");
         IntStream.range(0, compositions.size())
-                .forEach(i -> runStatementWithTransactionalWrites(String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
+                .forEach(i -> runStatementWithTransactionalWrites(
+                        String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
 
         log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
                 + "because it is a very long running operation. \n"
@@ -597,7 +603,13 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, int bulkSize) {
-        // We want the entry inserts to start as early as possible since these take the longest
+
+        CompletableFuture<Void> composition = CompletableFuture.runAsync(
+                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
+        CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() ->
+                bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream()), bulkSize));
+        CompletableFuture<Void> auditDetails = CompletableFuture.runAsync(() ->
+                bulkInsert(AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream()), bulkSize));
         CompletableFuture<Void> entry = CompletableFuture.allOf(ehrDescriptors.stream()
                 .flatMap(d -> d.entries.stream())
                 .collect(Collectors.groupingBy(EntryRecord::getSequence))
@@ -606,14 +618,8 @@ public class LoaderServiceImp implements LoaderService {
                 .map(e -> CompletableFuture.runAsync(() ->
                         bulkInsert(ENTRY.rename(ENTRY.getName() + "_" + e.getKey()), e.getValue().stream(), bulkSize)))
                 .toArray(CompletableFuture[]::new));
-        CompletableFuture<Void> composition = CompletableFuture.runAsync(
-                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
-        CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() ->
-                bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream()), bulkSize));
         CompletableFuture<Void> participations = CompletableFuture.runAsync(() ->
                 bulkInsert(PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.participations.stream()), bulkSize));
-        CompletableFuture<Void> auditDetails = CompletableFuture.runAsync(() ->
-                bulkInsert(AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream()), bulkSize));
         CompletableFuture<Void> contribution = CompletableFuture.runAsync(() ->
                 bulkInsert(CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()), bulkSize));
         CompletableFuture<Void> partyIdentified = CompletableFuture.runAsync(
@@ -640,53 +646,63 @@ public class LoaderServiceImp implements LoaderService {
         sw.start("count");
         long loops = (entryTableSize(compositionNumber) / JSONB_INSERT_BATCH_SIZE) + 1;
         sw.stop();
-        log.info("Count comp {} took {}ms",compositionNumber,sw.getLastTaskTimeMillis());
+        log.info("Count comp {} took {}ms", compositionNumber, sw.getLastTaskTimeMillis());
         for (long i = 0; i < loops; i++) {
-            sw.start("batch"+i);
+            sw.start("batch" + i);
             try {
                 int insertCount;
                 insertCount = copyBatchIntoEntryTableWithJsonb(compositionNumber);
                 sw.stop();
-                log.info("Copy comp {} batch: {}, count: {}, time: {}ms", compositionNumber, i, insertCount,sw.getLastTaskTimeMillis());
+                log.info(
+                        "Copy comp {} batch: {}, count: {}, time: {}ms",
+                        compositionNumber,
+                        i,
+                        insertCount,
+                        sw.getLastTaskTimeMillis());
             } catch (SQLException e) {
                 sw.stop();
-                log.error("Error while processing comp "+compositionNumber+" batch: "+i, e);
+                log.error("Error while processing comp " + compositionNumber + " batch: " + i, e);
                 i--;
             }
         }
-        log.info("Copying comp {} done in {}s",compositionNumber,sw.getTotalTimeSeconds());
+        log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
     }
 
-    private int copyBatchIntoEntryTableWithJsonb( int compositionNumber) throws SQLException {
-        try (Connection c = primaryDataSource.getConnection(); Statement s = c.createStatement()) {
+    private int copyBatchIntoEntryTableWithJsonb(int compositionNumber) throws SQLException {
+        try (Connection c = primaryDataSource.getConnection();
+                Statement s = c.createStatement()) {
             s.setQueryTimeout(0);
             String statement = String.format(
-                "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
-                + "INSERT INTO ehr.entry "
-                + "  SELECT \"id\","
-                + "  \"composition_id\","
-                + "  \"sequence\","
-                + "  \"item_type\","
-                + "  \"template_id\","
-                + "  \"template_uuid\","
-                + "  \"archetype_id\","
-                + "  \"category\","
-                + "  '%s'::JSONB,"
-                + "  \"sys_transaction\","
-                + "  \"sys_period\","
-                + "  \"rm_version\","
-                + "  \"name\""
-                + "FROM del;",
-                compositionNumber,
-                compositionNumber,
-                JSONB_INSERT_BATCH_SIZE,
-                compositions.get(compositionNumber).getValue().data());
+                    "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
+                            + "INSERT INTO ehr.entry "
+                            + "  SELECT \"id\","
+                            + "  \"composition_id\","
+                            + "  \"sequence\","
+                            + "  \"item_type\","
+                            + "  \"template_id\","
+                            + "  \"template_uuid\","
+                            + "  \"archetype_id\","
+                            + "  \"category\","
+                            + "  '%s'::JSONB,"
+                            + "  \"sys_transaction\","
+                            + "  \"sys_period\","
+                            + "  \"rm_version\","
+                            + "  \"name\""
+                            + "FROM del;",
+                    compositionNumber,
+                    compositionNumber,
+                    JSONB_INSERT_BATCH_SIZE,
+                    compositions.get(compositionNumber).getValue().data());
             return s.executeUpdate(statement);
         }
     }
 
     private long entryTableSize(int compositionNumber) {
-        return dsl.select(DSL.aggregate("count", Long.class, ENTRY.rename(ENTRY.getName()+"_"+compositionNumber).ID)).from(ENTRY.rename(ENTRY.getName()+"_"+compositionNumber)).fetchOptional(0, Long.class).orElse(0L);
+        return dsl.select(
+                        DSL.aggregate("count", Long.class, ENTRY.rename(ENTRY.getName() + "_" + compositionNumber).ID))
+                .from(ENTRY.rename(ENTRY.getName() + "_" + compositionNumber))
+                .fetchOptional(0, Long.class)
+                .orElse(0L);
     }
 
     private <T extends Table<R>, R extends TableRecord<R>> void updateToAddVersions(
