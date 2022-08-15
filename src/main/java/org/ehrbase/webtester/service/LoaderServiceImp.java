@@ -647,6 +647,7 @@ public class LoaderServiceImp implements LoaderService {
         long loops = (entryTableSize(compositionNumber) / JSONB_INSERT_BATCH_SIZE) + 1;
         sw.stop();
         log.info("Count comp {} took {}ms", compositionNumber, sw.getLastTaskTimeMillis());
+        int errorCount = 0;
         for (long i = 0; i < loops; i++) {
             sw.start("batch" + i);
             try {
@@ -662,6 +663,13 @@ public class LoaderServiceImp implements LoaderService {
             } catch (SQLException e) {
                 sw.stop();
                 log.error("Error while processing comp " + compositionNumber + " batch: " + i, e);
+                errorCount++;
+                // We stop if errors keep piling up for the same composition since this indicates a non
+                // "memory-pressure" issue
+                if (errorCount > 1000) {
+                    throw new RuntimeException(
+                            "Aborting because error threshold was reached for composition " + compositionNumber);
+                }
                 i--;
             }
         }
