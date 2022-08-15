@@ -42,13 +42,10 @@ import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.TermMapping;
 import com.nedap.archie.rm.support.identification.TerminologyId;
 import com.zaxxer.hikari.HikariDataSource;
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -64,6 +61,7 @@ import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -90,6 +88,7 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -126,6 +125,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.core.io.support.ResourcePatternUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -142,8 +144,8 @@ import org.xml.sax.SAXException;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class LoaderServiceImp implements LoaderService {
 
-    private static final String TEMPLATES_BASE = "classpath:templates/";
-    private static final String COMPOSITIONS_BASE = "classpath:compositions/";
+    private static final String TEMPLATES_BASE = "classpath*:templates/**";
+    private static final String COMPOSITIONS_BASE = "classpath*:compositions/**";
     private static final int MAX_COMPOSITION_VERSIONS = 3;
     private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
     private static final String SYS_PERIOD_FIELD_NAME = "sys_period";
@@ -158,6 +160,7 @@ public class LoaderServiceImp implements LoaderService {
     private final DSLContext dsl;
     private final HikariDataSource primaryDataSource;
     private final HikariDataSource secondaryDataSource;
+    private final ResourceLoader resourceLoader;
     private final Map<String, Integer> territories = new HashMap<>();
 
     private UUID systemId;
@@ -167,11 +170,13 @@ public class LoaderServiceImp implements LoaderService {
 
     public LoaderServiceImp(
             DSLContext dsl,
+            ResourceLoader resourceLoader,
             @Qualifier("primaryDataSource") HikariDataSource primaryDataSource,
             @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource) {
         this.dsl = dsl;
         this.secondaryDataSource = secondaryDataSource;
         this.primaryDataSource = primaryDataSource;
+        this.resourceLoader = resourceLoader;
     }
 
     @PostConstruct
@@ -202,20 +207,19 @@ public class LoaderServiceImp implements LoaderService {
 
     private void initializeTemplates() {
         try {
-            Arrays.stream(org.springframework.util.ResourceUtils.getFile(TEMPLATES_BASE)
-                            .listFiles())
-                    .filter(File::isFile)
-                    .map(File::toPath)
+            Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
+                            .getResources(TEMPLATES_BASE))
+                    .sorted(Comparator.comparing(Resource::getFilename))
                     .forEach(f -> {
                         String templateId;
-                        try (InputStream in = Files.newInputStream(f)) {
+                        try (InputStream in = f.getInputStream()) {
                             templateId = xpath(in, "//template/template_id/value/text()");
                             createTemplate(templateId, f);
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }
                     });
-        } catch (FileNotFoundException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
@@ -236,20 +240,19 @@ public class LoaderServiceImp implements LoaderService {
 
     private void initializeCompositions() {
         try {
-            Arrays.stream(org.springframework.util.ResourceUtils.getFile(COMPOSITIONS_BASE)
-                            .listFiles())
-                    .filter(File::isFile)
-                    .map(File::toPath)
+            Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
+                            .getResources(COMPOSITIONS_BASE))
+                    .sorted(Comparator.comparing(Resource::getFilename))
                     .map(p -> {
-                        try {
-                            return objectMapper.readValue(Files.readString(p), Composition.class);
+                        try (InputStream in = p.getInputStream()) {
+                            return objectMapper.readValue(in, Composition.class);
                         } catch (IOException e) {
                             throw new LoaderException("Failed to read composition file", e);
                         }
                     })
                     .map(c -> Pair.of(c, JSONB.jsonb(rawJson.marshal(c))))
                     .forEach(compositions::add);
-        } catch (FileNotFoundException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
@@ -1102,7 +1105,7 @@ public class LoaderServiceImp implements LoaderService {
         return committerRecord.getId();
     }
 
-    private void createTemplate(String templateId, Path file) throws IOException {
+    private void createTemplate(String templateId, Resource file) throws IOException {
         var existingTemplateStore = dsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
 
         if (existingTemplateStore.isPresent()) {
@@ -1111,7 +1114,9 @@ public class LoaderServiceImp implements LoaderService {
             var templateStoreRecord = dsl.newRecord(TEMPLATE_STORE);
             templateStoreRecord.setId(UUID.randomUUID());
             templateStoreRecord.setTemplateId(templateId);
-            templateStoreRecord.setContent(Files.readString(file));
+            try (InputStream in = file.getInputStream()) {
+                templateStoreRecord.setContent(IOUtils.toString(in, StandardCharsets.UTF_8));
+            }
             templateStoreRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
             templateStoreRecord.store();
         }
