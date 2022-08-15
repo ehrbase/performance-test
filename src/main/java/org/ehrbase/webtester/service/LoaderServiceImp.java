@@ -209,6 +209,7 @@ public class LoaderServiceImp implements LoaderService {
         try {
             Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
                             .getResources(TEMPLATES_BASE))
+                    .filter(r -> StringUtils.endsWith(r.getFilename(),".opt"))
                     .sorted(Comparator.comparing(Resource::getFilename))
                     .forEach(f -> {
                         String templateId;
@@ -242,6 +243,7 @@ public class LoaderServiceImp implements LoaderService {
         try {
             Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
                             .getResources(COMPOSITIONS_BASE))
+                    .filter(r -> StringUtils.endsWith(r.getFilename(),".json"))
                     .sorted(Comparator.comparing(Resource::getFilename))
                     .map(p -> {
                         try (InputStream in = p.getInputStream()) {
