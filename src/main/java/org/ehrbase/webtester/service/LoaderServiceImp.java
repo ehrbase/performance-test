@@ -209,7 +209,7 @@ public class LoaderServiceImp implements LoaderService {
         try {
             Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
                             .getResources(TEMPLATES_BASE))
-                    .filter(r -> StringUtils.endsWith(r.getFilename(),".opt"))
+                    .filter(r -> StringUtils.endsWith(r.getFilename(), ".opt"))
                     .sorted(Comparator.comparing(Resource::getFilename))
                     .forEach(f -> {
                         String templateId;
@@ -243,7 +243,7 @@ public class LoaderServiceImp implements LoaderService {
         try {
             Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
                             .getResources(COMPOSITIONS_BASE))
-                    .filter(r -> StringUtils.endsWith(r.getFilename(),".json"))
+                    .filter(r -> StringUtils.endsWith(r.getFilename(), ".json"))
                     .sorted(Comparator.comparing(Resource::getFilename))
                     .map(p -> {
                         try (InputStream in = p.getInputStream()) {
@@ -649,15 +649,16 @@ public class LoaderServiceImp implements LoaderService {
     private void copyIntoEntryTableWithJsonb(int compositionNumber) {
         StopWatch sw = new StopWatch();
         sw.start("count");
-        long loops = (entryTableSize(compositionNumber) / JSONB_INSERT_BATCH_SIZE) + 1;
+        long tableSize = entryTableSize(compositionNumber);
+        long loops = (tableSize / JSONB_INSERT_BATCH_SIZE) + 1;
         sw.stop();
-        log.info("Count comp {} took {}ms", compositionNumber, sw.getLastTaskTimeMillis());
+        log.info("Count comp {} took {}ms. Result: {}", compositionNumber, sw.getLastTaskTimeMillis(), tableSize);
         int errorCount = 0;
         for (long i = 0; i < loops; i++) {
             sw.start("batch" + i);
-            try {
+            try (Connection c = primaryDataSource.getConnection()) {
                 int insertCount;
-                insertCount = copyBatchIntoEntryTableWithJsonb(compositionNumber);
+                insertCount = copyBatchIntoEntryTableWithJsonb(c, compositionNumber);
                 sw.stop();
                 log.info(
                         "Copy comp {} batch: {}, count: {}, time: {}ms",
@@ -667,7 +668,10 @@ public class LoaderServiceImp implements LoaderService {
                         sw.getLastTaskTimeMillis());
             } catch (SQLException e) {
                 sw.stop();
-                log.error("Error while processing comp " + compositionNumber + " batch: " + i, e);
+                log.error(
+                        "Error while processing comp " + compositionNumber + " batch: " + i
+                                + ", time (ms) until error: " + sw.getLastTaskTimeMillis(),
+                        e);
                 errorCount++;
                 // We stop if errors keep piling up for the same composition since this indicates a non
                 // "memory-pressure" issue
@@ -675,15 +679,14 @@ public class LoaderServiceImp implements LoaderService {
                     throw new RuntimeException(
                             "Aborting because error threshold was reached for composition " + compositionNumber);
                 }
-                i--;
+                loops++;
             }
         }
         log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
     }
 
-    private int copyBatchIntoEntryTableWithJsonb(int compositionNumber) throws SQLException {
-        try (Connection c = primaryDataSource.getConnection();
-                Statement s = c.createStatement()) {
+    private int copyBatchIntoEntryTableWithJsonb(Connection c, int compositionNumber) throws SQLException {
+        try (Statement s = c.createStatement()) {
             s.setQueryTimeout(0);
             String statement = String.format(
                     "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
@@ -707,6 +710,10 @@ public class LoaderServiceImp implements LoaderService {
                     JSONB_INSERT_BATCH_SIZE,
                     compositions.get(compositionNumber).getValue().data());
             return s.executeUpdate(statement);
+        } catch (SQLException e) {
+            // Some errors may result in a broken DB session therefore we evict the connection from the pool
+            primaryDataSource.evictConnection(c);
+            throw e;
         }
     }
 
