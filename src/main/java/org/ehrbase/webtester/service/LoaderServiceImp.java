@@ -300,7 +300,7 @@ public class LoaderServiceImp implements LoaderService {
         // We will use temporary entry tables for each composition number for faster JSONB inserts in the end
         IntStream.range(0, compositions.size())
                 .forEach(i -> runStatementWithTransactionalWrites(String.format(
-                        "CREATE TABLE ehr.entry_%d("
+                        "CREATE TABLE IF NOT EXISTS ehr.entry_%d("
                                 + "    id uuid,"
                                 + "    composition_id uuid,"
                                 + "    sequence integer,"
@@ -313,7 +313,8 @@ public class LoaderServiceImp implements LoaderService {
                                 + "    sys_transaction timestamp without time zone,"
                                 + "    sys_period tstzrange,"
                                 + "    rm_version text COLLATE pg_catalog.\"default\","
-                                + "    name ehr.dv_coded_text);",
+                                + "    name ehr.dv_coded_text,"
+                                + "    PRIMARY KEY (id));",
                         i)));
     }
 
@@ -689,7 +690,8 @@ public class LoaderServiceImp implements LoaderService {
         try (Statement s = c.createStatement()) {
             s.setQueryTimeout(0);
             String statement = String.format(
-                    "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
+                    "/*+ Leading( (\"ANY_subquery\" a) ) NestLoop(\"ANY_subquery\" a) */"
+                            + "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
                             + "INSERT INTO ehr.entry "
                             + "  SELECT \"id\","
                             + "  \"composition_id\","
