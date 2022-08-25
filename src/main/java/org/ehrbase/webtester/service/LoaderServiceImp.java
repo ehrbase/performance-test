@@ -609,11 +609,10 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, int bulkSize) {
-
-        CompletableFuture<Void> composition = CompletableFuture.runAsync(
-                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
         CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() ->
                 bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream()), bulkSize));
+        CompletableFuture<Void> composition = CompletableFuture.runAsync(
+                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
         CompletableFuture<Void> auditDetails = CompletableFuture.runAsync(() ->
                 bulkInsert(AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream()), bulkSize));
         CompletableFuture<Void> entry = CompletableFuture.allOf(ehrDescriptors.stream()
@@ -655,11 +654,12 @@ public class LoaderServiceImp implements LoaderService {
         sw.stop();
         log.info("Count comp {} took {}ms. Result: {}", compositionNumber, sw.getLastTaskTimeMillis(), tableSize);
         int errorCount = 0;
+
         for (long i = 0; i < loops; i++) {
             sw.start("batch" + i);
-            try (Connection c = primaryDataSource.getConnection()) {
+            try {
                 int insertCount;
-                insertCount = copyBatchIntoEntryTableWithJsonb(c, compositionNumber);
+                insertCount = copyBatchIntoEntryTableWithJsonb(compositionNumber);
                 sw.stop();
                 log.info(
                         "Copy comp {} batch: {}, count: {}, time: {}ms",
@@ -686,36 +686,38 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
     }
 
-    private int copyBatchIntoEntryTableWithJsonb(Connection c, int compositionNumber) throws SQLException {
-        try (Statement s = c.createStatement()) {
-            s.setQueryTimeout(0);
-            String statement = String.format(
-                    "/*+ Leading( (\"ANY_subquery\" a) ) NestLoop(\"ANY_subquery\" a) */"
-                            + "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
-                            + "INSERT INTO ehr.entry "
-                            + "  SELECT \"id\","
-                            + "  \"composition_id\","
-                            + "  \"sequence\","
-                            + "  \"item_type\","
-                            + "  \"template_id\","
-                            + "  \"template_uuid\","
-                            + "  \"archetype_id\","
-                            + "  \"category\","
-                            + "  '%s'::JSONB,"
-                            + "  \"sys_transaction\","
-                            + "  \"sys_period\","
-                            + "  \"rm_version\","
-                            + "  \"name\""
-                            + "FROM del;",
-                    compositionNumber,
-                    compositionNumber,
-                    JSONB_INSERT_BATCH_SIZE,
-                    compositions.get(compositionNumber).getValue().data());
-            return s.executeUpdate(statement);
-        } catch (SQLException e) {
-            // Some errors may result in a broken DB session therefore we evict the connection from the pool
-            primaryDataSource.evictConnection(c);
-            throw e;
+    private int copyBatchIntoEntryTableWithJsonb(int compositionNumber) throws SQLException {
+        try (Connection c = primaryDataSource.getConnection()) {
+            try (Statement s = c.createStatement()) {
+                s.setQueryTimeout(0);
+                String statement = String.format(
+                        "/*+ Leading( (\"ANY_subquery\" a) ) NestLoop(\"ANY_subquery\" a) */"
+                                + "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
+                                + "INSERT INTO ehr.entry "
+                                + "  SELECT \"id\","
+                                + "  \"composition_id\","
+                                + "  \"sequence\","
+                                + "  \"item_type\","
+                                + "  \"template_id\","
+                                + "  \"template_uuid\","
+                                + "  \"archetype_id\","
+                                + "  \"category\","
+                                + "  '%s'::JSONB,"
+                                + "  \"sys_transaction\","
+                                + "  \"sys_period\","
+                                + "  \"rm_version\","
+                                + "  \"name\""
+                                + "FROM del;",
+                        compositionNumber,
+                        compositionNumber,
+                        JSONB_INSERT_BATCH_SIZE,
+                        compositions.get(compositionNumber).getValue().data());
+                return s.executeUpdate(statement);
+            } catch (SQLException e) {
+                // Some errors may result in a broken DB session therefore we evict the connection from the pool
+                primaryDataSource.evictConnection(c);
+                throw e;
+            }
         }
     }
 
