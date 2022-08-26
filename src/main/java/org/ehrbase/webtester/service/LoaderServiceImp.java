@@ -758,30 +758,47 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Updates {} for versions took {}", table.getName(), sw.getTotalTimeSeconds());
     }
 
-    private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(T table, Stream<R> records, int bulkSize) {
+    private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(
+            T table, Stream<R> recordStream, int bulkSize) {
         StopWatch sw = new StopWatch();
         sw.start();
-        List<LoaderError> errors;
-        try {
-            errors = dsl.loadInto(table)
-                    .bulkAfter(bulkSize)
-                    .commitNone()
-                    .loadRecords(records)
-                    .fields(table.fields())
-                    .execute()
-                    .errors();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        boolean success = false;
+        int errorCount = 0;
+        List<R> records = recordStream.collect(Collectors.toList());
+        // With yugabyte on rare occasions bulk inserts may fail, therefore we retry
+        // already inserted rows from the bulk due to non-transactional writes are overwritten, because of
+        // yb_enable_upsert_mode
+        while (!success && errorCount < 100) {
+            if (errorCount > 0) {
+                log.info("Retrying bulk insert. table: {}, retry-attempt: {}", table.getName(), errorCount);
+            }
+            List<LoaderError> errors;
+            try {
+                errors = dsl.loadInto(table)
+                        .bulkAfter(bulkSize)
+                        .commitNone()
+                        .loadRecords(records)
+                        .fields(table.fields())
+                        .execute()
+                        .errors();
+                success = errors.isEmpty();
+                if (!errors.isEmpty()) {
+                    errorCount++;
+                    errors.stream()
+                            .map(LoaderError::exception)
+                            .filter(Objects::nonNull)
+                            .forEach(err -> log.error("Error while loading data into DB", err));
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("bulk insert failed. table: " + table.getName(), e);
+            }
         }
-        if (!errors.isEmpty()) {
-            errors.stream()
-                    .map(LoaderError::exception)
-                    .filter(Objects::nonNull)
-                    .forEach(err -> log.error("Error while loading data into DB", err));
-            throw new RuntimeException("bulk insert failed");
+        if (!success) {
+            // If after 100 attempts we still fail, we assume a more general problem and abort data loading
+            throw new LoaderException("bulk insert failed. table: " + table.getName());
         }
         sw.stop();
-        log.info("Insert {} took {}", table.getName(), sw.getTotalTimeSeconds());
+        log.info("Insert {} took {}. Attempts: {}", table.getName(), sw.getTotalTimeSeconds(), errorCount + 1);
     }
 
     /**
