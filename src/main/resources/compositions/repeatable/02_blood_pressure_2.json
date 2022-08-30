@@ -1,11 +1,11 @@
 {
                 "uid": {
                     "_type": "OBJECT_VERSION_ID",
-                    "value": "4b89a099-e0a3-488c-927c-84cdc33012c9::local.ehrbase.org::1"
+                    "value": "ec09f908-fc1c-43bf-9d1b-ae58b6c3273a::local.ehrbase.org::1"
                 },
                 "name": {
                     "_type": "DV_TEXT",
-                    "value": "Beatmungswerte"
+                    "value": "Blutdruck"
                 },
                 "_type": "COMPOSITION",
                 "context": {
@@ -24,7 +24,7 @@
                     },
                     "start_time": {
                         "_type": "DV_DATE_TIME",
-                        "value": "2021-10-21T00:00:00.000+02:00"
+                        "value": "2022-04-14T00:00:00.000+02:00"
                     },
                     "other_context": {
                         "name": {
@@ -61,31 +61,7 @@
                                 },
                                 "value": {
                                     "_type": "DV_TEXT",
-                                    "value": "26436-6"
-                                },
-                                "_type": "ELEMENT",
-                                "archetype_node_id": "at0005"
-                            },
-                            {
-                                "name": {
-                                    "value": "Kategorie",
-                                    "_type": "DV_TEXT"
-                                },
-                                "value": {
-                                    "_type": "DV_TEXT",
-                                    "value": "laboratory"
-                                },
-                                "_type": "ELEMENT",
-                                "archetype_node_id": "at0005"
-                            },
-                            {
-                                "name": {
-                                    "value": "Kategorie",
-                                    "_type": "DV_TEXT"
-                                },
-                                "value": {
-                                    "_type": "DV_TEXT",
-                                    "value": "18767-4"
+                                    "value": "vital-signs"
                                 },
                                 "_type": "ELEMENT",
                                 "archetype_node_id": "at0005"
@@ -131,7 +107,7 @@
                     },
                     "originating_system_item_ids": [
                         {
-                            "id": "Observation/7851b55d-0310-499b-9a3c-f66a99b89289/_history/1",
+                            "id": "Observation/6115aed3-8b17-42ce-97d5-67e25b02a702/_history/1",
                             "type": "fhir_logical_id",
                             "_type": "DV_IDENTIFIER"
                         },
@@ -153,7 +129,7 @@
                     "rm_version": "1.0.4",
                     "template_id": {
                         "_type": "TEMPLATE_ID",
-                        "value": "Beatmungswerte"
+                        "value": "Blutdruck"
                     },
                     "archetype_id": {
                         "_type": "ARCHETYPE_ID",
@@ -164,7 +140,7 @@
                 "content": [
                     {
                         "name": {
-                            "value": "Beobachtungen am Beatmungsgerät",
+                            "value": "Blutdruck",
                             "_type": "DV_TEXT"
                         },
                         "_type": "OBSERVATION",
@@ -189,27 +165,27 @@
                         },
                         "data": {
                             "name": {
-                                "value": "Event Series",
+                                "value": "Historie",
                                 "_type": "DV_TEXT"
                             },
                             "origin": {
-                                "value": "2021-10-21T00:00:00.000+02:00",
+                                "value": "2021-04-14T00:00:00.000+02:00",
                                 "_type": "DV_DATE_TIME"
                             },
                             "events": [
                                 {
                                     "name": {
-                                        "value": "Jedes Ereignis",
+                                        "value": "Beliebiges Ereignis",
                                         "_type": "DV_TEXT"
                                     },
                                     "time": {
-                                        "value": "2021-10-21T00:00:00.000+02:00",
+                                        "value": "2021-04-14T01:00:00.000+02:00",
                                         "_type": "DV_DATE_TIME"
                                     },
                                     "_type": "POINT_EVENT",
                                     "data": {
                                         "name": {
-                                            "value": "Tree",
+                                            "value": "Blutdruck",
                                             "_type": "DV_TEXT"
                                         },
                                         "archetype_node_id": "at0003",
@@ -217,31 +193,33 @@
                                         "items": [
                                             {
                                                 "name": {
-                                                    "value": "Eingeatmeter Sauerstoff",
+                                                    "value": "Systolisch",
                                                     "_type": "DV_TEXT"
                                                 },
-                                                "archetype_node_id": "openEHR-EHR-CLUSTER.inspired_oxygen.v1",
-                                                "_type": "CLUSTER",
-                                                "items": [
-                                                    {
-                                                        "name": {
-                                                            "value": "Inspiratorische Sauerstofffraktion",
-                                                            "_type": "DV_TEXT"
-                                                        },
-                                                        "value": {
-                                                            "type": 2.0,
-                                                            "_type": "DV_PROPORTION",
-                                                            "numerator": 24.0,
-                                                            "denominator": 100.0
-                                                        },
-                                                        "_type": "ELEMENT",
-                                                        "archetype_node_id": "at0053"
-                                                    }
-                                                ]
+                                                "value": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "units": "mm[Hg]",
+                                                    "magnitude": 130.0
+                                                },
+                                                "_type": "ELEMENT",
+                                                "archetype_node_id": "at0004"
+                                            },
+                                            {
+                                                "name": {
+                                                    "value": "Diastolisch",
+                                                    "_type": "DV_TEXT"
+                                                },
+                                                "value": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "units": "mm[Hg]",
+                                                    "magnitude": 70.0
+                                                },
+                                                "_type": "ELEMENT",
+                                                "archetype_node_id": "at0005"
                                             }
                                         ]
                                     },
-                                    "archetype_node_id": "at0002"
+                                    "archetype_node_id": "at0006"
                                 }
                             ],
                             "_type": "HISTORY",
@@ -250,13 +228,13 @@
                         "archetype_details": {
                             "rm_version": "1.0.4",
                             "template_id": {
-                                "value": "Beatmungswerte"
+                                "value": "Blutdruck"
                             },
                             "archetype_id": {
-                                "value": "openEHR-EHR-OBSERVATION.ventilator_vital_signs.v0"
+                                "value": "openEHR-EHR-OBSERVATION.blood_pressure.v2"
                             }
                         },
-                        "archetype_node_id": "openEHR-EHR-OBSERVATION.ventilator_vital_signs.v0"
+                        "archetype_node_id": "openEHR-EHR-OBSERVATION.blood_pressure.v2"
                     }
                 ]
             }

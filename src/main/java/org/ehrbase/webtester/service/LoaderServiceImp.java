@@ -69,6 +69,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.PrimitiveIterator.OfInt;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -145,7 +146,8 @@ import org.xml.sax.SAXException;
 public class LoaderServiceImp implements LoaderService {
 
     private static final String TEMPLATES_BASE = "classpath*:templates/**";
-    private static final String COMPOSITIONS_BASE = "classpath*:compositions/**";
+    private static final String COMPOSITIONS_REPEATABLE_PATH = "classpath*:compositions/repeatable/**";
+    private static final String COMPOSITIONS_SINGLE_PATH = "classpath*:compositions/single/**";
     private static final int MAX_COMPOSITION_VERSIONS = 3;
     private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
     private static final String SYS_PERIOD_FIELD_NAME = "sys_period";
@@ -154,7 +156,8 @@ public class LoaderServiceImp implements LoaderService {
     // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
     // otherwise
     private final ThreadLocal<Random> random = ThreadLocal.withInitial(SecureRandom::new);
-    private final List<Pair<Composition, JSONB>> compositions = new ArrayList<>();
+    private final List<Triple<Integer, Composition, JSONB>> singleCompositions = new ArrayList<>();
+    private final List<List<Triple<Integer, Composition, JSONB>>> compositionsWithSequenceByType = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
     private final DSLContext dsl;
@@ -241,21 +244,62 @@ public class LoaderServiceImp implements LoaderService {
 
     private void initializeCompositions() {
         try {
-            Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
-                            .getResources(COMPOSITIONS_BASE))
+            final OfInt sequenceNumIterator = IntStream.iterate(0, i -> i + 1).iterator();
+            Map<Integer, List<Triple<Integer, Composition, JSONB>>> compByGroup = Arrays.stream(
+                            ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
+                                    .getResources(COMPOSITIONS_REPEATABLE_PATH))
+                    // We need a sequential stream, so we get distinct sequence values
+                    .sequential()
                     .filter(r -> StringUtils.endsWith(r.getFilename(), ".json"))
                     .sorted(Comparator.comparing(Resource::getFilename))
                     .map(p -> {
                         try (InputStream in = p.getInputStream()) {
-                            return objectMapper.readValue(in, Composition.class);
+                            if (!p.getFilename().matches("[0-9]{2}_.*")) {
+                                throw new LoaderException("composition resource " + p.getFilename()
+                                        + " filename has to start with a 2 digit composition group number");
+                            }
+                            return Pair.of(p.getFilename(), objectMapper.readValue(in, Composition.class));
                         } catch (IOException e) {
                             throw new LoaderException("Failed to read composition file", e);
                         }
                     })
-                    .map(c -> Pair.of(c, JSONB.jsonb(rawJson.marshal(c))))
-                    .forEach(compositions::add);
+                    .collect(Collectors.groupingBy(
+                            p -> Integer.parseInt(p.getLeft().substring(0, 2)),
+                            Collectors.mapping(
+                                    p -> Triple.of(
+                                            sequenceNumIterator.next(),
+                                            p.getRight(),
+                                            JSONB.jsonb(rawJson.marshal(p.getRight()))),
+                                    Collectors.toList())));
+
+            compByGroup.entrySet().stream()
+                    .sorted(Entry.comparingByKey())
+                    .map(Entry::getValue)
+                    .forEach(compositionsWithSequenceByType::add);
+
+            Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
+                            .getResources(COMPOSITIONS_SINGLE_PATH))
+                    // We need a sequential stream, so we get distinct sequence values
+                    .sequential()
+                    .filter(r -> StringUtils.endsWith(r.getFilename(), ".json"))
+                    .map(p -> {
+                        try (InputStream in = p.getInputStream()) {
+                            if (!p.getFilename().matches("[0-9]{2}_.*")) {
+                                throw new LoaderException("composition resource " + p.getFilename()
+                                        + " filename has to start with a 2 digit composition group number");
+                            }
+                            Composition composition = objectMapper.readValue(in, Composition.class);
+                            return Triple.of(
+                                    sequenceNumIterator.next(),
+                                    composition,
+                                    JSONB.valueOf(rawJson.marshal(composition)));
+                        } catch (IOException e) {
+                            throw new LoaderException("Failed to read composition file", e);
+                        }
+                    })
+                    .forEach(singleCompositions::add);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -298,7 +342,12 @@ public class LoaderServiceImp implements LoaderService {
 
     private void prepareEntryTables() {
         // We will use temporary entry tables for each composition number for faster JSONB inserts in the end
-        IntStream.range(0, compositions.size())
+        IntStream.range(
+                        0,
+                        compositionsWithSequenceByType.stream()
+                                        .mapToInt(List::size)
+                                        .sum()
+                                + singleCompositions.size())
                 .forEach(i -> runStatementWithTransactionalWrites(String.format(
                         "CREATE TABLE IF NOT EXISTS ehr.entry_%d("
                                 + "    id uuid,"
@@ -439,7 +488,7 @@ public class LoaderServiceImp implements LoaderService {
                 .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
 
         log.info("Removing temporary entry tables...");
-        IntStream.range(0, compositions.size())
+        IntStream.range(0, compositionsWithSequenceByType.size())
                 .forEach(i -> runStatementWithTransactionalWrites(
                         String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
 
@@ -554,8 +603,10 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Last Batch completed in {} ms", stopWatch.getLastTaskTimeMillis());
         log.info("Copying to ehr.entry with JSONB data...");
         stopWatch.start("jsonb");
-        waitForTaskToComplete(CompletableFuture.allOf(IntStream.range(0, compositions.size())
-                .mapToObj(i -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(i)))
+        waitForTaskToComplete(CompletableFuture.allOf(Stream.concat(
+                        singleCompositions.stream(),
+                        compositionsWithSequenceByType.stream().flatMap(List::stream))
+                .map(ci -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(ci.getLeft(), ci.getRight())))
                 .toArray(CompletableFuture[]::new)));
         stopWatch.stop();
         log.info("JSONB data update completed in {} ms", stopWatch.getLastTaskTimeMillis());
@@ -646,7 +697,7 @@ public class LoaderServiceImp implements LoaderService {
                 ehr);
     }
 
-    private void copyIntoEntryTableWithJsonb(int compositionNumber) {
+    private void copyIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) {
         StopWatch sw = new StopWatch();
         sw.start("count");
         long tableSize = entryTableSize(compositionNumber);
@@ -659,12 +710,12 @@ public class LoaderServiceImp implements LoaderService {
             sw.start("batch" + i);
             try {
                 int insertCount;
-                insertCount = copyBatchIntoEntryTableWithJsonb(compositionNumber);
+                insertCount = copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
                 sw.stop();
                 log.info(
                         "Copy comp {} batch: {}, count: {}, time: {}ms",
                         compositionNumber,
-                        i,
+                        i - errorCount,
                         insertCount,
                         sw.getLastTaskTimeMillis());
             } catch (SQLException e) {
@@ -686,7 +737,7 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
     }
 
-    private int copyBatchIntoEntryTableWithJsonb(int compositionNumber) throws SQLException {
+    private int copyBatchIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) throws SQLException {
         try (Connection c = primaryDataSource.getConnection()) {
             try (Statement s = c.createStatement()) {
                 s.setQueryTimeout(0);
@@ -696,7 +747,7 @@ public class LoaderServiceImp implements LoaderService {
                                 + "INSERT INTO ehr.entry "
                                 + "  SELECT \"id\","
                                 + "  \"composition_id\","
-                                + "  \"sequence\","
+                                + "  0,"
                                 + "  \"item_type\","
                                 + "  \"template_id\","
                                 + "  \"template_uuid\","
@@ -708,10 +759,7 @@ public class LoaderServiceImp implements LoaderService {
                                 + "  \"rm_version\","
                                 + "  \"name\""
                                 + "FROM del;",
-                        compositionNumber,
-                        compositionNumber,
-                        JSONB_INSERT_BATCH_SIZE,
-                        compositions.get(compositionNumber).getValue().data());
+                        compositionNumber, compositionNumber, JSONB_INSERT_BATCH_SIZE, jsonbData.data());
                 return s.executeUpdate(statement);
             } catch (SQLException e) {
                 // Some errors may result in a broken DB session therefore we evict the connection from the pool
@@ -964,7 +1012,6 @@ public class LoaderServiceImp implements LoaderService {
                 .mapToObj(i -> buildCompositionData(
                         i,
                         ehrId,
-                        this.compositions.get(i % this.compositions.size()),
                         facilityIdToHcpId.get(facilities.get(i % facilities.size())),
                         facilities.get(i % facilities.size())))
                 .collect(Collectors.toList());
@@ -994,15 +1041,20 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private CompositionCreateDescriptor buildCompositionData(
-            int compositionNumber,
-            UUID ehrId,
-            Pair<Composition, JSONB> compositionData,
-            List<UUID> hcpIds,
-            UUID facility) {
+            int compositionNumber, UUID ehrId, List<UUID> hcpIds, UUID facility) {
+        Triple<Integer, Composition, JSONB> selectedComposition;
+        if (compositionNumber < singleCompositions.size()) {
+            selectedComposition = singleCompositions.get(compositionNumber);
+        } else {
+            List<Triple<Integer, Composition, JSONB>> compositionData = this.compositionsWithSequenceByType.get(
+                    (compositionNumber - singleCompositions.size()) % compositionsWithSequenceByType.size());
+            selectedComposition = compositionData.size() > 1
+                    ? compositionData.get(random.get().nextInt(compositionData.size()))
+                    : compositionData.get(0);
+        }
 
         int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
         UUID composerId = hcpIds.get(compositionNumber % hcpIds.size());
-
         OffsetDateTime sysTransaction = OffsetDateTime.now();
 
         CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
@@ -1013,7 +1065,7 @@ public class LoaderServiceImp implements LoaderService {
         createDescriptor.contributionAudit = contribution.getRight();
         Pair<CompositionRecord, AuditDetailsRecord> composition = createComposition(
                 ehrId,
-                compositionData.getLeft(),
+                selectedComposition.getMiddle(),
                 composerId,
                 contribution.getLeft().getId(),
                 sysTransaction);
@@ -1021,12 +1073,12 @@ public class LoaderServiceImp implements LoaderService {
         createDescriptor.compositionAudit = composition.getRight();
         createDescriptor.entry = createEntry(
                 composition.getLeft().getId(),
-                compositionData.getLeft(),
-                compositionData.getRight(),
+                selectedComposition.getMiddle(),
+                selectedComposition.getRight(),
                 sysTransaction,
-                compositionNumber % compositions.size());
+                selectedComposition.getLeft());
         createDescriptor.eventContext = createEventContext(
-                composition.getLeft().getId(), compositionData.getLeft().getContext(), facility, sysTransaction);
+                composition.getLeft().getId(), selectedComposition.getMiddle().getContext(), facility, sysTransaction);
         if (hcpCount > 1 && hcpIds.size() > 1) {
             List<UUID> participationCandidates =
                     CollectionUtils.selectRejected(hcpIds, composerId::equals, new ArrayList<>());

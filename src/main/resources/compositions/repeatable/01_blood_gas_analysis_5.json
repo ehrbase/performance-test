@@ -179,7 +179,7 @@
                             "_type": "DV_TEXT"
                         },
                         "time": {
-                            "value": "2020-09-21T00:00:00.000+02:00",
+                            "value": "2020-09-24T00:00:00.000+02:00",
                             "_type": "DV_DATE_TIME"
                         },
                         "_type": "POINT_EVENT",
@@ -227,7 +227,7 @@
                                             "value": {
                                                 "_type": "DV_QUANTITY",
                                                 "units": "mmHg",
-                                                "magnitude": 44.0
+                                                "magnitude": 55.0
                                             },
                                             "_type": "ELEMENT",
                                             "archetype_node_id": "at0001"
@@ -282,7 +282,7 @@
                                             "value": {
                                                 "_type": "DV_QUANTITY",
                                                 "units": "mmHg",
-                                                "magnitude": 67.0
+                                                "magnitude": 55.0
                                             },
                                             "_type": "ELEMENT",
                                             "archetype_node_id": "at0001"
@@ -337,7 +337,7 @@
                                             "value": {
                                                 "_type": "DV_QUANTITY",
                                                 "units": "pH",
-                                                "magnitude": 7.4
+                                                "magnitude": 7.7
                                             },
                                             "_type": "ELEMENT",
                                             "archetype_node_id": "at0001"
@@ -392,7 +392,7 @@
                                             "value": {
                                                 "_type": "DV_QUANTITY",
                                                 "units": "%",
-                                                "magnitude": 98.0
+                                                "magnitude": 85.0
                                             },
                                             "_type": "ELEMENT",
                                             "archetype_node_id": "at0001"

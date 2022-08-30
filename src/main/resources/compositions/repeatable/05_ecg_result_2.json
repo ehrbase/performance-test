@@ -1,0 +1,276 @@
+{
+    "_type": "COMPOSITION",
+    "name": {
+        "_type": "DV_TEXT",
+        "value": "ecg_result"
+    },
+    "archetype_details": {
+        "archetype_id": {
+            "value": "openEHR-EHR-COMPOSITION.report.v1"
+        },
+        "template_id": {
+            "value": "ecg_result"
+        },
+        "rm_version": "1.0.4"
+    },
+    "language": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "ISO_639-1"
+        },
+        "code_string": "de"
+    },
+    "territory": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "ISO_3166-1"
+        },
+        "code_string": "DE"
+    },
+    "category": {
+        "_type": "DV_CODED_TEXT",
+        "value": "event",
+        "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+                "_type": "TERMINOLOGY_ID",
+                "value": "openehr"
+            },
+            "code_string": "433"
+        }
+    },
+    "composer": {
+        "_type": "PARTY_IDENTIFIED",
+        "name": "Markus Stein"
+    },
+    "context": {
+        "_type": "EVENT_CONTEXT",
+        "start_time": {
+            "_type": "DV_DATE_TIME",
+            "value": "2022-02-03T04:05:06.000"
+        },
+        "end_time": {
+            "_type": "DV_DATE_TIME",
+            "value": "2022-02-03T04:05:06.000"
+        },
+        "setting": {
+            "_type": "DV_CODED_TEXT",
+            "value": "home",
+            "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "openehr"
+                },
+                "code_string": "225"
+            }
+        },
+        "other_context": {
+            "_type": "ITEM_TREE",
+            "name": {
+                "_type": "DV_TEXT",
+                "value": "Tree"
+            },
+            "items": [
+                {
+                    "_type": "ELEMENT",
+                    "name": {
+                        "_type": "DV_TEXT",
+                        "value": "Bericht ID"
+                    },
+                    "value": {
+                        "_type": "DV_TEXT",
+                        "value": "Lorem ipsum"
+                    },
+                    "archetype_node_id": "at0002"
+                },
+                {
+                    "_type": "ELEMENT",
+                    "name": {
+                        "_type": "DV_TEXT",
+                        "value": "Status"
+                    },
+                    "value": {
+                        "_type": "DV_TEXT",
+                        "value": "Lorem ipsum"
+                    },
+                    "archetype_node_id": "at0005"
+                }
+            ],
+            "archetype_node_id": "at0001"
+        },
+        "health_care_facility": {
+            "_type": "PARTY_IDENTIFIED",
+            "name": "DOE, John"
+        }
+    },
+    "content": [
+        {
+            "_type": "OBSERVATION",
+            "name": {
+                "_type": "DV_TEXT",
+                "value": "EKG Ergebnis"
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-EHR-OBSERVATION.ecg_result.v1"
+                },
+                "template_id": {
+                    "value": "ecg_result"
+                },
+                "rm_version": "1.0.4"
+            },
+            "language": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "ISO_639-1"
+                },
+                "code_string": "de"
+            },
+            "encoding": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "IANA_character-sets"
+                },
+                "code_string": "UTF-8"
+            },
+            "subject": {
+                "_type": "PARTY_SELF"
+            },
+            "data": {
+                "name": {
+                    "_type": "DV_TEXT",
+                    "value": "Event Series"
+                },
+                "origin": {
+                    "_type": "DV_DATE_TIME",
+                    "value": "2022-02-03T04:05:06.000"
+                },
+                "events": [
+                    {
+                        "_type": "INTERVAL_EVENT",
+                        "name": {
+                            "_type": "DV_TEXT",
+                            "value": "Beliebiges Ereignis"
+                        },
+                        "time": {
+                            "_type": "DV_DATE_TIME",
+                            "value": "2022-02-05T04:05:06.000"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "name": {
+                                "_type": "DV_TEXT",
+                                "value": "Tree"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "name": {
+                                        "_type": "DV_TEXT",
+                                        "value": "Globale QT-Zeit"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "units": "ms",
+                                        "magnitude": 60.0
+                                    },
+                                    "archetype_node_id": "at0007"
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "name": {
+                                        "_type": "DV_TEXT",
+                                        "value": "Globale PQ-Zeit"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "units": "ms",
+                                        "magnitude": 20.0
+                                    },
+                                    "archetype_node_id": "at0012"
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "name": {
+                                        "_type": "DV_TEXT",
+                                        "value": "Globale QRS-Dauer"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "units": "ms",
+                                        "magnitude": 8.0
+                                    },
+                                    "archetype_node_id": "at0014"
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "name": {
+                                        "_type": "DV_TEXT",
+                                        "value": "P-Achse"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "units": "deg",
+                                        "magnitude": 70.0
+                                    },
+                                    "archetype_node_id": "at0020"
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "name": {
+                                        "_type": "DV_TEXT",
+                                        "value": "Atriale Frequenz"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "units": "/min",
+                                        "magnitude": 60.0
+                                    },
+                                    "archetype_node_id": "at0094"
+                                }
+                            ],
+                            "archetype_node_id": "at0005"
+                        },
+                        "width": {
+                            "_type": "DV_DURATION",
+                            "value": "PT42H"
+                        },
+                        "math_function": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "minimum",
+                            "defining_code": {
+                                "_type": "CODE_PHRASE",
+                                "terminology_id": {
+                                    "_type": "TERMINOLOGY_ID",
+                                    "value": "openehr"
+                                },
+                                "code_string": "145"
+                            }
+                        },
+                        "archetype_node_id": "at0002",
+                        "uid": {
+                            "_type": "HIER_OBJECT_ID",
+                            "value": "d6ae69e7-1030-3525-bb73-1da9e03989cd"
+                        }
+                    }
+                ],
+                "archetype_node_id": "at0001"
+            },
+            "archetype_node_id": "openEHR-EHR-OBSERVATION.ecg_result.v1",
+            "uid": {
+                "_type": "HIER_OBJECT_ID",
+                "value": "a77acf3b-d10f-3171-9300-6991899819b7"
+            }
+        }
+    ],
+    "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1",
+    "uid": {
+        "_type": "OBJECT_VERSION_ID",
+        "value": "3762a102-a318-4ce3-a9c6-e9883b2b09c3::local.ehrbase.org::1"
+    }
+}

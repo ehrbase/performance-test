@@ -159,7 +159,7 @@
                         },
                         "time": {
                             "_type": "DV_DATE_TIME",
-                            "value": "2022-02-03T04:05:06.000"
+                            "value": "2022-02-05T04:05:06.000"
                         },
                         "data": {
                             "_type": "ITEM_TREE",
@@ -177,7 +177,7 @@
                                     "value": {
                                         "_type": "DV_QUANTITY",
                                         "units": "ms",
-                                        "magnitude": 40.0
+                                        "magnitude": 50.0
                                     },
                                     "archetype_node_id": "at0007"
                                 },
@@ -190,7 +190,7 @@
                                     "value": {
                                         "_type": "DV_QUANTITY",
                                         "units": "ms",
-                                        "magnitude": 17.0
+                                        "magnitude": 15.0
                                     },
                                     "archetype_node_id": "at0012"
                                 },
@@ -203,7 +203,7 @@
                                     "value": {
                                         "_type": "DV_QUANTITY",
                                         "units": "ms",
-                                        "magnitude": 8.0
+                                        "magnitude": 6.0
                                     },
                                     "archetype_node_id": "at0014"
                                 },
@@ -229,7 +229,7 @@
                                     "value": {
                                         "_type": "DV_QUANTITY",
                                         "units": "/min",
-                                        "magnitude": 65.0
+                                        "magnitude": 50.0
                                     },
                                     "archetype_node_id": "at0094"
                                 }

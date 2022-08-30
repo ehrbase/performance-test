@@ -172,7 +172,7 @@
                         },
                         "time": {
                             "_type": "DV_DATE_TIME",
-                            "value": "2020-10-02T00:00:00.000+02:00"
+                            "value": "2020-12-24T00:00:00.000+02:00"
                         },
                         "data": {
                             "_type": "ITEM_TREE",
@@ -190,7 +190,7 @@
                                     "value": {
                                         "_type": "DV_QUANTITY",
                                         "units": "kg",
-                                        "magnitude": 100.0
+                                        "magnitude": 72.5
                                     },
                                     "archetype_node_id": "at0004"
                                 }
