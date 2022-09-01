@@ -20,6 +20,8 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 15
+    hikarisecond:
+      maximum-pool-size: 2
   jooq:
     sql-dialect: POSTGRES
   flyway:

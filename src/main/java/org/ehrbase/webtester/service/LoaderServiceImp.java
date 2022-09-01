@@ -17,12 +17,7 @@
  */
 package org.ehrbase.webtester.service;
 
-import static org.ehrbase.jooq.pg.Tables.COMPOSITION_HISTORY;
-import static org.ehrbase.jooq.pg.Tables.ENTRY_HISTORY;
-import static org.ehrbase.jooq.pg.Tables.EVENT_CONTEXT_HISTORY;
-import static org.ehrbase.jooq.pg.Tables.PARTICIPATION_HISTORY;
 import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
-import static org.ehrbase.jooq.pg.Tables.STATUS_HISTORY;
 import static org.ehrbase.jooq.pg.Tables.SYSTEM;
 import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
 import static org.ehrbase.jooq.pg.tables.Composition.COMPOSITION;
@@ -46,10 +41,16 @@ import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.TermMapping;
 import com.nedap.archie.rm.support.identification.TerminologyId;
+import com.zaxxer.hikari.HikariDataSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -60,13 +61,17 @@ import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.PrimitiveIterator.OfInt;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -84,10 +89,11 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
-import org.ehrbase.jooq.pg.Indexes;
 import org.ehrbase.jooq.pg.enums.ContributionChangeType;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.jooq.pg.enums.ContributionState;
@@ -115,9 +121,14 @@ import org.jooq.Record2;
 import org.jooq.Table;
 import org.jooq.TableField;
 import org.jooq.TableRecord;
+import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.core.io.support.ResourcePatternUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -134,45 +145,25 @@ import org.xml.sax.SAXException;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class LoaderServiceImp implements LoaderService {
 
-    private static final String TEMPLATES_BASE = "templates/";
-    private static final String[] TEMPLATES = {
-        "corona_anamnese.opt",
-        "ehrbase_blood_pressure.opt",
-        "virologischer_befund.opt",
-        "international_patient_summary.opt"
-    };
-    private static final String COMPOSITIONS_BASE = "compositions/";
-    private static final String[] COMPOSITIONS = {
-        "blood_pressure.json", "international_patient_summary.json", "corona_anamnese.json", "virologischer_befund.json"
-    };
-    private static final Table[] RELEVANT_TABLES = {
-        PARTY_IDENTIFIED,
-        SYSTEM,
-        AUDIT_DETAILS,
-        COMPOSITION,
-        COMPOSITION_HISTORY,
-        CONTRIBUTION,
-        ENTRY,
-        ENTRY_HISTORY,
-        EVENT_CONTEXT,
-        EVENT_CONTEXT_HISTORY,
-        PARTICIPATION,
-        PARTICIPATION_HISTORY,
-        STATUS,
-        STATUS_HISTORY
-    };
-    private static final Table[] RELEVANT_VERSIONED_TABLES = {COMPOSITION, ENTRY, EVENT_CONTEXT, PARTICIPATION, STATUS};
+    private static final String TEMPLATES_BASE = "classpath*:templates/**";
+    private static final String COMPOSITIONS_REPEATABLE_PATH = "classpath*:compositions/repeatable/**";
+    private static final String COMPOSITIONS_SINGLE_PATH = "classpath*:compositions/single/**";
     private static final int MAX_COMPOSITION_VERSIONS = 3;
     private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
     private static final String SYS_PERIOD_FIELD_NAME = "sys_period";
+    private static final int JSONB_INSERT_BATCH_SIZE = 1000;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
     // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
     // otherwise
     private final ThreadLocal<Random> random = ThreadLocal.withInitial(SecureRandom::new);
-    private final List<Composition> compositions = new ArrayList<>();
+    private final List<Triple<Integer, Composition, JSONB>> singleCompositions = new ArrayList<>();
+    private final List<List<Triple<Integer, Composition, JSONB>>> compositionsWithSequenceByType = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
     private final DSLContext dsl;
+    private final HikariDataSource primaryDataSource;
+    private final HikariDataSource secondaryDataSource;
+    private final ResourceLoader resourceLoader;
     private final Map<String, Integer> territories = new HashMap<>();
 
     private UUID systemId;
@@ -180,32 +171,61 @@ public class LoaderServiceImp implements LoaderService {
     private String zoneId;
     private boolean isRunning = false;
 
-    public LoaderServiceImp(DSLContext dsl) {
+    public LoaderServiceImp(
+            DSLContext dsl,
+            ResourceLoader resourceLoader,
+            @Qualifier("primaryDataSource") HikariDataSource primaryDataSource,
+            @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource) {
         this.dsl = dsl;
+        this.secondaryDataSource = secondaryDataSource;
+        this.primaryDataSource = primaryDataSource;
+        this.resourceLoader = resourceLoader;
     }
 
     @PostConstruct
     public void initialize() {
+        // Initialize everything that does not require DB inserts,
+        // because inserts with indexes present are likely to fail with non-transactional writes
         zoneId = ZoneId.systemDefault().toString();
-        systemId = getSystemId();
-        committerId = getCommitterId();
+        initializeCompositions();
         territories.putAll(dsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE).from(TERRITORY).fetch().stream()
                 .collect(Collectors.toMap(Record2::value1, Record2::value2)));
+    }
 
-        initializeTemplates();
-        initializeCompositions();
+    private Set<String> getTableNames() {
+        try (Connection c = secondaryDataSource.getConnection();
+                Statement s = c.createStatement()) {
+            Set<String> tableNames = new HashSet<>();
+            s.execute("SELECT tablename FROM pg_tables WHERE schemaname='ehr';");
+            try (ResultSet resultSet = s.getResultSet()) {
+                while (resultSet.next()) {
+                    tableNames.add(resultSet.getString(1));
+                }
+            }
+            return tableNames;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void initializeTemplates() {
-        Stream.of(TEMPLATES).map(p -> TEMPLATES_BASE + p).forEach(p -> {
-            String templateId;
-            try (var in = ResourceUtils.getInputStream(p); ) {
-                templateId = xpath(in, "//template/template_id/value/text()");
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            createTemplate(templateId, p);
-        });
+        try {
+            Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
+                            .getResources(TEMPLATES_BASE))
+                    .filter(r -> StringUtils.endsWith(r.getFilename(), ".opt"))
+                    .sorted(Comparator.comparing(Resource::getFilename))
+                    .forEach(f -> {
+                        String templateId;
+                        try (InputStream in = f.getInputStream()) {
+                            templateId = xpath(in, "//template/template_id/value/text()");
+                            createTemplate(templateId, f);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String xpath(InputStream document, String xpathExpression) {
@@ -223,17 +243,64 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void initializeCompositions() {
-        Stream.of(COMPOSITIONS)
-                .map(p -> COMPOSITIONS_BASE + p)
-                .map(ResourceUtils::getContent)
-                .map(p -> {
-                    try {
-                        return objectMapper.readValue(p, Composition.class);
-                    } catch (IOException e) {
-                        throw new LoaderException("Failed to read composition file", e);
-                    }
-                })
-                .forEach(compositions::add);
+        try {
+            final OfInt sequenceNumIterator = IntStream.iterate(0, i -> i + 1).iterator();
+            Map<Integer, List<Triple<Integer, Composition, JSONB>>> compByGroup = Arrays.stream(
+                            ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
+                                    .getResources(COMPOSITIONS_REPEATABLE_PATH))
+                    // We need a sequential stream, so we get distinct sequence values
+                    .sequential()
+                    .filter(r -> StringUtils.endsWith(r.getFilename(), ".json"))
+                    .sorted(Comparator.comparing(Resource::getFilename))
+                    .map(p -> {
+                        try (InputStream in = p.getInputStream()) {
+                            if (!p.getFilename().matches("[0-9]{2}_.*")) {
+                                throw new LoaderException("composition resource " + p.getFilename()
+                                        + " filename has to start with a 2 digit composition group number");
+                            }
+                            return Pair.of(p.getFilename(), objectMapper.readValue(in, Composition.class));
+                        } catch (IOException e) {
+                            throw new LoaderException("Failed to read composition file", e);
+                        }
+                    })
+                    .collect(Collectors.groupingBy(
+                            p -> Integer.parseInt(p.getLeft().substring(0, 2)),
+                            Collectors.mapping(
+                                    p -> Triple.of(
+                                            sequenceNumIterator.next(),
+                                            p.getRight(),
+                                            JSONB.jsonb(rawJson.marshal(p.getRight()))),
+                                    Collectors.toList())));
+
+            compByGroup.entrySet().stream()
+                    .sorted(Entry.comparingByKey())
+                    .map(Entry::getValue)
+                    .forEach(compositionsWithSequenceByType::add);
+
+            Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
+                            .getResources(COMPOSITIONS_SINGLE_PATH))
+                    // We need a sequential stream, so we get distinct sequence values
+                    .sequential()
+                    .filter(r -> StringUtils.endsWith(r.getFilename(), ".json"))
+                    .map(p -> {
+                        try (InputStream in = p.getInputStream()) {
+                            if (!p.getFilename().matches("[0-9]{2}_.*")) {
+                                throw new LoaderException("composition resource " + p.getFilename()
+                                        + " filename has to start with a 2 digit composition group number");
+                            }
+                            Composition composition = objectMapper.readValue(in, Composition.class);
+                            return Triple.of(
+                                    sequenceNumIterator.next(),
+                                    composition,
+                                    JSONB.valueOf(rawJson.marshal(composition)));
+                        } catch (IOException e) {
+                            throw new LoaderException("Failed to read composition file", e);
+                        }
+                    })
+                    .forEach(singleCompositions::add);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override
@@ -255,9 +322,15 @@ public class LoaderServiceImp implements LoaderService {
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
-                preLoadOperations(properties);
+                prepareEntryTables();
+                Set<String> tableNames = getTableNames();
+                // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
+                List<Constraint> indexConstraints = findConstraints();
+                List<Triple<String, String, String>> indexes = findIndexes(
+                        indexConstraints.stream().map(c -> c.constraintName).collect(Collectors.toList()));
+                preLoadOperations(properties, indexes, indexConstraints, tableNames);
                 loadInternal(properties);
-                postLoadOperations();
+                postLoadOperations(indexes, indexConstraints, tableNames);
             } catch (RuntimeException e) {
                 isRunning = false;
                 throw e;
@@ -267,34 +340,186 @@ public class LoaderServiceImp implements LoaderService {
         });
     }
 
-    private void postLoadOperations() {
-        log.info("Re-enabling triggers...");
-        Arrays.stream(RELEVANT_TABLES)
-                .forEach(table -> dsl.execute(String.format(
-                        "ALTER TABLE %s.%s ENABLE TRIGGER ALL;",
-                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
-
-        log.info(
-                "GIN index on ehr.entry.entry will not be recreated automatically, because it is a very long running operation. Please add it manually! Statement: CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
+    private void prepareEntryTables() {
+        // We will use temporary entry tables for each composition number for faster JSONB inserts in the end
+        IntStream.range(
+                        0,
+                        compositionsWithSequenceByType.stream()
+                                        .mapToInt(List::size)
+                                        .sum()
+                                + singleCompositions.size())
+                .forEach(i -> runStatementWithTransactionalWrites(String.format(
+                        "CREATE TABLE IF NOT EXISTS ehr.entry_%d("
+                                + "    id uuid,"
+                                + "    composition_id uuid,"
+                                + "    sequence integer,"
+                                + "    item_type ehr.entry_type,"
+                                + "    template_id text COLLATE pg_catalog.\"default\","
+                                + "    template_uuid uuid,"
+                                + "    archetype_id text COLLATE pg_catalog.\"default\","
+                                + "    category ehr.dv_coded_text,"
+                                + "    entry jsonb,"
+                                + "    sys_transaction timestamp without time zone,"
+                                + "    sys_period tstzrange,"
+                                + "    rm_version text COLLATE pg_catalog.\"default\","
+                                + "    name ehr.dv_coded_text,"
+                                + "    PRIMARY KEY (id));",
+                        i)));
     }
 
-    private void preLoadOperations(LoaderRequestDto properties) {
-        log.info("Dropping GIN index on ehr.entry.entry...");
-        dsl.execute(String.format(
-                "DROP INDEX IF EXISTS %s.%s;",
-                org.ehrbase.jooq.pg.Ehr.EHR.getName(), Indexes.GIN_ENTRY_PATH_IDX.getName()));
-        log.info("Disabling all non-versioning triggers...");
+    private List<Triple<String, String, String>> findIndexes(List<String> constraintNames) {
+        try (Connection c = secondaryDataSource.getConnection();
+                Statement s = c.createStatement()) {
+            s.execute(String.format(
+                    "SELECT schemaname, indexname, indexdef\n" + "FROM pg_indexes\n"
+                            + "WHERE schemaname = 'ehr'"
+                            + "AND indexname NOT IN (%s)",
+                    constraintNames.stream().map(t -> "'" + t + "'").collect(Collectors.joining(","))));
+            List<Triple<String, String, String>> parsed = new ArrayList<>();
+            try (ResultSet resultSet = s.getResultSet()) {
+                while (resultSet.next()) {
+                    parsed.add(Triple.of(resultSet.getString(1), resultSet.getString(2), resultSet.getString(3)));
+                }
+            }
+            return parsed;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static class Constraint {
+        private String schema;
+        private String table;
+        private String constraintName;
+        private String type;
+        private String definition;
+
+        private Constraint(String schema, String table, String constraintName, String type, String definition) {
+            this.schema = schema;
+            this.table = table;
+            this.constraintName = constraintName;
+            this.type = type;
+            this.definition = definition;
+        }
+    }
+
+    private List<Constraint> findConstraints() {
+        try (Connection c = secondaryDataSource.getConnection();
+                Statement s = c.createStatement()) {
+            s.execute("SELECT nsp.nspname,rel.relname,con.conname, con.contype, pg_get_constraintdef(con.oid)"
+                    + "       FROM pg_catalog.pg_constraint con"
+                    + "            INNER JOIN pg_catalog.pg_class rel"
+                    + "                       ON rel.oid = con.conrelid"
+                    + "            INNER JOIN pg_catalog.pg_namespace nsp"
+                    + "                       ON nsp.oid = connamespace"
+                    + "       WHERE nsp.nspname = 'ehr' AND con.contype IN ('u','p');");
+            List<Constraint> parsed = new ArrayList<>();
+            try (ResultSet resultSet = s.getResultSet()) {
+                while (resultSet.next()) {
+                    parsed.add(new Constraint(
+                            resultSet.getString(1),
+                            resultSet.getString(2),
+                            resultSet.getString(3),
+                            resultSet.getString(4),
+                            resultSet.getString(5)));
+                }
+            }
+            return parsed;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void preLoadOperations(
+            LoaderRequestDto properties,
+            List<Triple<String, String, String>> indexes,
+            List<Constraint> constraints,
+            Set<String> tableNames) {
+        log.info("Dropping indexes (including unique constraints) on relevant tables: {}", tableNames);
+        constraints.stream()
+                .filter(cs -> "u".equalsIgnoreCase(cs.type))
+                .forEach(cs -> runStatementWithTransactionalWrites(String.format(
+                        "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", cs.schema, cs.table, cs.constraintName)));
+        indexes.forEach(indexInfo -> runStatementWithTransactionalWrites(
+                String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getLeft(), indexInfo.getMiddle())));
+
+        log.info("Disabling all triggers...");
         // We assume Postgres or Yugabyte as DB vendor -> disabling triggers will also disable foreign key
         // constraints
-        Arrays.stream(RELEVANT_TABLES)
-                .forEach(table -> dsl.execute(String.format(
-                        "ALTER TABLE %s.%s DISABLE TRIGGER ALL;",
-                        org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
-        if (properties.isInsertVersions()) {
-            Arrays.stream(RELEVANT_VERSIONED_TABLES)
-                    .forEach(table -> dsl.execute(String.format(
-                            "ALTER TABLE %s.%s ENABLE TRIGGER versioning_trigger;",
-                            org.ehrbase.jooq.pg.Ehr.EHR.getName(), table.getName())));
+        tableNames.forEach(table -> runStatementWithTransactionalWrites(
+                String.format("ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
+
+        // We initialize the following stuff, because they might perform DB inserts.
+        // These will fail if indexes are present, because our connections are set for non-transactional writes
+        if (systemId == null) {
+            systemId = getSystemId();
+        }
+        if (committerId == null) {
+            committerId = getCommitterId();
+        }
+        initializeTemplates();
+    }
+
+    private void postLoadOperations(
+            List<Triple<String, String, String>> indexes, List<Constraint> constraints, Set<String> tableNames) {
+        final List<String> failedStatements = new ArrayList<>();
+        // All streams are explicitly marked as sequential since parallel catalog updates may lead to conflicts
+        log.info("Re-enabling triggers...");
+        tableNames.stream()
+                .sequential()
+                .filter(t -> !StringUtils.startsWithIgnoreCase(t, "entry_"))
+                .map(table -> String.format(
+                        "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
+                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        log.info("Re-Creating indexes...");
+        indexes.stream()
+                .sequential()
+                .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
+                .map(Triple::getRight)
+                .map(s -> s + ";")
+                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        log.info("Re-Creating unique constraints...");
+        constraints.stream()
+                .sequential()
+                .filter(cs -> "u".equalsIgnoreCase(cs.type))
+                .map(cs -> String.format(
+                        "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
+                        cs.schema, cs.table, cs.constraintName, cs.definition))
+                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+
+        log.info("Removing temporary entry tables...");
+        IntStream.range(0, compositionsWithSequenceByType.size())
+                .forEach(i -> runStatementWithTransactionalWrites(
+                        String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
+
+        log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
+                + "because it is a very long running operation. \n"
+                + "Please add it manually! Statement: \n"
+                + "CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
+        if (!failedStatements.isEmpty()) {
+            log.error(
+                    "The following post load SQL statements failed. Please run them manually: \n {}",
+                    String.join("\n", failedStatements));
+        }
+    }
+
+    private void runStatementWithTransactionalWrites(String createStatement) {
+        runStatementWithTransactionalWrites(createStatement, null);
+    }
+
+    private void runStatementWithTransactionalWrites(String createStatement, List<String> errors) {
+        try (Connection c = secondaryDataSource.getConnection();
+                Statement s = c.createStatement()) {
+            s.setQueryTimeout(0);
+            log.info(createStatement);
+            s.execute(createStatement);
+        } catch (SQLException e) {
+            log.error("Error while executing SQL statement", e);
+            if (errors != null) {
+                errors.add(createStatement);
+            } else {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -367,8 +592,7 @@ public class LoaderServiceImp implements LoaderService {
             }
             stopWatch.start("insert-batch" + batch);
             // Insert the already prepared batch
-            currentInsertTask =
-                    insertEhrsAsync(ehrDescriptors, properties.getBulkSize(), properties.isInsertVersions());
+            currentInsertTask = insertEhrsAsync(ehrDescriptors, properties.getBulkSize());
         }
 
         // wait for the last insert batch to complete
@@ -377,9 +601,13 @@ public class LoaderServiceImp implements LoaderService {
             stopWatch.stop();
         }
         log.info("Last Batch completed in {} ms", stopWatch.getLastTaskTimeMillis());
-        log.info("Updating ehr.entry.entry with JSONB data...");
-        stopWatch.start("update");
-        waitForTaskToComplete(updateEntryWithJsonb());
+        log.info("Copying to ehr.entry with JSONB data...");
+        stopWatch.start("jsonb");
+        waitForTaskToComplete(CompletableFuture.allOf(Stream.concat(
+                        singleCompositions.stream(),
+                        compositionsWithSequenceByType.stream().flatMap(List::stream))
+                .map(ci -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(ci.getLeft(), ci.getRight())))
+                .toArray(CompletableFuture[]::new)));
         stopWatch.stop();
         log.info("JSONB data update completed in {} ms", stopWatch.getLastTaskTimeMillis());
         log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
@@ -431,48 +659,23 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private CompletableFuture<Void> insertEhrsAsync(
-            List<EhrCreateDescriptor> ehrDescriptors, int bulkSize, boolean runVersionUpdates) {
-        // We want the entry inserts to start as early as possible since these take the longest
-        CompletableFuture<Void> entry = CompletableFuture.runAsync(
-                () -> bulkInsert(ENTRY, ehrDescriptors.stream().flatMap(d -> d.entries.stream()), bulkSize));
-        CompletableFuture<Void> composition = CompletableFuture.runAsync(
-                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
+    private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, int bulkSize) {
         CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() ->
                 bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream()), bulkSize));
-        CompletableFuture<Void> participations = CompletableFuture.runAsync(() ->
-                bulkInsert(PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.participations.stream()), bulkSize));
-        if (runVersionUpdates) {
-            // We need a fixed timestamp for version updates because ehrbase uses it for fetching related objects
-            OffsetDateTime additionalVersionBaseDateTime = OffsetDateTime.now();
-
-            entry = entry.thenRunAsync(() -> updateToAddVersions(
-                    ENTRY,
-                    ENTRY.COMPOSITION_ID,
-                    ehrDescriptors,
-                    EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
-                    additionalVersionBaseDateTime));
-            composition = composition.thenRunAsync(() -> updateToAddVersions(
-                    COMPOSITION,
-                    COMPOSITION.ID,
-                    ehrDescriptors,
-                    EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
-                    additionalVersionBaseDateTime));
-            eventContext = eventContext.thenRunAsync(() -> updateToAddVersions(
-                    EVENT_CONTEXT,
-                    EVENT_CONTEXT.COMPOSITION_ID,
-                    ehrDescriptors,
-                    EhrCreateDescriptor::getCompositionIdStreamForVersionCount,
-                    additionalVersionBaseDateTime));
-            participations = participations.thenRunAsync(() -> updateToAddVersions(
-                    PARTICIPATION,
-                    PARTICIPATION.EVENT_CONTEXT,
-                    ehrDescriptors,
-                    EhrCreateDescriptor::getEventCtxIdStreamForVersionCount,
-                    additionalVersionBaseDateTime));
-        }
+        CompletableFuture<Void> composition = CompletableFuture.runAsync(
+                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
         CompletableFuture<Void> auditDetails = CompletableFuture.runAsync(() ->
                 bulkInsert(AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream()), bulkSize));
+        CompletableFuture<Void> entry = CompletableFuture.allOf(ehrDescriptors.stream()
+                .flatMap(d -> d.entries.stream())
+                .collect(Collectors.groupingBy(EntryRecord::getSequence))
+                .entrySet()
+                .stream()
+                .map(e -> CompletableFuture.runAsync(() ->
+                        bulkInsert(ENTRY.rename(ENTRY.getName() + "_" + e.getKey()), e.getValue().stream(), bulkSize)))
+                .toArray(CompletableFuture[]::new));
+        CompletableFuture<Void> participations = CompletableFuture.runAsync(() ->
+                bulkInsert(PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.participations.stream()), bulkSize));
         CompletableFuture<Void> contribution = CompletableFuture.runAsync(() ->
                 bulkInsert(CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()), bulkSize));
         CompletableFuture<Void> partyIdentified = CompletableFuture.runAsync(
@@ -494,18 +697,84 @@ public class LoaderServiceImp implements LoaderService {
                 ehr);
     }
 
-    private CompletableFuture<Void> updateEntryWithJsonb() {
+    private void copyIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) {
+        StopWatch sw = new StopWatch();
+        sw.start("count");
+        long tableSize = entryTableSize(compositionNumber);
+        long loops = (tableSize / JSONB_INSERT_BATCH_SIZE) + 1;
+        sw.stop();
+        log.info("Count comp {} took {}ms. Result: {}", compositionNumber, sw.getLastTaskTimeMillis(), tableSize);
+        int errorCount = 0;
 
-        return CompletableFuture.allOf(IntStream.range(0, compositions.size())
-                .mapToObj(i -> CompletableFuture.runAsync(() -> log.info(
-                        "comp {} update count: {}",
-                        i,
-                        dsl.update(ENTRY)
-                                .set(ENTRY.ENTRY_, JSONB.jsonb(rawJson.marshal(compositions.get(i))))
-                                .where(ENTRY.SEQUENCE.eq(i))
-                                .queryTimeout(0)
-                                .execute())))
-                .toArray(CompletableFuture[]::new));
+        for (long i = 0; i < loops; i++) {
+            sw.start("batch" + i);
+            try {
+                int insertCount;
+                insertCount = copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
+                sw.stop();
+                log.info(
+                        "Copy comp {} batch: {}, count: {}, time: {}ms",
+                        compositionNumber,
+                        i - errorCount,
+                        insertCount,
+                        sw.getLastTaskTimeMillis());
+            } catch (SQLException e) {
+                sw.stop();
+                log.error(
+                        "Error while processing comp " + compositionNumber + " batch: " + i
+                                + ", time (ms) until error: " + sw.getLastTaskTimeMillis(),
+                        e);
+                errorCount++;
+                // We stop if errors keep piling up for the same composition since this indicates a non
+                // "memory-pressure" issue
+                if (errorCount > 1000) {
+                    throw new RuntimeException(
+                            "Aborting because error threshold was reached for composition " + compositionNumber);
+                }
+                loops++;
+            }
+        }
+        log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
+    }
+
+    private int copyBatchIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) throws SQLException {
+        try (Connection c = primaryDataSource.getConnection()) {
+            try (Statement s = c.createStatement()) {
+                s.setQueryTimeout(0);
+                String statement = String.format(
+                        "/*+ Leading( (\"ANY_subquery\" a) ) NestLoop(\"ANY_subquery\" a) */"
+                                + "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
+                                + "INSERT INTO ehr.entry "
+                                + "  SELECT \"id\","
+                                + "  \"composition_id\","
+                                + "  0,"
+                                + "  \"item_type\","
+                                + "  \"template_id\","
+                                + "  \"template_uuid\","
+                                + "  \"archetype_id\","
+                                + "  \"category\","
+                                + "  '%s'::JSONB,"
+                                + "  \"sys_transaction\","
+                                + "  \"sys_period\","
+                                + "  \"rm_version\","
+                                + "  \"name\""
+                                + "FROM del;",
+                        compositionNumber, compositionNumber, JSONB_INSERT_BATCH_SIZE, jsonbData.data());
+                return s.executeUpdate(statement);
+            } catch (SQLException e) {
+                // Some errors may result in a broken DB session therefore we evict the connection from the pool
+                primaryDataSource.evictConnection(c);
+                throw e;
+            }
+        }
+    }
+
+    private long entryTableSize(int compositionNumber) {
+        return dsl.select(
+                        DSL.aggregate("count", Long.class, ENTRY.rename(ENTRY.getName() + "_" + compositionNumber).ID))
+                .from(ENTRY.rename(ENTRY.getName() + "_" + compositionNumber))
+                .fetchOptional(0, Long.class)
+                .orElse(0L);
     }
 
     private <T extends Table<R>, R extends TableRecord<R>> void updateToAddVersions(
@@ -537,30 +806,47 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Updates {} for versions took {}", table.getName(), sw.getTotalTimeSeconds());
     }
 
-    private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(T table, Stream<R> records, int bulkSize) {
+    private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(
+            T table, Stream<R> recordStream, int bulkSize) {
         StopWatch sw = new StopWatch();
         sw.start();
-        List<LoaderError> errors;
-        try {
-            errors = dsl.loadInto(table)
-                    .bulkAfter(bulkSize)
-                    .commitNone()
-                    .loadRecords(records)
-                    .fields(table.fields())
-                    .execute()
-                    .errors();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        boolean success = false;
+        int errorCount = 0;
+        List<R> records = recordStream.collect(Collectors.toList());
+        // With yugabyte on rare occasions bulk inserts may fail, therefore we retry
+        // already inserted rows from the bulk due to non-transactional writes are overwritten, because of
+        // yb_enable_upsert_mode
+        while (!success && errorCount < 100) {
+            if (errorCount > 0) {
+                log.info("Retrying bulk insert. table: {}, retry-attempt: {}", table.getName(), errorCount);
+            }
+            List<LoaderError> errors;
+            try {
+                errors = dsl.loadInto(table)
+                        .bulkAfter(bulkSize)
+                        .commitNone()
+                        .loadRecords(records)
+                        .fields(table.fields())
+                        .execute()
+                        .errors();
+                success = errors.isEmpty();
+                if (!errors.isEmpty()) {
+                    errorCount++;
+                    errors.stream()
+                            .map(LoaderError::exception)
+                            .filter(Objects::nonNull)
+                            .forEach(err -> log.error("Error while loading data into DB", err));
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("bulk insert failed. table: " + table.getName(), e);
+            }
         }
-        if (!errors.isEmpty()) {
-            errors.stream()
-                    .map(LoaderError::exception)
-                    .filter(Objects::nonNull)
-                    .forEach(err -> log.error("Error while loading data into DB", err));
-            throw new RuntimeException("bulk insert failed");
+        if (!success) {
+            // If after 100 attempts we still fail, we assume a more general problem and abort data loading
+            throw new LoaderException("bulk insert failed. table: " + table.getName());
         }
         sw.stop();
-        log.info("Insert {} took {}", table.getName(), sw.getTotalTimeSeconds());
+        log.info("Insert {} took {}. Attempts: {}", table.getName(), sw.getTotalTimeSeconds(), errorCount + 1);
     }
 
     /**
@@ -721,32 +1007,33 @@ public class LoaderServiceImp implements LoaderService {
         ehrDescriptor.auditDetails.add(statusContribution.getRight());
 
         // Compositions
-        List<CompositionCreateDescriptor> compositions = IntStream.range(0, compositionCount)
+        List<CompositionCreateDescriptor> compositionDescriptors = IntStream.range(0, compositionCount)
                 .parallel()
                 .mapToObj(i -> buildCompositionData(
                         i,
                         ehrId,
-                        this.compositions.get(i % this.compositions.size()),
                         facilityIdToHcpId.get(facilities.get(i % facilities.size())),
                         facilities.get(i % facilities.size())))
                 .collect(Collectors.toList());
         ehrDescriptor.compositions =
-                compositions.stream().map(d -> d.composition).collect(Collectors.toList());
-        ehrDescriptor.participations =
-                compositions.stream().flatMap(d -> d.participations.stream()).collect(Collectors.toList());
-        ehrDescriptor.auditDetails.addAll(compositions.stream()
+                compositionDescriptors.stream().map(d -> d.composition).collect(Collectors.toList());
+        ehrDescriptor.participations = compositionDescriptors.stream()
+                .flatMap(d -> d.participations.stream())
+                .collect(Collectors.toList());
+        ehrDescriptor.auditDetails.addAll(compositionDescriptors.stream()
                 .flatMap(d -> Stream.of(d.compositionAudit, d.contributionAudit))
                 .collect(Collectors.toList()));
         ehrDescriptor.eventContexts =
-                compositions.stream().map(d -> d.eventContext).collect(Collectors.toList());
-        ehrDescriptor.entries = compositions.stream().map(d -> d.entry).collect(Collectors.toList());
+                compositionDescriptors.stream().map(d -> d.eventContext).collect(Collectors.toList());
+        ehrDescriptor.entries =
+                compositionDescriptors.stream().map(d -> d.entry).collect(Collectors.toList());
         ehrDescriptor.contributions.addAll(
-                compositions.stream().map(d -> d.contribution).collect(Collectors.toList()));
+                compositionDescriptors.stream().map(d -> d.contribution).collect(Collectors.toList()));
 
-        ehrDescriptor.compositionIdToVersionCount = compositions.stream()
+        ehrDescriptor.compositionIdToVersionCount = compositionDescriptors.stream()
                 .filter(c -> c.versions > 1)
                 .collect(Collectors.toMap(c -> c.composition.getId(), c -> c.versions));
-        ehrDescriptor.eventCtxIdToVersionCount = compositions.stream()
+        ehrDescriptor.eventCtxIdToVersionCount = compositionDescriptors.stream()
                 .filter(c -> c.versions > 1)
                 .collect(Collectors.toMap(c -> c.eventContext.getId(), c -> c.versions));
 
@@ -754,11 +1041,20 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private CompositionCreateDescriptor buildCompositionData(
-            int compositionNumber, UUID ehrId, Composition compositionData, List<UUID> hcpIds, UUID facility) {
+            int compositionNumber, UUID ehrId, List<UUID> hcpIds, UUID facility) {
+        Triple<Integer, Composition, JSONB> selectedComposition;
+        if (compositionNumber < singleCompositions.size()) {
+            selectedComposition = singleCompositions.get(compositionNumber);
+        } else {
+            List<Triple<Integer, Composition, JSONB>> compositionData = this.compositionsWithSequenceByType.get(
+                    (compositionNumber - singleCompositions.size()) % compositionsWithSequenceByType.size());
+            selectedComposition = compositionData.size() > 1
+                    ? compositionData.get(random.get().nextInt(compositionData.size()))
+                    : compositionData.get(0);
+        }
 
         int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
         UUID composerId = hcpIds.get(compositionNumber % hcpIds.size());
-
         OffsetDateTime sysTransaction = OffsetDateTime.now();
 
         CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
@@ -768,16 +1064,21 @@ public class LoaderServiceImp implements LoaderService {
         createDescriptor.contribution = contribution.getLeft();
         createDescriptor.contributionAudit = contribution.getRight();
         Pair<CompositionRecord, AuditDetailsRecord> composition = createComposition(
-                ehrId, compositionData, composerId, contribution.getLeft().getId(), sysTransaction);
+                ehrId,
+                selectedComposition.getMiddle(),
+                composerId,
+                contribution.getLeft().getId(),
+                sysTransaction);
         createDescriptor.composition = composition.getLeft();
         createDescriptor.compositionAudit = composition.getRight();
         createDescriptor.entry = createEntry(
                 composition.getLeft().getId(),
-                compositionData,
+                selectedComposition.getMiddle(),
+                selectedComposition.getRight(),
                 sysTransaction,
-                compositionNumber % compositions.size());
+                selectedComposition.getLeft());
         createDescriptor.eventContext = createEventContext(
-                composition.getLeft().getId(), compositionData.getContext(), facility, sysTransaction);
+                composition.getLeft().getId(), selectedComposition.getMiddle().getContext(), facility, sysTransaction);
         if (hcpCount > 1 && hcpIds.size() > 1) {
             List<UUID> participationCandidates =
                     CollectionUtils.selectRejected(hcpIds, composerId::equals, new ArrayList<>());
@@ -886,7 +1187,7 @@ public class LoaderServiceImp implements LoaderService {
         return committerRecord.getId();
     }
 
-    private void createTemplate(String templateId, String resourceLocation) {
+    private void createTemplate(String templateId, Resource file) throws IOException {
         var existingTemplateStore = dsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
 
         if (existingTemplateStore.isPresent()) {
@@ -895,7 +1196,9 @@ public class LoaderServiceImp implements LoaderService {
             var templateStoreRecord = dsl.newRecord(TEMPLATE_STORE);
             templateStoreRecord.setId(UUID.randomUUID());
             templateStoreRecord.setTemplateId(templateId);
-            templateStoreRecord.setContent(ResourceUtils.getContent(resourceLocation));
+            try (InputStream in = file.getInputStream()) {
+                templateStoreRecord.setContent(IOUtils.toString(in, StandardCharsets.UTF_8));
+            }
             templateStoreRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
             templateStoreRecord.store();
         }
@@ -928,7 +1231,11 @@ public class LoaderServiceImp implements LoaderService {
      * Creates an {@link EntryRecord} for the given composition.
      */
     private EntryRecord createEntry(
-            UUID compositionId, Composition composition, OffsetDateTime sysTransaction, int compositionIndex) {
+            UUID compositionId,
+            Composition composition,
+            JSONB jsonb,
+            OffsetDateTime sysTransaction,
+            int compositionIndex) {
         Assert.notNull(composition.getArchetypeDetails().getTemplateId(), "Template Id must not be null");
 
         EntryRecord entryRecord = dsl.newRecord(ENTRY);
@@ -939,7 +1246,7 @@ public class LoaderServiceImp implements LoaderService {
                 composition.getArchetypeDetails().getTemplateId().getValue());
         entryRecord.setArchetypeId(composition.getArchetypeNodeId());
         entryRecord.setCategory(createDvCodedText(composition.getCategory()));
-        // entryRecord.setEntry(JSONB.jsonb(rawJson.marshal(composition)));
+        // entryRecord.setEntry(jsonb);
         entryRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
         entryRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
         entryRecord.setRmVersion(composition.getArchetypeDetails().getRmVersion());

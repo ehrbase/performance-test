@@ -1,0 +1,196 @@
+{
+                "uid": {
+                    "_type": "OBJECT_VERSION_ID",
+                    "value": "7b661057-8228-4134-b00d-e7d8b48f9a36::local.ehrbase.org::1"
+                },
+                "name": {
+                    "_type": "DV_TEXT",
+                    "value": "GECCO_Diagnose"
+                },
+                "_type": "COMPOSITION",
+                "context": {
+                    "_type": "EVENT_CONTEXT",
+                    "setting": {
+                        "_type": "DV_CODED_TEXT",
+                        "value": "secondary medical care",
+                        "defining_code": {
+                            "_type": "CODE_PHRASE",
+                            "code_string": "232",
+                            "terminology_id": {
+                                "_type": "TERMINOLOGY_ID",
+                                "value": "openehr"
+                            }
+                        }
+                    },
+                    "start_time": {
+                        "_type": "DV_DATE_TIME",
+                        "value": "2020-10-06T00:00:00.000+02:00"
+                    },
+                    "other_context": {
+                        "name": {
+                            "value": "Baum",
+                            "_type": "DV_TEXT"
+                        },
+                        "archetype_node_id": "at0001",
+                        "_type": "ITEM_TREE",
+                        "items": [
+                            {
+                                "name": {
+                                    "value": "Kategorie",
+                                    "_type": "DV_TEXT"
+                                },
+                                "value": {
+                                    "_type": "DV_CODED_TEXT",
+                                    "value": "Psychiatry",
+                                    "defining_code": {
+                                        "_type": "CODE_PHRASE",
+                                        "code_string": "394587001",
+                                        "terminology_id": {
+                                            "_type": "TERMINOLOGY_ID",
+                                            "value": "http://snomed.info/sct"
+                                        }
+                                    }
+                                },
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at0005"
+                            }
+                        ]
+                    }
+                },
+                "category": {
+                    "_type": "DV_CODED_TEXT",
+                    "value": "event",
+                    "defining_code": {
+                        "_type": "CODE_PHRASE",
+                        "code_string": "433",
+                        "terminology_id": {
+                            "_type": "TERMINOLOGY_ID",
+                            "value": "openehr"
+                        }
+                    }
+                },
+                "composer": {
+                    "_type": "PARTY_SELF"
+                },
+                "language": {
+                    "_type": "CODE_PHRASE",
+                    "code_string": "de",
+                    "terminology_id": {
+                        "_type": "TERMINOLOGY_ID",
+                        "value": "ISO_639-1"
+                    }
+                },
+                "territory": {
+                    "_type": "CODE_PHRASE",
+                    "code_string": "DE",
+                    "terminology_id": {
+                        "_type": "TERMINOLOGY_ID",
+                        "value": "ISO_3166-1"
+                    }
+                },
+                "feeder_audit": {
+                    "originating_system_audit": {
+                        "_type": "FEEDER_AUDIT_DETAILS",
+                        "system_id": "FHIR-Bridge"
+                    },
+                    "originating_system_item_ids": [
+                        {
+                            "id": "Condition/0c90bb62-df63-4bf3-a0e0-3b09a901ca22/_history/1",
+                            "type": "fhir_logical_id",
+                            "_type": "DV_IDENTIFIER"
+                        },
+                        {
+                            "id": "Patient/6d353436-f201-4779-a913-13e9cdf493c2/_history/1",
+                            "_type": "DV_IDENTIFIER",
+                            "assigner": "fhir_patient_id"
+                        },
+                        {
+                            "id": "b775d069-547a-42f0-b24c-f3708ad49acc",
+                            "type": "fhir_patient_identifier",
+                            "_type": "DV_IDENTIFIER"
+                        }
+                    ],
+                    "_type": "FEEDER_AUDIT"
+                },
+                "archetype_details": {
+                    "_type": "ARCHETYPED",
+                    "rm_version": "1.0.4",
+                    "template_id": {
+                        "_type": "TEMPLATE_ID",
+                        "value": "GECCO_Diagnose"
+                    },
+                    "archetype_id": {
+                        "_type": "ARCHETYPE_ID",
+                        "value": "openEHR-EHR-COMPOSITION.registereintrag.v1"
+                    }
+                },
+                "archetype_node_id": "openEHR-EHR-COMPOSITION.registereintrag.v1",
+                "content": [
+                    {
+                        "name": {
+                            "value": "Vorliegende Diagnose",
+                            "_type": "DV_TEXT"
+                        },
+                        "_type": "EVALUATION",
+                        "subject": {
+                            "_type": "PARTY_SELF"
+                        },
+                        "encoding": {
+                            "_type": "CODE_PHRASE",
+                            "code_string": "UTF-8",
+                            "terminology_id": {
+                                "_type": "TERMINOLOGY_ID",
+                                "value": "IANA_character-sets"
+                            }
+                        },
+                        "language": {
+                            "_type": "CODE_PHRASE",
+                            "code_string": "de",
+                            "terminology_id": {
+                                "_type": "TERMINOLOGY_ID",
+                                "value": "ISO_639-1"
+                            }
+                        },
+                        "data": {
+                            "name": {
+                                "value": "Structure",
+                                "_type": "DV_TEXT"
+                            },
+                            "archetype_node_id": "at0001",
+                            "_type": "ITEM_TREE",
+                            "items": [
+                                {
+                                    "name": {
+                                        "value": "Name des Problems/ der Diagnose",
+                                        "_type": "DV_TEXT"
+                                    },
+                                    "value": {
+                                        "_type": "DV_CODED_TEXT",
+                                        "value": "Mental disorder",
+                                        "defining_code": {
+                                            "_type": "CODE_PHRASE",
+                                            "code_string": "74732009",
+                                            "terminology_id": {
+                                                "_type": "TERMINOLOGY_ID",
+                                                "value": "http://snomed.info/sct"
+                                            }
+                                        }
+                                    },
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0002"
+                                }
+                            ]
+                        },
+                        "archetype_details": {
+                            "rm_version": "1.0.4",
+                            "template_id": {
+                                "value": "GECCO_Diagnose"
+                            },
+                            "archetype_id": {
+                                "value": "openEHR-EHR-EVALUATION.problem_diagnosis.v1"
+                            }
+                        },
+                        "archetype_node_id": "openEHR-EHR-EVALUATION.problem_diagnosis.v1"
+                    }
+                ]
+            }
