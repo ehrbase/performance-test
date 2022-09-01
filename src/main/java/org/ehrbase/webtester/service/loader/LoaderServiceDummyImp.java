@@ -15,19 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.ehrbase.webtester.service;
+package org.ehrbase.webtester.service.loader;
+
+import org.ehrbase.webtester.exception.WebTesterException;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
 
 /**
- * @author Renaud Subiger
- * @since 1.0
+ * @author Stefan Spiska
  */
-public class LoaderException extends RuntimeException {
+@Service
+@ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "false")
+public class LoaderServiceDummyImp implements LoaderService {
+    @Override
+    public void load(LoaderRequestDto properties1) {
 
-    public LoaderException(String message) {
-        super(message);
-    }
-
-    public LoaderException(String message, Throwable cause) {
-        super(message, cause);
+        throw new WebTesterException("Loader not enabled");
     }
 }

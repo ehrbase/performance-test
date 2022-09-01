@@ -21,11 +21,8 @@ import com.zaxxer.hikari.HikariDataSource;
 import javax.sql.DataSource;
 import org.jooq.ExecuteContext;
 import org.jooq.SQLDialect;
-import org.jooq.impl.DataSourceConnectionProvider;
-import org.jooq.impl.DefaultConfiguration;
-import org.jooq.impl.DefaultDSLContext;
-import org.jooq.impl.DefaultExecuteListener;
-import org.jooq.impl.DefaultExecuteListenerProvider;
+import org.jooq.impl.*;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
@@ -57,10 +54,20 @@ public class PersistenceConfig {
         }
     }
 
+    public TransactionAwareDataSourceProxy transactionAwareDataSource(DataSource dataSource) {
+        return new TransactionAwareDataSourceProxy(dataSource);
+    }
+
     protected static <T> T createDataSource(DataSourceProperties properties, Class<? extends DataSource> type) {
         return (T) properties.initializeDataSourceBuilder().type(type).build();
     }
 
+    @Bean
+    public ExceptionTranslator exceptionTransformer() {
+        return new ExceptionTranslator();
+    }
+
+    // ------------------- Primary DataSource and DSL (Non-transactional-writes)-------------------
     @Primary
     @Bean
     @ConfigurationProperties(prefix = "spring.datasource.hikari")
@@ -72,6 +79,41 @@ public class PersistenceConfig {
         return dataSource;
     }
 
+    @Bean
+    @Primary
+    public DataSourceTransactionManager primaryTransactionManager(
+            @Qualifier("primaryDataSource") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+
+    @Bean
+    @Primary
+    public DataSourceConnectionProvider primaryConnectionProvider(
+            @Qualifier("primaryDataSource") DataSource dataSource) {
+        return new DataSourceConnectionProvider(transactionAwareDataSource(dataSource));
+    }
+
+    @Bean
+    @Primary
+    public DefaultConfiguration primaryConfiguration(
+            @Qualifier("primaryConnectionProvider") DataSourceConnectionProvider dataSource) {
+        DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
+        jooqConfiguration.set(dataSource);
+        jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));
+        //        jooqConfiguration.set(new PerformanceListener());
+        SQLDialect dialect = SQLDialect.valueOf(sqlDialect);
+        jooqConfiguration.set(dialect);
+        return jooqConfiguration;
+    }
+
+    @Bean
+    @Primary
+    public DefaultDSLContext primaryDsl(@Qualifier("primaryConfiguration") DefaultConfiguration cfg) {
+        return new DefaultDSLContext(cfg);
+    }
+
+    // ------------------- Secondary DataSource and DSL (transactional-writes)-------------------
+
     @Bean("secondaryDataSource")
     @ConfigurationProperties(prefix = "spring.datasource.hikarisecond")
     HikariDataSource secondaryDataSource(DataSourceProperties properties) {
@@ -82,33 +124,26 @@ public class PersistenceConfig {
         return dataSource;
     }
 
-    public TransactionAwareDataSourceProxy transactionAwareDataSource(DataSource dataSource) {
-        return new TransactionAwareDataSourceProxy(dataSource);
-    }
-
     @Bean
-    public DataSourceTransactionManager transactionManager(DataSource dataSource) {
+    public DataSourceTransactionManager secondaryTransactionManager(
+            @Qualifier("secondaryDataSource") DataSource dataSource) {
         return new DataSourceTransactionManager(dataSource);
     }
 
     @Bean
-    public DataSourceConnectionProvider connectionProvider(DataSource dataSource) {
+    public DataSourceConnectionProvider secondaryConnectionProvider(
+            @Qualifier("secondaryDataSource") DataSource dataSource) {
         return new DataSourceConnectionProvider(transactionAwareDataSource(dataSource));
     }
 
     @Bean
-    public ExceptionTranslator exceptionTransformer() {
-        return new ExceptionTranslator();
-    }
-
-    @Bean
-    @Primary
-    public DefaultDSLContext dsl(DefaultConfiguration cfg) {
+    public DefaultDSLContext secondaryDsl(@Qualifier("secondaryConfiguration") DefaultConfiguration cfg) {
         return new DefaultDSLContext(cfg);
     }
 
     @Bean
-    public DefaultConfiguration configuration(DataSourceConnectionProvider dataSource) {
+    public DefaultConfiguration secondaryConfiguration(
+            @Qualifier("secondaryConnectionProvider") DataSourceConnectionProvider dataSource) {
         DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
         jooqConfiguration.set(dataSource);
         jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));

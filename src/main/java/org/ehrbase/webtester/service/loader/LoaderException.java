@@ -15,11 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.ehrbase.webtester.service;
+package org.ehrbase.webtester.service.loader;
 
 /**
- * @author Stefan Spiska
+ * @author Renaud Subiger
+ * @since 1.0
  */
-public interface LoaderService {
-    void load(LoaderRequestDto properties1);
+public class LoaderException extends RuntimeException {
+
+    public LoaderException(String message) {
+        super(message);
+    }
+
+    public LoaderException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

@@ -17,8 +17,8 @@
  */
 package org.ehrbase.webtester.web.rest;
 
-import org.ehrbase.webtester.service.LoaderRequestDto;
-import org.ehrbase.webtester.service.LoaderService;
+import org.ehrbase.webtester.service.loader.LoaderRequestDto;
+import org.ehrbase.webtester.service.loader.LoaderService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
