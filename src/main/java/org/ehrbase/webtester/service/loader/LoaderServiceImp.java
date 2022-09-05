@@ -17,6 +17,7 @@
  */
 package org.ehrbase.webtester.service.loader;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nedap.archie.json.JacksonUtil;
 import com.nedap.archie.rm.composition.Composition;
@@ -37,6 +38,8 @@ import org.ehrbase.webtester.service.loader.creators.CompositionCreationInfo;
 import org.ehrbase.webtester.service.loader.creators.DataCreator;
 import org.ehrbase.webtester.service.loader.creators.EhrCreateDescriptor;
 import org.ehrbase.webtester.service.loader.creators.EhrCreator;
+import org.ehrbase.webtester.service.loader.jooq.LoaderState;
+import org.ehrbase.webtester.service.loader.jooq.LoaderStateRecord;
 import org.jooq.*;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
@@ -84,8 +87,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
-import static org.ehrbase.jooq.pg.Tables.SYSTEM;
+import static org.ehrbase.jooq.pg.Tables.*;
 import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
 import static org.ehrbase.jooq.pg.tables.Composition.COMPOSITION;
 import static org.ehrbase.jooq.pg.tables.Contribution.CONTRIBUTION;
@@ -105,6 +107,41 @@ import static org.ehrbase.webtester.service.loader.RandomHelper.getRandomGaussia
 @Service
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class LoaderServiceImp implements LoaderService {
+
+    private static class IndexInfo {
+        private String name;
+        private String ddl;
+
+        private IndexInfo(){
+            //For Jackson
+        }
+
+        private IndexInfo(String name, String ddl) {
+            this.name = name;
+            this.ddl = ddl;
+        }
+    }
+
+    private static class Constraint {
+        private String schema;
+        private String table;
+        private String constraintName;
+        private String type;
+        private String definition;
+
+        private Constraint(){
+            //For Jackson
+        }
+
+        private Constraint(String schema, String table, String constraintName, String type, String definition) {
+            this.schema = schema;
+            this.table = table;
+            this.constraintName = constraintName;
+            this.type = type;
+            this.definition = definition;
+        }
+    }
+
     private static final String TEMPLATES_BASE = "classpath*:templates/**";
     private static final String COMPOSITIONS_REPEATABLE_PATH = "classpath*:compositions/repeatable/**";
     private static final String COMPOSITIONS_SINGLE_PATH = "classpath*:compositions/single/**";
@@ -126,6 +163,7 @@ public class LoaderServiceImp implements LoaderService {
     private final HikariDataSource secondaryDataSource;
     private final ResourceLoader resourceLoader;
 
+    private LoaderStateRecord currentStateRecord;
     private EhrCreator ehrCreator;
     private boolean isRunning = false;
 
@@ -157,22 +195,26 @@ public class LoaderServiceImp implements LoaderService {
                         .collect(Collectors.toMap(Record2::value1, Record2::value2)),
                 singleCompositions,
                 compositionsWithSequenceByType);
+        ensureLoaderStatusTableAndRecord();
+        LoaderPhase currentPhase = LoaderPhase.valueOf(currentStateRecord.getValue());
+        if(!EnumSet.of(LoaderPhase.NOT_RUN, LoaderPhase.FINISHED).contains(currentPhase)){
+            load(null);
+        }
     }
 
-    private Set<String> getTableNames() {
-        try (Connection c = secondaryDataSource.getConnection();
-                Statement s = c.createStatement()) {
-            Set<String> tableNames = new HashSet<>();
-            s.execute("SELECT tablename FROM pg_tables WHERE schemaname='ehr';");
-            try (ResultSet resultSet = s.getResultSet()) {
-                while (resultSet.next()) {
-                    tableNames.add(resultSet.getString(1));
-                }
-            }
-            return tableNames;
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+    private void ensureLoaderStatusTableAndRecord() {
+
+        //create the table if necessary
+        secondaryDsl.createTableIfNotExists(LoaderState.LOADER_STATE).columns(LoaderState.LOADER_STATE.fields()).primaryKey(LoaderState.LOADER_STATE.ID).unique(LoaderState.LOADER_STATE.KEY).execute();
+        //create or load current execution progress
+        currentStateRecord = secondaryDsl.fetchOptional(LoaderState.LOADER_STATE,LoaderState.LOADER_STATE.KEY.eq("execution_state")).orElseGet(() -> {
+            LoaderStateRecord stateRecord = secondaryDsl.newRecord(LoaderState.LOADER_STATE);
+            stateRecord.setId(UUID.randomUUID());
+            stateRecord.setKey("execution_state");
+            stateRecord.setValue(LoaderPhase.NOT_RUN.name());
+            stateRecord.store();
+            return stateRecord;
+        });
     }
 
     private void initializeTemplates() {
@@ -279,25 +321,62 @@ public class LoaderServiceImp implements LoaderService {
                     "A test data loading request is currently being processed. Please try again later...");
         }
 
-        log.info(
-                "Test data loading options [EHRs: {}, Facilities: {}, Bulk insert size {}, EHRs per batch: {}, Create versions: {}]",
-                properties.getEhr(),
-                properties.getHealthcareFacilities(),
-                properties.getBulkSize(),
-                properties.getEhrsPerBatch(),
-                properties.isInsertVersions());
+        if (properties != null && (properties.getHealthcareFacilities() < 1 || properties.getEhr() < properties.getHealthcareFacilities())) {
+            throw new IllegalArgumentException(
+                    "EHR count must be greater or equal to the number of healthcareFacilities and greater than 0");
+        }
+
+        Optional<LoaderStateRecord> propertiesFromDB = secondaryDsl.fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq("settings"));
+        final LoaderRequestDto settings;
+        try {
+            if(properties == null){
+                settings = objectMapper.readValue(propertiesFromDB.map(LoaderStateRecord::getValue).orElseThrow(() -> new LoaderException("Failed to resume: No properties found in DB.")), LoaderRequestDto.class);
+            }else {
+                settings = properties;
+                if(propertiesFromDB.isPresent()){
+                    propertiesFromDB.get().setValue(objectMapper.writeValueAsString(properties));
+                    propertiesFromDB.get().update(LoaderState.LOADER_STATE.VALUE);
+                }else{
+                    LoaderStateRecord propertyRecord = secondaryDsl.newRecord(LoaderState.LOADER_STATE);
+                    propertyRecord.setId(UUID.randomUUID());
+                    propertyRecord.setKey("settings");
+                    propertyRecord.setValue(objectMapper.writeValueAsString(properties));
+                    propertyRecord.store();
+                }
+            }
+        } catch (JsonProcessingException e) {
+            throw new LoaderException("Failed to read/write settings from/to DB",e);
+        }
+
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
-                prepareEntryTables();
-                Set<String> tableNames = getTableNames();
-                // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
-                List<Constraint> indexConstraints = findConstraints();
-                List<Triple<String, String, String>> indexes = findIndexes(
-                        indexConstraints.stream().map(c -> c.constraintName).collect(Collectors.toList()));
-                preLoadOperations(properties, indexes, indexConstraints, tableNames);
-                loadInternal(properties);
-                postLoadOperations(indexes, indexConstraints, tableNames);
+                LoaderPhase currentPhase = LoaderPhase.valueOf(currentStateRecord.getValue());
+                switch (currentPhase){
+                    //The fall throughs are intentional, since each earlier phase will include all phases after them
+                    case FINISHED:
+                        log.warn("A previous run already finished successfully. This run will create new facilities so the data will be independent from the existing data!");
+                        preLoadPhase(settings);
+                        break;
+                    case NOT_RUN:
+                        preLoadPhase(settings);
+                        break;
+                    case PRE_LOAD:
+                        throw new LoaderException("Failed to resume: Can't resume preload phase. Please reinitialize the database.");
+                    case PHASE_1:
+                        truncateDataTables();
+                        loadPhase1(settings);
+                        break;
+                    case PHASE_2:
+                        loadPhase2();
+                        break;
+                    case POST_LOAD:
+                        postLoadPhase();
+                        break;
+                    default:
+                        throw new LoaderException("Unknown state " + currentPhase);
+                }
+                setCurrentPhase(LoaderPhase.FINISHED);
             } catch (RuntimeException e) {
                 isRunning = false;
                 throw e;
@@ -307,66 +386,71 @@ public class LoaderServiceImp implements LoaderService {
         });
     }
 
-    private void prepareEntryTables() {
+    private List<String> prepareEntryTables() {
         // We will use temporary entry tables for each composition number for faster JSONB inserts in the end
-        IntStream.range(
+        List<String> names = IntStream.range(
                         0,
                         compositionsWithSequenceByType.stream()
-                                        .mapToInt(List::size)
-                                        .sum()
+                                .mapToInt(List::size)
+                                .sum()
                                 + singleCompositions.size())
-                .forEach(i -> runStatementWithTransactionalWrites(String.format(
-                        "CREATE TABLE IF NOT EXISTS ehr.entry_%d("
-                                + "    id uuid,"
-                                + "    composition_id uuid,"
-                                + "    sequence integer,"
-                                + "    item_type ehr.entry_type,"
-                                + "    template_id text COLLATE pg_catalog.\"default\","
-                                + "    template_uuid uuid,"
-                                + "    archetype_id text COLLATE pg_catalog.\"default\","
-                                + "    category ehr.dv_coded_text,"
-                                + "    entry jsonb,"
-                                + "    sys_transaction timestamp without time zone,"
-                                + "    sys_period tstzrange,"
-                                + "    rm_version text COLLATE pg_catalog.\"default\","
-                                + "    name ehr.dv_coded_text,"
-                                + "    PRIMARY KEY (id));",
-                        i)));
+                .mapToObj(i -> "entry_" + i)
+                .collect(Collectors.toList());
+        names.forEach(i -> runStatementWithTransactionalWrites(String.format(
+            "CREATE TABLE IF NOT EXISTS ehr.%s("
+                    + "    id uuid,"
+                    + "    composition_id uuid,"
+                    + "    sequence integer,"
+                    + "    item_type ehr.entry_type,"
+                    + "    template_id text COLLATE pg_catalog.\"default\","
+                    + "    template_uuid uuid,"
+                    + "    archetype_id text COLLATE pg_catalog.\"default\","
+                    + "    category ehr.dv_coded_text,"
+                    + "    entry jsonb,"
+                    + "    sys_transaction timestamp without time zone,"
+                    + "    sys_period tstzrange,"
+                    + "    rm_version text COLLATE pg_catalog.\"default\","
+                    + "    name ehr.dv_coded_text,"
+                    + "    PRIMARY KEY (id));",
+            i)));
+        return names;
     }
 
-    private List<Triple<String, String, String>> findIndexes(List<String> constraintNames) {
+    private List<String> getTableNames() {
         try (Connection c = secondaryDataSource.getConnection();
-                Statement s = c.createStatement()) {
-            s.execute(String.format(
-                    "SELECT schemaname, indexname, indexdef\n" + "FROM pg_indexes\n"
-                            + "WHERE schemaname = 'ehr'"
-                            + "AND indexname NOT IN (%s)",
-                    constraintNames.stream().map(t -> "'" + t + "'").collect(Collectors.joining(","))));
-            List<Triple<String, String, String>> parsed = new ArrayList<>();
+             Statement s = c.createStatement()) {
+            List<String> tableNames = new ArrayList<>();
+            s.execute("SELECT DISTINCT tablename FROM pg_tables WHERE schemaname='ehr';");
             try (ResultSet resultSet = s.getResultSet()) {
                 while (resultSet.next()) {
-                    parsed.add(Triple.of(resultSet.getString(1), resultSet.getString(2), resultSet.getString(3)));
+                    tableNames.add(resultSet.getString(1));
                 }
             }
-            return parsed;
+            return tableNames;
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static class Constraint {
-        private String schema;
-        private String table;
-        private String constraintName;
-        private String type;
-        private String definition;
-
-        private Constraint(String schema, String table, String constraintName, String type, String definition) {
-            this.schema = schema;
-            this.table = table;
-            this.constraintName = constraintName;
-            this.type = type;
-            this.definition = definition;
+    private List<IndexInfo> findIndexes(List<String> constraintNames) {
+        try (Connection c = secondaryDataSource.getConnection();
+                Statement s = c.createStatement()) {
+            s.execute(String.format(
+                    "SELECT indexname, indexdef\n" + "FROM pg_indexes\n"
+                            + "WHERE schemaname = 'ehr'"
+                            + "AND indexname NOT IN (%s)",
+                    constraintNames.stream().map(t -> "'" + t + "'").collect(Collectors.joining(","))));
+            List<IndexInfo> parsed = new ArrayList<>();
+            try (ResultSet resultSet = s.getResultSet()) {
+                while (resultSet.next()) {
+                    if(!"gin_entry_path_idx".equalsIgnoreCase(resultSet.getString(1))) {
+                        parsed.add(new IndexInfo(resultSet.getString(1), resultSet.getString(2)));
+                    }
+                }
+            }
+            return parsed;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -397,98 +481,105 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private void preLoadOperations(
-            LoaderRequestDto properties,
-            List<Triple<String, String, String>> indexes,
-            List<Constraint> constraints,
-            Set<String> tableNames) {
-        log.info("Dropping indexes (including unique constraints) on relevant tables: {}", tableNames);
-        constraints.stream()
+    private void truncateDataTables(){
+        secondaryDsl.truncate(PARTY_IDENTIFIED).cascade().execute();
+        secondaryDsl.truncate(AUDIT_DETAILS).cascade().execute();
+        secondaryDsl.truncate(CONTRIBUTION).cascade().execute();
+        secondaryDsl.truncate(COMPOSITION).cascade().execute();
+        secondaryDsl.truncate(EVENT_CONTEXT).cascade().execute();
+        secondaryDsl.truncate(ENTRY).cascade().execute();
+        secondaryDsl.truncate(PARTICIPATION).cascade().execute();
+        secondaryDsl.truncate(EHR_).cascade().execute();
+        secondaryDsl.truncate(EHR_STATUS).cascade().execute();
+        getStateDataFromDB("temp_tables", String.class).forEach(
+                t -> secondaryDsl.truncate("ehr."+t).cascade().execute());
+    }
+
+    private void serializeAndStoreAsLoaderState(String key, Object toStore){
+        Optional<LoaderStateRecord> indexesRecord = secondaryDsl.fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq(Objects.requireNonNull(key)));
+        try{
+            if (indexesRecord.isPresent()) {
+                indexesRecord.get().setValue(objectMapper.writeValueAsString(toStore));
+                indexesRecord.get().update(LoaderState.LOADER_STATE.VALUE);
+            }else{
+                LoaderStateRecord newRecord = secondaryDsl.newRecord(LoaderState.LOADER_STATE);
+                newRecord.setId(UUID.randomUUID());
+                newRecord.setKey(key);
+                newRecord.setValue(objectMapper.writeValueAsString(toStore));
+                newRecord.store();
+            }
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void setCurrentPhase(LoaderPhase phase){
+        currentStateRecord.setValue(phase.name());
+        currentStateRecord.update(LoaderState.LOADER_STATE.VALUE);
+    }
+
+    private void preLoadPhase(LoaderRequestDto settings) {
+
+        setCurrentPhase(LoaderPhase.PRE_LOAD);
+
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start("gather-db-info");
+        List<String> tableNames = getTableNames();
+        serializeAndStoreAsLoaderState("tables", tableNames);
+        List<String> tmpTables = prepareEntryTables();
+        serializeAndStoreAsLoaderState("tmp_tables", tmpTables);
+        // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
+        List<Constraint> indexConstraints = findConstraints();
+        List<IndexInfo> indexes = findIndexes(
+                indexConstraints.stream().map(c -> c.constraintName).collect(Collectors.toList()));
+        serializeAndStoreAsLoaderState("indexes", indexes);
+        List<Constraint> uniqueConstraints = indexConstraints.stream()
                 .filter(cs -> "u".equalsIgnoreCase(cs.type))
+                .collect(Collectors.toList());
+        serializeAndStoreAsLoaderState("unique_constraints", uniqueConstraints);
+
+        stopWatch.stop();
+        log.info("Loaded necessary info from DB in {}ms",stopWatch.getLastTaskTimeMillis());
+
+        stopWatch.start("constraints-indexes");
+        log.info("Dropping unique constraints...");
+        uniqueConstraints
                 .forEach(cs -> runStatementWithTransactionalWrites(String.format(
                         "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", cs.schema, cs.table, cs.constraintName)));
-        indexes.forEach(indexInfo -> runStatementWithTransactionalWrites(
-                String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getLeft(), indexInfo.getMiddle())));
 
+        log.info("Dropping non primary key indexes...");
+        indexes.forEach(indexInfo -> runStatementWithTransactionalWrites(
+                String.format("DROP INDEX IF EXISTS ehr.%s;", indexInfo.name)));
+        stopWatch.stop();
+        log.info("Removed indexes and unique constraints in {}ms", stopWatch.getLastTaskTimeMillis());
+
+        stopWatch.start("triggers");
         log.info("Disabling all triggers...");
         // We assume Postgres or Yugabyte as DB vendor -> disabling triggers will also disable foreign key
         // constraints
-        tableNames.forEach(table -> runStatementWithTransactionalWrites(
-                String.format("ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
+        Stream.concat(tableNames.stream(), tmpTables.stream()).forEach(table -> runStatementWithTransactionalWrites(
+                String.format("ALTER TABLE ehr.%s DISABLE TRIGGER ALL;", table)));
+        stopWatch.stop();
+        log.info("Disabled triggers in {}ms", stopWatch.getLastTaskTimeMillis());
+        log.info("Completed pre load operations in {}s", stopWatch.getTotalTimeSeconds());
+
+        loadPhase1(settings);
     }
 
-    private void postLoadOperations(
-            List<Triple<String, String, String>> indexes, List<Constraint> constraints, Set<String> tableNames) {
-        final List<String> failedStatements = new ArrayList<>();
-        // All streams are explicitly marked as sequential since parallel catalog updates may lead to conflicts
-        log.info("Re-enabling triggers...");
-        tableNames.stream()
-                .sequential()
-                .filter(t -> !StringUtils.startsWithIgnoreCase(t, "entry_"))
-                .map(table -> String.format(
-                        "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
-                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
-        log.info("Re-Creating indexes...");
-        indexes.stream()
-                .sequential()
-                .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
-                .map(Triple::getRight)
-                .map(s -> s + ";")
-                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
-        log.info("Re-Creating unique constraints...");
-        constraints.stream()
-                .sequential()
-                .filter(cs -> "u".equalsIgnoreCase(cs.type))
-                .map(cs -> String.format(
-                        "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
-                        cs.schema, cs.table, cs.constraintName, cs.definition))
-                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+    private void loadPhase1(LoaderRequestDto properties) {
 
-        log.info("Removing temporary entry tables...");
-        IntStream.range(0, compositionsWithSequenceByType.size())
-                .forEach(i -> runStatementWithTransactionalWrites(
-                        String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
+        setCurrentPhase(LoaderPhase.PHASE_1);
 
-        log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
-                + "because it is a very long running operation. \n"
-                + "Please add it manually! Statement: \n"
-                + "CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
-        if (!failedStatements.isEmpty()) {
-            log.error(
-                    "The following post load SQL statements failed. Please run them manually: \n {}",
-                    String.join("\n", failedStatements));
-        }
-    }
-
-    private void runStatementWithTransactionalWrites(String createStatement) {
-        runStatementWithTransactionalWrites(createStatement, null);
-    }
-
-    private void runStatementWithTransactionalWrites(String createStatement, List<String> errors) {
-        try (Connection c = secondaryDataSource.getConnection();
-                Statement s = c.createStatement()) {
-            s.setQueryTimeout(0);
-            log.info(createStatement);
-            s.execute(createStatement);
-        } catch (SQLException e) {
-            log.error("Error while executing SQL statement", e);
-            if (errors != null) {
-                errors.add(createStatement);
-            } else {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    private void loadInternal(LoaderRequestDto properties) {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start("prep");
 
-        if (properties.getHealthcareFacilities() < 1 || properties.getEhr() < properties.getHealthcareFacilities()) {
-            throw new IllegalArgumentException(
-                    "EHR count must be higher or equal to the number of healthcareFacilities and greater than 0");
-        }
-
+        log.info(
+                "Test data loading options [EHRs: {}, Facilities: {}, Bulk insert size {}, EHRs per batch: {}, Create versions: {}]",
+                properties.getEhr(),
+                properties.getHealthcareFacilities(),
+                properties.getBulkSize(),
+                properties.getEhrsPerBatch(),
+                properties.isInsertVersions());
         log.info("Preparing EHR distributions...");
         // Create healthcare facilities and the assigned HCPs in Table party_identified
         Map<Integer, UUID> facilityNumberToUuid = IntStream.range(0, properties.getHealthcareFacilities())
@@ -536,7 +627,7 @@ public class LoaderServiceImp implements LoaderService {
             }
             // Prepare data to insert while current insert task is running
             List<EhrCreateDescriptor> ehrDescriptors = getEhrSettingsBatch(
-                            facilityNumberToUuid, facilityCountToEhrCountDistribution, scaledEhrDistribution, batchSize)
+                    facilityNumberToUuid, facilityCountToEhrCountDistribution, scaledEhrDistribution, batchSize)
                     .stream()
                     .map(ehrInfo -> ehrCreator.create(new EhrCreator.EhrCreationInfo(
                             ehrInfo.getRight(),
@@ -562,6 +653,16 @@ public class LoaderServiceImp implements LoaderService {
             stopWatch.stop();
         }
         log.info("Last Batch completed in {} ms", stopWatch.getLastTaskTimeMillis());
+        log.info("Completed loading phase 1 in {} s", stopWatch.getTotalTimeSeconds());
+
+        loadPhase2();
+    }
+
+    private void loadPhase2(){
+
+        setCurrentPhase(LoaderPhase.PHASE_2);
+
+        StopWatch stopWatch = new StopWatch();
         log.info("Copying to ehr.entry with JSONB data...");
         stopWatch.start("jsonb");
         waitForTaskToComplete(CompletableFuture.allOf(Stream.concat(
@@ -570,8 +671,101 @@ public class LoaderServiceImp implements LoaderService {
                 .map(ci -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(ci.getLeft(), ci.getRight())))
                 .toArray(CompletableFuture[]::new)));
         stopWatch.stop();
-        log.info("JSONB data update completed in {} ms", stopWatch.getLastTaskTimeMillis());
-        log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
+        log.info("Completed loading phase 2 (Entry JSONB) in {} ms", stopWatch.getTotalTimeSeconds());
+
+        postLoadPhase();
+    }
+
+    private void postLoadPhase() {
+
+        setCurrentPhase(LoaderPhase.POST_LOAD);
+
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start("gather-info");
+        List<String> tableNames = getStateDataFromDB("tables", String.class);
+        List<String> tmpTableNames = getStateDataFromDB("tmp_tables", String.class);
+        List<IndexInfo> indexes = getStateDataFromDB("indexes", IndexInfo.class);
+        List<Constraint> uniqueConstraints = getStateDataFromDB("unique_constraints", Constraint.class);
+        stopWatch.stop();
+        log.info("Loaded post load op info from DB in {}ms", stopWatch.getLastTaskTimeMillis());
+
+        final List<String> failedStatements = new ArrayList<>();
+        stopWatch.start("triggers");
+        // All streams are explicitly marked as sequential since parallel catalog updates may lead to conflicts
+        log.info("Re-enabling triggers...");
+        tableNames.stream()
+                .sequential()
+                .map(table -> String.format(
+                        "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
+                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        stopWatch.stop();
+        log.info("Enabled triggers in {}ms", stopWatch.getLastTaskTimeMillis());
+
+        stopWatch.start("indexes-constraints");
+        log.info("Re-Creating indexes...");
+        indexes.stream()
+                .sequential()
+                .map(i -> i.ddl)
+                .map(s -> s + ";")
+                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        log.info("Re-Creating unique constraints...");
+        uniqueConstraints.stream()
+                .sequential()
+                .map(cs -> String.format(
+                        "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
+                        cs.schema, cs.table, cs.constraintName, cs.definition))
+                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        stopWatch.stop();
+        log.info("Created indexes and unique constraints in {}ms", stopWatch.getLastTaskTimeMillis());
+
+        stopWatch.start("tmp-tables");
+        log.info("Removing temporary entry tables...");
+        tmpTableNames
+                .forEach(n -> runStatementWithTransactionalWrites(
+                        String.format("DROP TABLE ehr.%s;", n), failedStatements));
+        stopWatch.stop();
+        log.info("Removed temporary tables in {}ms", stopWatch.getLastTaskTimeMillis());
+        log.info("Completed post load operations in {}s", stopWatch.getTotalTimeSeconds());
+
+        log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
+                + "because it is a very long running operation. \n"
+                + "Please add it manually, if you want to have it. Statement: \n"
+                + "CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
+        if (!failedStatements.isEmpty()) {
+            log.error(
+                    "The following post load SQL statements failed. Indexes may exist in an incomplete state.\n"
+                            +"Please delete the mentioned indexes and run these statements manually: \n {}",
+                    String.join("\n", failedStatements));
+        }
+    }
+
+    private <R> List<R> getStateDataFromDB(String key, Class<R> objClass) {
+        String value = secondaryDsl.fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq(Objects.requireNonNull(key))).map(LoaderStateRecord::getValue).orElseThrow();
+        try {
+            return objectMapper.readerForListOf(objClass).readValue(value);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void runStatementWithTransactionalWrites(String createStatement) {
+        runStatementWithTransactionalWrites(createStatement, null);
+    }
+
+    private void runStatementWithTransactionalWrites(String createStatement, List<String> errors) {
+        try (Connection c = secondaryDataSource.getConnection();
+                Statement s = c.createStatement()) {
+            s.setQueryTimeout(0);
+            log.debug(createStatement);
+            s.execute(createStatement);
+        } catch (SQLException e) {
+            log.error("Error while executing SQL statement", e);
+            if (errors != null) {
+                errors.add(createStatement);
+            } else {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     private Map<UUID, List<UUID>> insertHCPsForFacilities(Map<Integer, UUID> facilityNumberToUuid, int bulkSize) {
@@ -598,10 +792,10 @@ public class LoaderServiceImp implements LoaderService {
                 .collect(Collectors.toList())));
     }
 
-    private void waitForTaskToComplete(CompletableFuture<Void> insertTask) {
+    private <R> R waitForTaskToComplete(CompletableFuture<R> insertTask) {
         if (insertTask != null) {
             try {
-                insertTask.get();
+                return insertTask.get();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
@@ -609,6 +803,7 @@ public class LoaderServiceImp implements LoaderService {
                 throw new RuntimeException(e);
             }
         }
+        throw new LoaderException("Task failed");
     }
 
     private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, int bulkSize) {
@@ -778,7 +973,7 @@ public class LoaderServiceImp implements LoaderService {
         // yb_enable_upsert_mode
         while (!success && errorCount < 100) {
             if (errorCount > 0) {
-                log.info("Retrying bulk insert. table: {}, retry-attempt: {}", table.getName(), errorCount);
+                log.info("Retrying failed bulk insert. table: {}, retry-attempt: {}", table.getName(), errorCount);
             }
             List<LoaderError> errors;
             try {
@@ -807,7 +1002,7 @@ public class LoaderServiceImp implements LoaderService {
             throw new LoaderException("bulk insert failed. table: " + table.getName());
         }
         sw.stop();
-        log.info("Insert {} took {}. Attempts: {}", table.getName(), sw.getTotalTimeSeconds(), errorCount + 1);
+        log.debug("Insert {} took {}. Attempts: {}", table.getName(), sw.getTotalTimeSeconds(), errorCount + 1);
     }
 
     /**

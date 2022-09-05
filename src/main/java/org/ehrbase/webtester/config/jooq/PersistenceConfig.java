@@ -18,7 +18,6 @@
 package org.ehrbase.webtester.config.jooq;
 
 import com.zaxxer.hikari.HikariDataSource;
-import javax.sql.DataSource;
 import org.jooq.ExecuteContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.*;
@@ -35,6 +34,8 @@ import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
 import org.springframework.jdbc.support.SQLExceptionTranslator;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+import javax.sql.DataSource;
 
 @Configuration
 @EnableTransactionManagement
@@ -68,12 +69,12 @@ public class PersistenceConfig {
     }
 
     // ------------------- Primary DataSource and DSL (Non-transactional-writes)-------------------
-    @Primary
-    @Bean
+
+    @Bean("nonTransactionalWritesDataSource")
     @ConfigurationProperties(prefix = "spring.datasource.hikari")
-    HikariDataSource primaryDataSource(DataSourceProperties properties) {
+    HikariDataSource nonTransactionalWritesDataSource(DataSourceProperties properties) {
         HikariDataSource dataSource = (HikariDataSource) createDataSource(properties, HikariDataSource.class);
-        dataSource.setPoolName("primary-pool");
+        dataSource.setPoolName("nonTransactionalWrites-pool");
         dataSource.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
 
         return dataSource;
@@ -81,22 +82,22 @@ public class PersistenceConfig {
 
     @Bean
     @Primary
-    public DataSourceTransactionManager primaryTransactionManager(
-            @Qualifier("primaryDataSource") DataSource dataSource) {
+    public DataSourceTransactionManager nonTransactionalWritesTransactionManager(
+            @Qualifier("nonTransactionalWritesDataSource") DataSource dataSource) {
         return new DataSourceTransactionManager(dataSource);
     }
 
     @Bean
     @Primary
-    public DataSourceConnectionProvider primaryConnectionProvider(
-            @Qualifier("primaryDataSource") DataSource dataSource) {
+    public DataSourceConnectionProvider nonTransactionalWritesConnectionProvider(
+            @Qualifier("nonTransactionalWritesDataSource") DataSource dataSource) {
         return new DataSourceConnectionProvider(transactionAwareDataSource(dataSource));
     }
 
     @Bean
     @Primary
-    public DefaultConfiguration primaryConfiguration(
-            @Qualifier("primaryConnectionProvider") DataSourceConnectionProvider dataSource) {
+    public DefaultConfiguration nonTransactionalWritesConfiguration(
+            @Qualifier("nonTransactionalWritesConnectionProvider") DataSourceConnectionProvider dataSource) {
         DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
         jooqConfiguration.set(dataSource);
         jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));
@@ -108,42 +109,42 @@ public class PersistenceConfig {
 
     @Bean
     @Primary
-    public DefaultDSLContext primaryDsl(@Qualifier("primaryConfiguration") DefaultConfiguration cfg) {
+    public DefaultDSLContext nonTransactionalWritesDsl(@Qualifier("nonTransactionalWritesConfiguration") DefaultConfiguration cfg) {
         return new DefaultDSLContext(cfg);
     }
 
     // ------------------- Secondary DataSource and DSL (transactional-writes)-------------------
 
-    @Bean("secondaryDataSource")
+    @Bean("transactionalWritesDataSource")
     @ConfigurationProperties(prefix = "spring.datasource.hikarisecond")
-    HikariDataSource secondaryDataSource(DataSourceProperties properties) {
+    HikariDataSource transactionalWritesDataSource(DataSourceProperties properties) {
         HikariDataSource dataSource = (HikariDataSource) createDataSource(properties, HikariDataSource.class);
-        dataSource.setPoolName("secondary-pool");
+        dataSource.setPoolName("transactionalWrites-pool");
         dataSource.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
 
         return dataSource;
     }
 
     @Bean
-    public DataSourceTransactionManager secondaryTransactionManager(
-            @Qualifier("secondaryDataSource") DataSource dataSource) {
+    public DataSourceTransactionManager transactionalWritesTransactionManager(
+            @Qualifier("transactionalWritesDataSource") DataSource dataSource) {
         return new DataSourceTransactionManager(dataSource);
     }
 
     @Bean
-    public DataSourceConnectionProvider secondaryConnectionProvider(
-            @Qualifier("secondaryDataSource") DataSource dataSource) {
+    public DataSourceConnectionProvider transactionalWritesConnectionProvider(
+            @Qualifier("transactionalWritesDataSource") DataSource dataSource) {
         return new DataSourceConnectionProvider(transactionAwareDataSource(dataSource));
     }
 
     @Bean
-    public DefaultDSLContext secondaryDsl(@Qualifier("secondaryConfiguration") DefaultConfiguration cfg) {
+    public DefaultDSLContext transactionalWritesDsl(@Qualifier("transactionalWritesConfiguration") DefaultConfiguration cfg) {
         return new DefaultDSLContext(cfg);
     }
 
     @Bean
-    public DefaultConfiguration secondaryConfiguration(
-            @Qualifier("secondaryConnectionProvider") DataSourceConnectionProvider dataSource) {
+    public DefaultConfiguration transactionalWritesConfiguration(
+            @Qualifier("transactionalWritesConnectionProvider") DataSourceConnectionProvider dataSource) {
         DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
         jooqConfiguration.set(dataSource);
         jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));

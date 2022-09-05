@@ -45,4 +45,14 @@ public class LoaderController {
 
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("resume")
+    public ResponseEntity<Void> load() {
+
+        loaderService.load(null);
+
+        return ResponseEntity.ok().build();
+    }
+
+
 }
