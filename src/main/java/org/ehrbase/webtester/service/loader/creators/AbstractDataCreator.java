@@ -22,6 +22,14 @@ import com.nedap.archie.rm.composition.AdminEntry;
 import com.nedap.archie.rm.composition.CareEntry;
 import com.nedap.archie.rm.composition.Composition;
 import com.nedap.archie.rm.composition.Section;
+import java.security.SecureRandom;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
+import java.time.temporal.TemporalAccessor;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
@@ -33,15 +41,6 @@ import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
 import org.ehrbase.serialisation.dbencoding.RawJson;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
-
-import java.security.SecureRandom;
-import java.time.OffsetDateTime;
-import java.time.ZonedDateTime;
-import java.time.temporal.TemporalAccessor;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
-import java.util.UUID;
 
 public abstract class AbstractDataCreator<DESCRIPTOR, PARAM_OBJ> implements DataCreator<DESCRIPTOR, PARAM_OBJ> {
 

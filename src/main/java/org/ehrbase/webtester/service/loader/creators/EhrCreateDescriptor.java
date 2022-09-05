@@ -17,11 +17,10 @@
  */
 package org.ehrbase.webtester.service.loader.creators;
 
-import org.ehrbase.jooq.pg.tables.records.*;
-import org.ehrbase.webtester.service.loader.jooq.Entry2Record;
-
 import java.util.*;
 import java.util.stream.Stream;
+import org.ehrbase.jooq.pg.tables.records.*;
+import org.ehrbase.webtester.service.loader.jooq.Entry2Record;
 
 public class EhrCreateDescriptor {
     private EhrRecord ehr;

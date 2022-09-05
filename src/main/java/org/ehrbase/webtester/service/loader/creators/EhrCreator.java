@@ -17,7 +17,15 @@
  */
 package org.ehrbase.webtester.service.loader.creators;
 
+import static org.ehrbase.jooq.pg.tables.Status.STATUS;
+
 import com.nedap.archie.rm.composition.Composition;
+import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Triple;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.jooq.pg.enums.PartyType;
@@ -27,15 +35,6 @@ import org.ehrbase.jooq.pg.udt.records.DvCodedTextRecord;
 import org.ehrbase.webtester.service.loader.RandomHelper;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
-
-import java.sql.Timestamp;
-import java.time.OffsetDateTime;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
-
-import static org.ehrbase.jooq.pg.tables.Status.STATUS;
 
 public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCreator.EhrCreationInfo> {
 

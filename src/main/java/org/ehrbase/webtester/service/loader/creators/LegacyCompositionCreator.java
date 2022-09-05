@@ -17,12 +17,21 @@
  */
 package org.ehrbase.webtester.service.loader.creators;
 
+import static org.ehrbase.jooq.pg.tables.Composition.COMPOSITION;
+import static org.ehrbase.jooq.pg.tables.Entry.ENTRY;
+import static org.ehrbase.jooq.pg.tables.EventContext.EVENT_CONTEXT;
+import static org.ehrbase.jooq.pg.tables.Participation.PARTICIPATION;
+
 import com.nedap.archie.rm.composition.Composition;
 import com.nedap.archie.rm.composition.EventContext;
 import com.nedap.archie.rm.datatypes.CodePhrase;
 import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.support.identification.TerminologyId;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.*;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Triple;
 import org.ehrbase.jooq.pg.tables.records.CompositionRecord;
@@ -32,16 +41,6 @@ import org.ehrbase.jooq.pg.tables.records.ParticipationRecord;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
 import org.springframework.util.Assert;
-
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.util.*;
-
-import static org.ehrbase.jooq.pg.tables.Composition.COMPOSITION;
-import static org.ehrbase.jooq.pg.tables.Entry.ENTRY;
-import static org.ehrbase.jooq.pg.tables.EventContext.EVENT_CONTEXT;
-import static org.ehrbase.jooq.pg.tables.Participation.PARTICIPATION;
 
 public class LegacyCompositionCreator
         extends AbstractDataCreator<

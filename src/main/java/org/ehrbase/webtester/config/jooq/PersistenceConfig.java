@@ -18,6 +18,7 @@
 package org.ehrbase.webtester.config.jooq;
 
 import com.zaxxer.hikari.HikariDataSource;
+import javax.sql.DataSource;
 import org.jooq.ExecuteContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.*;
@@ -34,8 +35,6 @@ import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
 import org.springframework.jdbc.support.SQLExceptionTranslator;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-
-import javax.sql.DataSource;
 
 @Configuration
 @EnableTransactionManagement
@@ -109,7 +108,8 @@ public class PersistenceConfig {
 
     @Bean
     @Primary
-    public DefaultDSLContext nonTransactionalWritesDsl(@Qualifier("nonTransactionalWritesConfiguration") DefaultConfiguration cfg) {
+    public DefaultDSLContext nonTransactionalWritesDsl(
+            @Qualifier("nonTransactionalWritesConfiguration") DefaultConfiguration cfg) {
         return new DefaultDSLContext(cfg);
     }
 
@@ -138,7 +138,8 @@ public class PersistenceConfig {
     }
 
     @Bean
-    public DefaultDSLContext transactionalWritesDsl(@Qualifier("transactionalWritesConfiguration") DefaultConfiguration cfg) {
+    public DefaultDSLContext transactionalWritesDsl(
+            @Qualifier("transactionalWritesConfiguration") DefaultConfiguration cfg) {
         return new DefaultDSLContext(cfg);
     }
 

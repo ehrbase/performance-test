@@ -18,15 +18,14 @@
 package org.ehrbase.webtester.service.loader.creators;
 
 import com.nedap.archie.rm.composition.Composition;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.tuple.Triple;
-import org.ehrbase.webtester.service.loader.LoaderException;
-import org.jooq.JSONB;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.tuple.Triple;
+import org.ehrbase.webtester.service.loader.LoaderException;
+import org.jooq.JSONB;
 
 public class CompositionCreationInfo {
 

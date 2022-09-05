@@ -17,11 +17,22 @@
  */
 package org.ehrbase.webtester.service.loader.creators;
 
+import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
+import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
+import static org.ehrbase.jooq.pg.tables.Contribution.CONTRIBUTION;
+
 import com.nedap.archie.rm.datatypes.CodePhrase;
 import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.TermMapping;
 import com.nedap.archie.rm.support.identification.TerminologyId;
+import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
 import org.ehrbase.jooq.pg.enums.*;
 import org.ehrbase.jooq.pg.tables.records.AuditDetailsRecord;
@@ -30,18 +41,6 @@ import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
 import org.ehrbase.jooq.pg.udt.records.CodePhraseRecord;
 import org.ehrbase.jooq.pg.udt.records.DvCodedTextRecord;
 import org.jooq.DSLContext;
-
-import java.sql.Timestamp;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
-import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
-import static org.ehrbase.jooq.pg.tables.Contribution.CONTRIBUTION;
 
 public interface DataCreator<DESCRIPTOR, PARAM_OBJ> {
 

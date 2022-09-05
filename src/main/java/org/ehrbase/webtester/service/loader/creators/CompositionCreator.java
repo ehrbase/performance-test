@@ -17,10 +17,7 @@
  */
 package org.ehrbase.webtester.service.loader.creators;
 
-import org.apache.commons.collections4.CollectionUtils;
-import org.ehrbase.jooq.pg.enums.ContributionDataType;
-import org.ehrbase.webtester.service.loader.RandomHelper;
-import org.jooq.DSLContext;
+import static org.ehrbase.webtester.service.loader.RandomHelper.getRandomGaussianWithLimitsLong;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -28,8 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.IntStream;
-
-import static org.ehrbase.webtester.service.loader.RandomHelper.getRandomGaussianWithLimitsLong;
+import org.apache.commons.collections4.CollectionUtils;
+import org.ehrbase.jooq.pg.enums.ContributionDataType;
+import org.ehrbase.webtester.service.loader.RandomHelper;
+import org.jooq.DSLContext;
 
 class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor, CompositionCreationInfo> {
 

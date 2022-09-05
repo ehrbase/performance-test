@@ -53,6 +53,4 @@ public class LoaderController {
 
         return ResponseEntity.ok().build();
     }
-
-
 }
