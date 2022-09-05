@@ -117,7 +117,23 @@ public class LoaderServiceImp implements LoaderService {
         }
 
         private IndexInfo(String name, String ddl) {
+            this.setName(name);
+            this.setDdl(ddl);
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
             this.name = name;
+        }
+
+        public String getDdl() {
+            return ddl;
+        }
+
+        public void setDdl(String ddl) {
             this.ddl = ddl;
         }
     }
@@ -134,10 +150,50 @@ public class LoaderServiceImp implements LoaderService {
         }
 
         private Constraint(String schema, String table, String constraintName, String type, String definition) {
+            this.setSchema(schema);
+            this.setTable(table);
+            this.setConstraintName(constraintName);
+            this.setType(type);
+            this.setDefinition(definition);
+        }
+
+        public String getSchema() {
+            return schema;
+        }
+
+        public void setSchema(String schema) {
             this.schema = schema;
+        }
+
+        public String getTable() {
+            return table;
+        }
+
+        public void setTable(String table) {
             this.table = table;
+        }
+
+        public String getConstraintName() {
+            return constraintName;
+        }
+
+        public void setConstraintName(String constraintName) {
             this.constraintName = constraintName;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
             this.type = type;
+        }
+
+        public String getDefinition() {
+            return definition;
+        }
+
+        public void setDefinition(String definition) {
             this.definition = definition;
         }
     }
@@ -157,10 +213,10 @@ public class LoaderServiceImp implements LoaderService {
     private final List<List<Triple<Integer, Composition, JSONB>>> compositionsWithSequenceByType = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
-    private final DSLContext primaryDsl;
-    private final DSLContext secondaryDsl;
-    private final HikariDataSource primaryDataSource;
-    private final HikariDataSource secondaryDataSource;
+    private final DSLContext nonTransactionalWritesDsl;
+    private final DSLContext transactionalWritesDsl;
+    private final HikariDataSource nonTransactionalWritesDataSource;
+    private final HikariDataSource transactionalWritesDataSource;
     private final ResourceLoader resourceLoader;
 
     private LoaderStateRecord currentStateRecord;
@@ -168,15 +224,15 @@ public class LoaderServiceImp implements LoaderService {
     private boolean isRunning = false;
 
     public LoaderServiceImp(
-            @Qualifier("primaryDsl") DSLContext primaryDsl,
-            @Qualifier("secondaryDsl") DSLContext secondaryDsl,
+            @Qualifier("nonTransactionalWritesDsl") DSLContext nonTransactionalWritesDsl,
+            @Qualifier("transactionalWritesDsl") DSLContext transactionalWritesDsl,
             ResourceLoader resourceLoader,
-            @Qualifier("primaryDataSource") HikariDataSource primaryDataSource,
-            @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource) {
-        this.primaryDsl = primaryDsl;
-        this.secondaryDsl = secondaryDsl;
-        this.secondaryDataSource = secondaryDataSource;
-        this.primaryDataSource = primaryDataSource;
+            @Qualifier("nonTransactionalWritesDataSource") HikariDataSource nonTransactionalWritesDataSource,
+            @Qualifier("transactionalWritesDataSource") HikariDataSource transactionalWritesDataSource) {
+        this.nonTransactionalWritesDsl = nonTransactionalWritesDsl;
+        this.transactionalWritesDsl = transactionalWritesDsl;
+        this.transactionalWritesDataSource = transactionalWritesDataSource;
+        this.nonTransactionalWritesDataSource = nonTransactionalWritesDataSource;
         this.resourceLoader = resourceLoader;
     }
 
@@ -187,11 +243,11 @@ public class LoaderServiceImp implements LoaderService {
         initializeTemplates();
         initializeCompositions();
         ehrCreator = new EhrCreator(
-                primaryDsl,
+                nonTransactionalWritesDsl,
                 ZoneId.systemDefault().toString(),
                 getSystemId(),
                 getCommitterId(),
-                primaryDsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE).from(TERRITORY).fetch().stream()
+                nonTransactionalWritesDsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE).from(TERRITORY).fetch().stream()
                         .collect(Collectors.toMap(Record2::value1, Record2::value2)),
                 singleCompositions,
                 compositionsWithSequenceByType);
@@ -205,10 +261,10 @@ public class LoaderServiceImp implements LoaderService {
     private void ensureLoaderStatusTableAndRecord() {
 
         //create the table if necessary
-        secondaryDsl.createTableIfNotExists(LoaderState.LOADER_STATE).columns(LoaderState.LOADER_STATE.fields()).primaryKey(LoaderState.LOADER_STATE.ID).unique(LoaderState.LOADER_STATE.KEY).execute();
+        transactionalWritesDsl.createTableIfNotExists(LoaderState.LOADER_STATE).columns(LoaderState.LOADER_STATE.fields()).primaryKey(LoaderState.LOADER_STATE.ID).unique(LoaderState.LOADER_STATE.KEY).execute();
         //create or load current execution progress
-        currentStateRecord = secondaryDsl.fetchOptional(LoaderState.LOADER_STATE,LoaderState.LOADER_STATE.KEY.eq("execution_state")).orElseGet(() -> {
-            LoaderStateRecord stateRecord = secondaryDsl.newRecord(LoaderState.LOADER_STATE);
+        currentStateRecord = transactionalWritesDsl.fetchOptional(LoaderState.LOADER_STATE,LoaderState.LOADER_STATE.KEY.eq("execution_state")).orElseGet(() -> {
+            LoaderStateRecord stateRecord = transactionalWritesDsl.newRecord(LoaderState.LOADER_STATE);
             stateRecord.setId(UUID.randomUUID());
             stateRecord.setKey("execution_state");
             stateRecord.setValue(LoaderPhase.NOT_RUN.name());
@@ -326,7 +382,7 @@ public class LoaderServiceImp implements LoaderService {
                     "EHR count must be greater or equal to the number of healthcareFacilities and greater than 0");
         }
 
-        Optional<LoaderStateRecord> propertiesFromDB = secondaryDsl.fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq("settings"));
+        Optional<LoaderStateRecord> propertiesFromDB = transactionalWritesDsl.fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq("settings"));
         final LoaderRequestDto settings;
         try {
             if(properties == null){
@@ -337,7 +393,7 @@ public class LoaderServiceImp implements LoaderService {
                     propertiesFromDB.get().setValue(objectMapper.writeValueAsString(properties));
                     propertiesFromDB.get().update(LoaderState.LOADER_STATE.VALUE);
                 }else{
-                    LoaderStateRecord propertyRecord = secondaryDsl.newRecord(LoaderState.LOADER_STATE);
+                    LoaderStateRecord propertyRecord = transactionalWritesDsl.newRecord(LoaderState.LOADER_STATE);
                     propertyRecord.setId(UUID.randomUUID());
                     propertyRecord.setKey("settings");
                     propertyRecord.setValue(objectMapper.writeValueAsString(properties));
@@ -417,7 +473,7 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private List<String> getTableNames() {
-        try (Connection c = secondaryDataSource.getConnection();
+        try (Connection c = transactionalWritesDataSource.getConnection();
              Statement s = c.createStatement()) {
             List<String> tableNames = new ArrayList<>();
             s.execute("SELECT DISTINCT tablename FROM pg_tables WHERE schemaname='ehr';");
@@ -433,8 +489,8 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private List<IndexInfo> findIndexes(List<String> constraintNames) {
-        try (Connection c = secondaryDataSource.getConnection();
-                Statement s = c.createStatement()) {
+        try (Connection c = transactionalWritesDataSource.getConnection();
+             Statement s = c.createStatement()) {
             s.execute(String.format(
                     "SELECT indexname, indexdef\n" + "FROM pg_indexes\n"
                             + "WHERE schemaname = 'ehr'"
@@ -455,8 +511,8 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private List<Constraint> findConstraints() {
-        try (Connection c = secondaryDataSource.getConnection();
-                Statement s = c.createStatement()) {
+        try (Connection c = transactionalWritesDataSource.getConnection();
+             Statement s = c.createStatement()) {
             s.execute("SELECT nsp.nspname,rel.relname,con.conname, con.contype, pg_get_constraintdef(con.oid)"
                     + "       FROM pg_catalog.pg_constraint con"
                     + "            INNER JOIN pg_catalog.pg_class rel"
@@ -482,27 +538,27 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void truncateDataTables(){
-        secondaryDsl.truncate(PARTY_IDENTIFIED).cascade().execute();
-        secondaryDsl.truncate(AUDIT_DETAILS).cascade().execute();
-        secondaryDsl.truncate(CONTRIBUTION).cascade().execute();
-        secondaryDsl.truncate(COMPOSITION).cascade().execute();
-        secondaryDsl.truncate(EVENT_CONTEXT).cascade().execute();
-        secondaryDsl.truncate(ENTRY).cascade().execute();
-        secondaryDsl.truncate(PARTICIPATION).cascade().execute();
-        secondaryDsl.truncate(EHR_).cascade().execute();
-        secondaryDsl.truncate(EHR_STATUS).cascade().execute();
+        transactionalWritesDsl.truncate(PARTY_IDENTIFIED).cascade().execute();
+        transactionalWritesDsl.truncate(AUDIT_DETAILS).cascade().execute();
+        transactionalWritesDsl.truncate(CONTRIBUTION).cascade().execute();
+        transactionalWritesDsl.truncate(COMPOSITION).cascade().execute();
+        transactionalWritesDsl.truncate(EVENT_CONTEXT).cascade().execute();
+        transactionalWritesDsl.truncate(ENTRY).cascade().execute();
+        transactionalWritesDsl.truncate(PARTICIPATION).cascade().execute();
+        transactionalWritesDsl.truncate(EHR_).cascade().execute();
+        transactionalWritesDsl.truncate(EHR_STATUS).cascade().execute();
         getStateDataFromDB("temp_tables", String.class).forEach(
-                t -> secondaryDsl.truncate("ehr."+t).cascade().execute());
+                t -> transactionalWritesDsl.truncate("ehr."+t).cascade().execute());
     }
 
     private void serializeAndStoreAsLoaderState(String key, Object toStore){
-        Optional<LoaderStateRecord> indexesRecord = secondaryDsl.fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq(Objects.requireNonNull(key)));
+        Optional<LoaderStateRecord> indexesRecord = transactionalWritesDsl.fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq(Objects.requireNonNull(key)));
         try{
             if (indexesRecord.isPresent()) {
                 indexesRecord.get().setValue(objectMapper.writeValueAsString(toStore));
                 indexesRecord.get().update(LoaderState.LOADER_STATE.VALUE);
             }else{
-                LoaderStateRecord newRecord = secondaryDsl.newRecord(LoaderState.LOADER_STATE);
+                LoaderStateRecord newRecord = transactionalWritesDsl.newRecord(LoaderState.LOADER_STATE);
                 newRecord.setId(UUID.randomUUID());
                 newRecord.setKey(key);
                 newRecord.setValue(objectMapper.writeValueAsString(toStore));
@@ -531,10 +587,10 @@ public class LoaderServiceImp implements LoaderService {
         // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
         List<Constraint> indexConstraints = findConstraints();
         List<IndexInfo> indexes = findIndexes(
-                indexConstraints.stream().map(c -> c.constraintName).collect(Collectors.toList()));
+                indexConstraints.stream().map(c -> c.getConstraintName()).collect(Collectors.toList()));
         serializeAndStoreAsLoaderState("indexes", indexes);
         List<Constraint> uniqueConstraints = indexConstraints.stream()
-                .filter(cs -> "u".equalsIgnoreCase(cs.type))
+                .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
                 .collect(Collectors.toList());
         serializeAndStoreAsLoaderState("unique_constraints", uniqueConstraints);
 
@@ -545,11 +601,11 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Dropping unique constraints...");
         uniqueConstraints
                 .forEach(cs -> runStatementWithTransactionalWrites(String.format(
-                        "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", cs.schema, cs.table, cs.constraintName)));
+                        "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", cs.getSchema(), cs.getTable(), cs.getConstraintName())));
 
         log.info("Dropping non primary key indexes...");
         indexes.forEach(indexInfo -> runStatementWithTransactionalWrites(
-                String.format("DROP INDEX IF EXISTS ehr.%s;", indexInfo.name)));
+                String.format("DROP INDEX IF EXISTS ehr.%s;", indexInfo.getName())));
         stopWatch.stop();
         log.info("Removed indexes and unique constraints in {}ms", stopWatch.getLastTaskTimeMillis());
 
@@ -705,7 +761,7 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Re-Creating indexes...");
         indexes.stream()
                 .sequential()
-                .map(i -> i.ddl)
+                .map(i -> i.getDdl())
                 .map(s -> s + ";")
                 .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
         log.info("Re-Creating unique constraints...");
@@ -713,7 +769,7 @@ public class LoaderServiceImp implements LoaderService {
                 .sequential()
                 .map(cs -> String.format(
                         "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
-                        cs.schema, cs.table, cs.constraintName, cs.definition))
+                        cs.getSchema(), cs.getTable(), cs.getConstraintName(), cs.getDefinition()))
                 .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
         stopWatch.stop();
         log.info("Created indexes and unique constraints in {}ms", stopWatch.getLastTaskTimeMillis());
@@ -740,7 +796,7 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private <R> List<R> getStateDataFromDB(String key, Class<R> objClass) {
-        String value = secondaryDsl.fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq(Objects.requireNonNull(key))).map(LoaderStateRecord::getValue).orElseThrow();
+        String value = transactionalWritesDsl.fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq(Objects.requireNonNull(key))).map(LoaderStateRecord::getValue).orElseThrow();
         try {
             return objectMapper.readerForListOf(objClass).readValue(value);
         } catch (JsonProcessingException e) {
@@ -753,8 +809,8 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void runStatementWithTransactionalWrites(String createStatement, List<String> errors) {
-        try (Connection c = secondaryDataSource.getConnection();
-                Statement s = c.createStatement()) {
+        try (Connection c = transactionalWritesDataSource.getConnection();
+             Statement s = c.createStatement()) {
             s.setQueryTimeout(0);
             log.debug(createStatement);
             s.execute(createStatement);
@@ -775,7 +831,7 @@ public class LoaderServiceImp implements LoaderService {
                 .collect(Collectors.toMap(
                         Entry::getValue, e -> IntStream.range(0, (int) getRandomGaussianWithLimitsLong(20, 5, 5, 35))
                                 .mapToObj(i -> DataCreator.createPartyWithRef(
-                                        primaryDsl,
+                                        nonTransactionalWritesDsl,
                                         "hcf" + e.getKey() + "hcp" + i,
                                         "hcp",
                                         "PERSON",
@@ -887,7 +943,7 @@ public class LoaderServiceImp implements LoaderService {
 
     private Pair<Integer, Double> copyBatchIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData)
             throws SQLException {
-        try (Connection c = primaryDataSource.getConnection()) {
+        try (Connection c = nonTransactionalWritesDataSource.getConnection()) {
             StopWatch sw = new StopWatch();
             sw.start();
             try (Statement s = c.createStatement()) {
@@ -917,14 +973,14 @@ public class LoaderServiceImp implements LoaderService {
             } catch (SQLException e) {
                 sw.stop();
                 // Some errors may result in a broken DB session therefore we evict the connection from the pool
-                primaryDataSource.evictConnection(c);
+                nonTransactionalWritesDataSource.evictConnection(c);
                 throw e;
             }
         }
     }
 
     private long entryTableSize(int compositionNumber) {
-        return primaryDsl
+        return nonTransactionalWritesDsl
                 .select(DSL.aggregate("count", Long.class, ENTRY.rename(ENTRY.getName() + "_" + compositionNumber).ID))
                 .from(ENTRY.rename(ENTRY.getName() + "_" + compositionNumber))
                 .fetchOptional(0, Long.class)
@@ -942,7 +998,7 @@ public class LoaderServiceImp implements LoaderService {
 
         for (int i = 2; i <= MAX_COMPOSITION_VERSIONS; i++) {
             int versionCount = i;
-            primaryDsl
+            nonTransactionalWritesDsl
                     .update(table)
                     .set(
                             table.field(SYS_TRANSACTION_FIELD_NAME, Timestamp.class),
@@ -977,7 +1033,7 @@ public class LoaderServiceImp implements LoaderService {
             }
             List<LoaderError> errors;
             try {
-                errors = primaryDsl
+                errors = nonTransactionalWritesDsl
                         .loadInto(table)
                         .bulkAfter(bulkSize)
                         .commitNone()
@@ -1108,15 +1164,15 @@ public class LoaderServiceImp implements LoaderService {
 
     private Pair<Integer, UUID> insertHealthcareFacility(int number) {
         PartyIdentifiedRecord record = DataCreator.createPartyWithRef(
-                primaryDsl, "hcf" + number, "facilities", "ORGANISATION", PartyType.party_identified);
+                nonTransactionalWritesDsl, "hcf" + number, "facilities", "ORGANISATION", PartyType.party_identified);
         record.store();
         return Pair.of(number, record.getId());
     }
 
     private UUID getSystemId() {
-        var system = secondaryDsl.fetchOne(SYSTEM);
+        var system = transactionalWritesDsl.fetchOne(SYSTEM);
         if (system == null) {
-            system = secondaryDsl.newRecord(SYSTEM);
+            system = transactionalWritesDsl.newRecord(SYSTEM);
             system.setDescription("Default system");
             system.setSettings("local.ehrbase.org");
             system.store();
@@ -1126,10 +1182,10 @@ public class LoaderServiceImp implements LoaderService {
 
     private UUID getCommitterId() {
         var committerRecord =
-                secondaryDsl.fetchOne(PARTY_IDENTIFIED, PARTY_IDENTIFIED.NAME.eq("EHRbase Internal Test Data Loader"));
+                transactionalWritesDsl.fetchOne(PARTY_IDENTIFIED, PARTY_IDENTIFIED.NAME.eq("EHRbase Internal Test Data Loader"));
 
         if (committerRecord == null) {
-            committerRecord = secondaryDsl.newRecord(PARTY_IDENTIFIED);
+            committerRecord = transactionalWritesDsl.newRecord(PARTY_IDENTIFIED);
             committerRecord.setName("EHRbase Internal Test Data Loader");
             committerRecord.setPartyRefValue(UUID.randomUUID().toString());
             committerRecord.setPartyRefScheme("DEMOGRAPHIC");
@@ -1139,25 +1195,25 @@ public class LoaderServiceImp implements LoaderService {
             committerRecord.setObjectIdType(PartyRefIdType.generic_id);
             committerRecord.store();
 
-            var identifierRecord = secondaryDsl.newRecord(Identifier.IDENTIFIER);
+            var identifierRecord = transactionalWritesDsl.newRecord(Identifier.IDENTIFIER);
             identifierRecord.setIdValue("Test Data Loader");
             identifierRecord.setIssuer("EHRbase");
             identifierRecord.setAssigner("EHRbase");
             identifierRecord.setTypeName("EHRbase Security Authentication User");
             identifierRecord.setParty(committerRecord.getId());
-            secondaryDsl.insertInto(Identifier.IDENTIFIER).set(identifierRecord).execute();
+            transactionalWritesDsl.insertInto(Identifier.IDENTIFIER).set(identifierRecord).execute();
         }
         return committerRecord.getId();
     }
 
     private void createTemplate(String templateId, Resource file) throws IOException {
         var existingTemplateStore =
-                secondaryDsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
+                transactionalWritesDsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
 
         if (existingTemplateStore.isPresent()) {
             log.info("Template {} already exists", templateId);
         } else {
-            var templateStoreRecord = secondaryDsl.newRecord(TEMPLATE_STORE);
+            var templateStoreRecord = transactionalWritesDsl.newRecord(TEMPLATE_STORE);
             templateStoreRecord.setId(UUID.randomUUID());
             templateStoreRecord.setTemplateId(templateId);
             try (InputStream in = file.getInputStream()) {
