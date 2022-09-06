@@ -31,13 +31,17 @@ import com.nedap.archie.rm.support.identification.TerminologyId;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.tuple.Triple;
 import org.ehrbase.jooq.pg.tables.records.CompositionRecord;
 import org.ehrbase.jooq.pg.tables.records.EntryRecord;
 import org.ehrbase.jooq.pg.tables.records.EventContextRecord;
 import org.ehrbase.jooq.pg.tables.records.ParticipationRecord;
+import org.ehrbase.webtester.service.loader.CachedComposition;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
 import org.springframework.util.Assert;
@@ -94,7 +98,7 @@ public class LegacyCompositionCreator
         private final UUID ehrId;
         private final UUID facility;
         private final List<UUID> participants;
-        private final Triple<Integer, Composition, JSONB> selectedComposition;
+        private final CachedComposition selectedComposition;
         private final OffsetDateTime sysTransaction;
 
         public LegacyCompositionCreationInfo(
@@ -105,7 +109,7 @@ public class LegacyCompositionCreator
                 UUID auditDetailsId,
                 UUID facility,
                 List<UUID> participants,
-                Triple<Integer, Composition, JSONB> selectedComposition,
+                CachedComposition selectedComposition,
                 OffsetDateTime sysTransaction) {
             this.composerId = composerId;
             this.compositionId = compositionId;
@@ -146,7 +150,7 @@ public class LegacyCompositionCreator
             return participants;
         }
 
-        public Triple<Integer, Composition, JSONB> getSelectedComposition() {
+        public CachedComposition getSelectedComposition() {
             return selectedComposition;
         }
 
@@ -165,12 +169,12 @@ public class LegacyCompositionCreator
         createDescriptor.setComposition(createComposition(info));
         createDescriptor.setEntry(createEntry(
                 createDescriptor.getComposition().getId(),
-                info.getSelectedComposition().getMiddle(),
+                info.getSelectedComposition().getComposition(),
                 info.getSysTransaction(),
-                info.getSelectedComposition().getLeft()));
+                info.getSelectedComposition().getIdx()));
         createDescriptor.setEventContext(createEventContext(
                 createDescriptor.getComposition().getId(),
-                info.getSelectedComposition().getMiddle().getContext(),
+                info.getSelectedComposition().getComposition().getContext(),
                 info.getFacility(),
                 info.getSysTransaction()));
 
@@ -189,9 +193,9 @@ public class LegacyCompositionCreator
         compositionRecord.setEhrId(info.getEhrId());
         compositionRecord.setInContribution(info.getContributionId());
         compositionRecord.setLanguage(
-                info.getSelectedComposition().getMiddle().getLanguage().getCodeString());
+                info.getSelectedComposition().getComposition().getLanguage().getCodeString());
         compositionRecord.setTerritory(getTerritory(
-                info.getSelectedComposition().getMiddle().getTerritory().getCodeString()));
+                info.getSelectedComposition().getComposition().getTerritory().getCodeString()));
         compositionRecord.setComposer(info.getComposerId());
         compositionRecord.setSysTransaction(
                 Timestamp.valueOf(info.getSysTransaction().toLocalDateTime()));

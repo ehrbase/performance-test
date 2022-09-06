@@ -56,6 +56,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -83,7 +84,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
+import org.apache.xmlbeans.XmlException;
 import org.ehrbase.jooq.pg.enums.PartyRefIdType;
 import org.ehrbase.jooq.pg.enums.PartyType;
 import org.ehrbase.jooq.pg.tables.Ehr;
@@ -91,6 +92,8 @@ import org.ehrbase.jooq.pg.tables.Identifier;
 import org.ehrbase.jooq.pg.tables.records.EntryRecord;
 import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
 import org.ehrbase.serialisation.dbencoding.RawJson;
+import org.ehrbase.serialisation.matrixencoding.MatrixFormat;
+import org.ehrbase.serialisation.matrixencoding.Row;
 import org.ehrbase.webtester.service.loader.creators.CompositionCreationInfo;
 import org.ehrbase.webtester.service.loader.creators.DataCreator;
 import org.ehrbase.webtester.service.loader.creators.EhrCreateDescriptor;
@@ -98,13 +101,14 @@ import org.ehrbase.webtester.service.loader.creators.EhrCreator;
 import org.ehrbase.webtester.service.loader.jooq.LoaderState;
 import org.ehrbase.webtester.service.loader.jooq.LoaderStateRecord;
 import org.jooq.DSLContext;
-import org.jooq.JSONB;
 import org.jooq.LoaderError;
 import org.jooq.Record2;
 import org.jooq.Table;
 import org.jooq.TableField;
 import org.jooq.TableRecord;
 import org.jooq.impl.DSL;
+import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
+import org.openehr.schemas.v1.TemplateDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -228,8 +232,9 @@ public class LoaderServiceImp implements LoaderService {
     // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
     // otherwise
     private final ThreadLocal<Random> random = ThreadLocal.withInitial(SecureRandom::new);
-    private final List<Triple<Integer, Composition, JSONB>> singleCompositions = new ArrayList<>();
-    private final List<List<Triple<Integer, Composition, JSONB>>> compositionsWithSequenceByType = new ArrayList<>();
+    private final Map<String, OPERATIONALTEMPLATE> templates = new HashMap<>();
+    private final List<CachedComposition> singleCompositions = new ArrayList<>();
+    private final List<List<CachedComposition>> compositionsWithSequenceByType = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
     private final DSLContext nonTransactionalWritesDsl;
@@ -257,6 +262,9 @@ public class LoaderServiceImp implements LoaderService {
 
     @PostConstruct
     public void initialize() {
+        System.setProperty(
+                "javax.xml.parsers.DocumentBuilderFactory",
+                "com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl");
         // Initialize everything that does not require DB inserts,
         // because inserts with indexes present are likely to fail with non-transactional writes
         initializeTemplates();
@@ -335,8 +343,10 @@ public class LoaderServiceImp implements LoaderService {
 
     private void initializeCompositions() {
         try {
+            MatrixFormat matrixFormat =
+                    new MatrixFormat(templateId -> Optional.of(templateId).map(templates::get));
             final OfInt sequenceNumIterator = IntStream.iterate(0, i -> i + 1).iterator();
-            Map<Integer, List<Triple<Integer, Composition, JSONB>>> compByGroup = Arrays.stream(
+            Map<Integer, List<CachedComposition>> compByGroup = Arrays.stream(
                             ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
                                     .getResources(COMPOSITIONS_REPEATABLE_PATH))
                     // We need a sequential stream, so we get distinct sequence values
@@ -357,10 +367,13 @@ public class LoaderServiceImp implements LoaderService {
                     .collect(Collectors.groupingBy(
                             p -> Integer.parseInt(p.getLeft().substring(0, 2)),
                             Collectors.mapping(
-                                    p -> Triple.of(
+                                    p -> new CachedComposition(
                                             sequenceNumIterator.next(),
                                             p.getRight(),
-                                            JSONB.jsonb(rawJson.marshal(p.getRight()))),
+                                            rawJson.marshal(p.getRight()),
+                                            matrixFormat.toTable(p.getRight()).stream()
+                                                    .map(this::toRowDataPair)
+                                                    .collect(Collectors.toList())),
                                     Collectors.toList())));
 
             compByGroup.entrySet().stream()
@@ -380,16 +393,27 @@ public class LoaderServiceImp implements LoaderService {
                                         + " filename has to start with a 2 digit composition group number");
                             }
                             Composition composition = objectMapper.readValue(in, Composition.class);
-                            return Triple.of(
+                            return new CachedComposition(
                                     sequenceNumIterator.next(),
                                     composition,
-                                    JSONB.valueOf(rawJson.marshal(composition)));
+                                    rawJson.marshal(composition),
+                                    matrixFormat.toTable(composition).stream()
+                                            .map(this::toRowDataPair)
+                                            .collect(Collectors.toList()));
                         } catch (IOException e) {
                             throw new LoaderException("Failed to read composition file", e);
                         }
                     })
                     .forEach(singleCompositions::add);
         } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private Pair<Row, String> toRowDataPair(Row r) {
+        try {
+            return Pair.of(r, MatrixFormat.MAPPER.writeValueAsString(r.getFields()));
+        } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }
     }
@@ -585,7 +609,7 @@ public class LoaderServiceImp implements LoaderService {
         transactionalWritesDsl.truncate(EHR_).cascade().execute();
         transactionalWritesDsl.truncate(STATUS).cascade().execute();
         getStateDataFromDB("tmp_tables", String.class)
-                .forEach(t -> runStatementWithTransactionalWrites(String.format("TRUNCATE TABLE ehr.%s CASCADE;",t)));
+                .forEach(t -> runStatementWithTransactionalWrites(String.format("TRUNCATE TABLE ehr.%s CASCADE;", t)));
     }
 
     private void serializeAndStoreAsLoaderState(String key, Object toStore) {
@@ -677,11 +701,13 @@ public class LoaderServiceImp implements LoaderService {
                 properties.isInsertVersions());
         log.info("Preparing EHR distributions...");
         // Create healthcare facilities and the assigned HCPs in Table party_identified
-        Map<Integer, UUID> facilityNumberToUuid = IntStream.range(0, properties.getHealthcareFacilities())
+        Map<Integer, Pair<UUID, String>> facilityNumberToUuid = IntStream.range(0, properties.getHealthcareFacilities())
                 .parallel()
                 .mapToObj(this::insertHealthcareFacility)
                 .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-        Map<UUID, List<UUID>> facilityIdToHcpId =
+        Map<UUID, String> facilityIdToName =
+                facilityNumberToUuid.values().stream().collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+        Map<UUID, List<Pair<UUID, String>>> facilityIdToHcp =
                 insertHCPsForFacilities(facilityNumberToUuid, properties.getBulkSize());
 
         /* Determine how many facilities should be assigned to each EHR (normal dist. m: 7 sd: 3)
@@ -722,12 +748,16 @@ public class LoaderServiceImp implements LoaderService {
             }
             // Prepare data to insert while current insert task is running
             List<EhrCreateDescriptor> ehrDescriptors = getEhrSettingsBatch(
-                            facilityNumberToUuid, facilityCountToEhrCountDistribution, scaledEhrDistribution, batchSize)
+                            facilityNumberToUuid,
+                            facilityIdToName,
+                            facilityCountToEhrCountDistribution,
+                            scaledEhrDistribution,
+                            batchSize)
                     .stream()
                     .map(ehrInfo -> ehrCreator.create(new EhrCreator.EhrCreationInfo(
                             ehrInfo.getRight(),
                             ehrInfo.getLeft(),
-                            facilityIdToHcpId,
+                            facilityIdToHcp,
                             EnumSet.of(CompositionCreationInfo.CompositionDataMode.LEGACY))))
                     .collect(Collectors.toList());
 
@@ -763,7 +793,8 @@ public class LoaderServiceImp implements LoaderService {
         waitForTaskToComplete(CompletableFuture.allOf(Stream.concat(
                         singleCompositions.stream(),
                         compositionsWithSequenceByType.stream().flatMap(List::stream))
-                .map(ci -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(ci.getLeft(), ci.getRight())))
+                .map(ci ->
+                        CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(ci.getIdx(), ci.getEntryJsonb())))
                 .toArray(CompletableFuture[]::new)));
         stopWatch.stop();
         log.info("Completed loading phase 2 (Entry JSONB) in {} ms", stopWatch.getTotalTimeSeconds());
@@ -865,19 +896,20 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private Map<UUID, List<UUID>> insertHCPsForFacilities(Map<Integer, UUID> facilityNumberToUuid, int bulkSize) {
+    private Map<UUID, List<Pair<UUID, String>>> insertHCPsForFacilities(
+            Map<Integer, Pair<UUID, String>> facilityNumberToUuid, int bulkSize) {
         // Generate HCPs according to a normal distribution (m: 20 sd: 5)
         // Names are following a schema of "hcf<facilitynumber>hcp<hcp-number-in-facility>"
         Map<UUID, List<PartyIdentifiedRecord>> facilityIdToHcp = facilityNumberToUuid.entrySet().parallelStream()
-                .collect(Collectors.toMap(
-                        Entry::getValue, e -> IntStream.range(0, (int) getRandomGaussianWithLimitsLong(20, 5, 5, 35))
-                                .mapToObj(i -> DataCreator.createPartyWithRef(
-                                        nonTransactionalWritesDsl,
-                                        "hcf" + e.getKey() + "hcp" + i,
-                                        "hcp",
-                                        "PERSON",
-                                        PartyType.party_identified))
-                                .collect(Collectors.toList())));
+                .collect(Collectors.toMap(e -> e.getValue().getKey(), e -> IntStream.range(
+                                0, (int) getRandomGaussianWithLimitsLong(20, 5, 5, 35))
+                        .mapToObj(i -> DataCreator.createPartyWithRef(
+                                nonTransactionalWritesDsl,
+                                "hcf" + e.getKey() + "hcp" + i,
+                                "hcp",
+                                "PERSON",
+                                PartyType.party_identified))
+                        .collect(Collectors.toList())));
 
         bulkInsert(
                 PARTY_IDENTIFIED,
@@ -885,7 +917,7 @@ public class LoaderServiceImp implements LoaderService {
                 bulkSize);
 
         return facilityIdToHcp.entrySet().stream().collect(Collectors.toMap(Entry::getKey, e -> e.getValue().stream()
-                .map(PartyIdentifiedRecord::getId)
+                .map(r -> Pair.of(r.getId(), r.getName()))
                 .collect(Collectors.toList())));
     }
 
@@ -941,7 +973,7 @@ public class LoaderServiceImp implements LoaderService {
                 ehr);
     }
 
-    private void copyIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) {
+    private void copyIntoEntryTableWithJsonb(int compositionNumber, String jsonbData) {
         StopWatch sw = new StopWatch();
         sw.start("count");
         long tableSize = entryTableSize(compositionNumber);
@@ -1113,12 +1145,15 @@ public class LoaderServiceImp implements LoaderService {
      * @return
      */
     private List<MutablePair<UUID, Integer>> buildScaledFacilityToEhrDistribution(
-            LoaderRequestDto properties, Map<Integer, UUID> facilityNumberToUuid, long ehrFacilityCountSum) {
+            LoaderRequestDto properties,
+            Map<Integer, Pair<UUID, String>> facilityNumberToUuid,
+            long ehrFacilityCountSum) {
 
         List<Pair<UUID, Double>> ehrDistribution = IntStream.range(0, properties.getHealthcareFacilities())
                 .boxed()
                 .map(i -> Pair.of(
-                        facilityNumberToUuid.get(i), getRandomGaussianWithLimitsDouble(15_000, 5_000, 1, 30_000)))
+                        facilityNumberToUuid.get(i).getLeft(),
+                        getRandomGaussianWithLimitsDouble(15_000, 5_000, 1, 30_000)))
                 .collect(Collectors.toList());
         Double scaleFactor = ehrFacilityCountSum
                 / ehrDistribution.parallelStream().mapToDouble(Pair::getRight).sum();
@@ -1153,17 +1188,19 @@ public class LoaderServiceImp implements LoaderService {
      * Pair::getRight -> Facility-UUIDs to use
      *
      * @param facilityNumberToUuid
+     * @param facilityIdToName
      * @param ehrFacilityCounts
      * @param scaledEhrDistribution
      * @param batchSize
      * @return
      */
-    private List<Pair<Integer, List<UUID>>> getEhrSettingsBatch(
-            Map<Integer, UUID> facilityNumberToUuid,
+    private List<Pair<Integer, List<Pair<UUID, String>>>> getEhrSettingsBatch(
+            Map<Integer, Pair<UUID, String>> facilityNumberToUuid,
+            Map<UUID, String> facilityIdToName,
             List<MutablePair<Integer, Long>> ehrFacilityCounts,
             List<MutablePair<UUID, Integer>> scaledEhrDistribution,
             int batchSize) {
-        List<Pair<Integer, List<UUID>>> ehrSettings = new ArrayList<>();
+        List<Pair<Integer, List<Pair<UUID, String>>>> ehrSettings = new ArrayList<>();
         long processedCount = 0;
         // go through the facility count to number of EHRs mapping until we reach our batch-size or we run out of EHRs
         for (Pair<Integer, Long> ehrFacilityCount : ehrFacilityCounts) {
@@ -1183,6 +1220,7 @@ public class LoaderServiceImp implements LoaderService {
                                 .filter(p -> !facilities.contains(p.getValue()))
                                 .min((i1, i2) -> -Integer.compare(i1.getKey(), i2.getKey()))
                                 .map(Entry::getValue)
+                                .map(Pair::getKey)
                                 .ifPresent(facilities::add);
                     } else {
                         MutablePair<UUID, Integer> facilityWithCount = scaledEhrDistribution.get(f);
@@ -1193,7 +1231,11 @@ public class LoaderServiceImp implements LoaderService {
                 scaledEhrDistribution.removeIf(p -> p.getRight() == 0);
                 // Determine how many compositions this EHR shall hold according to a normal distribution (m: 200,
                 // sd:50)
-                ehrSettings.add(Pair.of((int) getRandomGaussianWithLimitsLong(200, 50, 50, 350), facilities));
+                ehrSettings.add(Pair.of(
+                        (int) getRandomGaussianWithLimitsLong(200, 50, 50, 350),
+                        facilities.stream()
+                                .map(f -> Pair.of(f, facilityIdToName.get(f)))
+                                .collect(Collectors.toList())));
             }
 
             ehrFacilityCount.setValue(ehrFacilityCount.getValue() - count);
@@ -1203,11 +1245,11 @@ public class LoaderServiceImp implements LoaderService {
         return ehrSettings;
     }
 
-    private Pair<Integer, UUID> insertHealthcareFacility(int number) {
+    private Pair<Integer, Pair<UUID, String>> insertHealthcareFacility(int number) {
         PartyIdentifiedRecord record = DataCreator.createPartyWithRef(
                 nonTransactionalWritesDsl, "hcf" + number, "facilities", "ORGANISATION", PartyType.party_identified);
         record.store();
-        return Pair.of(number, record.getId());
+        return Pair.of(number, Pair.of(record.getId(), record.getName()));
     }
 
     private UUID getSystemId() {
@@ -1253,16 +1295,20 @@ public class LoaderServiceImp implements LoaderService {
     private void createTemplate(String templateId, Resource file) throws IOException {
         var existingTemplateStore =
                 transactionalWritesDsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
-
+        String tpl;
+        try (InputStream in = file.getInputStream()) {
+            tpl = IOUtils.toString(in, StandardCharsets.UTF_8);
+            templates.put(templateId, TemplateDocument.Factory.parse(tpl).getTemplate());
+        } catch (XmlException e) {
+            throw new LoaderException("Failed to parse template", e);
+        }
         if (existingTemplateStore.isPresent()) {
             log.info("Template {} already exists", templateId);
         } else {
             var templateStoreRecord = transactionalWritesDsl.newRecord(TEMPLATE_STORE);
             templateStoreRecord.setId(UUID.randomUUID());
             templateStoreRecord.setTemplateId(templateId);
-            try (InputStream in = file.getInputStream()) {
-                templateStoreRecord.setContent(IOUtils.toString(in, StandardCharsets.UTF_8));
-            }
+            templateStoreRecord.setContent(tpl);
             templateStoreRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
             templateStoreRecord.store();
         }

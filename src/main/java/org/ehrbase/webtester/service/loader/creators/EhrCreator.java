@@ -19,35 +19,43 @@ package org.ehrbase.webtester.service.loader.creators;
 
 import static org.ehrbase.jooq.pg.tables.Status.STATUS;
 
-import com.nedap.archie.rm.composition.Composition;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.jooq.pg.enums.PartyType;
 import org.ehrbase.jooq.pg.tables.Ehr;
-import org.ehrbase.jooq.pg.tables.records.*;
+import org.ehrbase.jooq.pg.tables.records.AuditDetailsRecord;
+import org.ehrbase.jooq.pg.tables.records.ContributionRecord;
+import org.ehrbase.jooq.pg.tables.records.EhrRecord;
+import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
+import org.ehrbase.jooq.pg.tables.records.StatusRecord;
 import org.ehrbase.jooq.pg.udt.records.DvCodedTextRecord;
+import org.ehrbase.webtester.service.loader.CachedComposition;
 import org.ehrbase.webtester.service.loader.RandomHelper;
 import org.jooq.DSLContext;
-import org.jooq.JSONB;
 
 public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCreator.EhrCreationInfo> {
 
     public static class EhrCreationInfo {
-        private final List<UUID> facilities;
+        private final List<Pair<UUID, String>> facilities;
         private final int compositionCount;
-        private final Map<UUID, List<UUID>> facilityIdToHcpId;
+        private final Map<UUID, List<Pair<UUID, String>>> facilityIdToHcpId;
         private final Set<CompositionCreationInfo.CompositionDataMode> modes;
 
         public EhrCreationInfo(
-                List<UUID> facilities,
+                List<Pair<UUID, String>> facilities,
                 int compositionCount,
-                Map<UUID, List<UUID>> facilityIdToHcpId,
+                Map<UUID, List<Pair<UUID, String>>> facilityIdToHcpId,
                 Set<CompositionCreationInfo.CompositionDataMode> modes) {
             this.facilities = facilities;
             this.compositionCount = compositionCount;
@@ -55,7 +63,7 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
             this.modes = modes;
         }
 
-        public List<UUID> getFacilities() {
+        public List<Pair<UUID, String>> getFacilities() {
             return facilities;
         }
 
@@ -63,7 +71,7 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
             return compositionCount;
         }
 
-        public Map<UUID, List<UUID>> getFacilityIdToHcpId() {
+        public Map<UUID, List<Pair<UUID, String>>> getFacilityIdToHcpId() {
             return facilityIdToHcpId;
         }
 
@@ -73,8 +81,8 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
     }
 
     private final CompositionCreator compositionCreator;
-    private final List<Triple<Integer, Composition, JSONB>> singleCompositions;
-    private final List<List<Triple<Integer, Composition, JSONB>>> repeatableCompositions;
+    private final List<CachedComposition> singleCompositions;
+    private final List<List<CachedComposition>> repeatableCompositions;
 
     public EhrCreator(
             DSLContext dsl,
@@ -82,8 +90,8 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
             UUID systemId,
             UUID committerId,
             Map<String, Integer> territories,
-            List<Triple<Integer, Composition, JSONB>> singleCompositions,
-            List<List<Triple<Integer, Composition, JSONB>>> repeatableCompositions) {
+            List<CachedComposition> singleCompositions,
+            List<List<CachedComposition>> repeatableCompositions) {
         super(dsl, zoneId, systemId, committerId, territories);
         this.singleCompositions = singleCompositions;
         this.repeatableCompositions = repeatableCompositions;
@@ -118,7 +126,8 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
                         info.getFacilities().get(i % info.getFacilities().size()),
                         info.getFacilityIdToHcpId()
                                 .get(info.getFacilities()
-                                        .get(i % info.getFacilities().size())),
+                                        .get(i % info.getFacilities().size())
+                                        .getKey()),
                         selectComposition(i),
                         info.modes,
                         i)))
@@ -156,11 +165,11 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
         return ehrDescriptor;
     }
 
-    private Triple<Integer, Composition, JSONB> selectComposition(int compositionNumber) {
+    private CachedComposition selectComposition(int compositionNumber) {
         if (compositionNumber < singleCompositions.size()) {
             return singleCompositions.get(compositionNumber);
         } else {
-            List<Triple<Integer, Composition, JSONB>> compositionData = this.repeatableCompositions.get(
+            List<CachedComposition> compositionData = this.repeatableCompositions.get(
                     (compositionNumber - singleCompositions.size()) % repeatableCompositions.size());
             return compositionData.size() > 1
                     ? compositionData.get(RandomHelper.RND.get().nextInt(compositionData.size()))

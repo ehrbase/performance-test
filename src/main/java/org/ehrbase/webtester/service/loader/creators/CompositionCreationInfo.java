@@ -17,29 +17,16 @@
  */
 package org.ehrbase.webtester.service.loader.creators;
 
-import com.nedap.archie.rm.composition.Composition;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.tuple.Triple;
+import org.apache.commons.lang3.tuple.Pair;
+import org.ehrbase.webtester.service.loader.CachedComposition;
 import org.ehrbase.webtester.service.loader.LoaderException;
-import org.jooq.JSONB;
 
 public class CompositionCreationInfo {
-
-    public Set<CompositionDataMode> getModes() {
-        return modes;
-    }
-
-    public List<UUID> getAvailableHcpIds() {
-        return availableHcpIds;
-    }
-
-    public int getCompositionCounter() {
-        return compositionCounter;
-    }
 
     public enum CompositionDataMode {
         LEGACY,
@@ -47,17 +34,17 @@ public class CompositionCreationInfo {
     }
 
     private final UUID ehrId;
-    private final UUID facility;
-    private final List<UUID> availableHcpIds;
-    private final Triple<Integer, Composition, JSONB> selectedComposition;
+    private final Pair<UUID, String> facility;
+    private final List<Pair<UUID, String>> availableHcpIds;
+    private final CachedComposition selectedComposition;
     private final Set<CompositionDataMode> modes;
     private final int compositionCounter;
 
     public CompositionCreationInfo(
             UUID ehrId,
-            UUID facility,
-            List<UUID> availableHcpIds,
-            Triple<Integer, Composition, JSONB> selectedComposition,
+            Pair<UUID, String> facility,
+            List<Pair<UUID, String>> availableHcpIds,
+            CachedComposition selectedComposition,
             Set<CompositionDataMode> modes,
             int compositionCounter) {
         this.ehrId = Objects.requireNonNull(ehrId);
@@ -75,11 +62,23 @@ public class CompositionCreationInfo {
         return ehrId;
     }
 
-    public UUID getFacility() {
+    public Pair<UUID, String> getFacility() {
         return facility;
     }
 
-    public Triple<Integer, Composition, JSONB> getSelectedComposition() {
+    public CachedComposition getSelectedComposition() {
         return selectedComposition;
+    }
+
+    public Set<CompositionDataMode> getModes() {
+        return modes;
+    }
+
+    public List<Pair<UUID, String>> getAvailableHcpIds() {
+        return availableHcpIds;
+    }
+
+    public int getCompositionCounter() {
+        return compositionCounter;
     }
 }

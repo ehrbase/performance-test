@@ -24,8 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.webtester.service.loader.RandomHelper;
 import org.jooq.DSLContext;
@@ -33,23 +35,25 @@ import org.jooq.DSLContext;
 class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor, CompositionCreationInfo> {
 
     private final LegacyCompositionCreator legacyCompositionCreator;
+    private final MatrixCompositionCreator matrixCompositionCreator;
 
     CompositionCreator(
             DSLContext dsl, String zoneId, UUID systemId, UUID committerId, Map<String, Integer> territories) {
         super(dsl, zoneId, systemId, committerId, territories);
         this.legacyCompositionCreator = new LegacyCompositionCreator(dsl, zoneId, systemId, committerId, territories);
+        this.matrixCompositionCreator = new MatrixCompositionCreator(dsl, zoneId, systemId, committerId, territories);
     }
 
     @Override
     public CompositionCreateDescriptor create(CompositionCreationInfo info) {
 
         int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
-        UUID composerId = info.getAvailableHcpIds()
+        Pair<UUID, String> composerId = info.getAvailableHcpIds()
                 .get(info.getCompositionCounter() % info.getAvailableHcpIds().size());
         OffsetDateTime sysTransaction = OffsetDateTime.now();
-        List<UUID> participants = new ArrayList<>();
+        List<Pair<UUID, String>> participants = new ArrayList<>();
         if (hcpCount > 1 && info.getAvailableHcpIds().size() > 1) {
-            List<UUID> participationCandidates =
+            List<Pair<UUID, String>> participationCandidates =
                     CollectionUtils.selectRejected(info.getAvailableHcpIds(), composerId::equals, new ArrayList<>());
             IntStream.range(0, hcpCount - 1)
                     .mapToObj(i ->
@@ -67,12 +71,12 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
             LegacyCompositionCreator.LegacyCompositionData legacyCompositionData =
                     legacyCompositionCreator.create(new LegacyCompositionCreator.LegacyCompositionCreationInfo(
                             info.getEhrId(),
-                            composerId,
+                            composerId.getKey(),
                             compositionId,
                             createDescriptor.getContribution().getId(),
                             createDescriptor.getCompositionAudit().getId(),
-                            info.getFacility(),
-                            participants,
+                            info.getFacility().getKey(),
+                            participants.stream().map(Pair::getKey).collect(Collectors.toList()),
                             info.getSelectedComposition(),
                             sysTransaction));
             createDescriptor.setComposition(legacyCompositionData.getComposition());
@@ -81,7 +85,17 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
             createDescriptor.setParticipations(legacyCompositionData.getParticipations());
         }
 
-        // TODO: Matrix storage data
+        if (info.getModes().contains(CompositionCreationInfo.CompositionDataMode.LEGACY)) {
+            MatrixCompositionCreator.MatrixCompositionData matrixCompositionData =
+                    matrixCompositionCreator.create(new MatrixCompositionCreator.MatrixCompositionCreationInfo(
+                            info.getEhrId(),
+                            composerId,
+                            compositionId,
+                            info.getFacility(),
+                            info.getSelectedComposition()));
+            createDescriptor.setMatrixRecords(matrixCompositionData.getMatrixRecords());
+        }
+
         return createDescriptor;
     }
 }
