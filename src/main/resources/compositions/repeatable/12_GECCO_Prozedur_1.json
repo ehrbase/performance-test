@@ -5,7 +5,7 @@
                 },
                 "name": {
                     "_type": "DV_TEXT",
-                    "value": "Prozedur"
+                    "value": "GECCO_Prozedur"
                 },
                 "_type": "COMPOSITION",
                 "context": {
@@ -87,7 +87,7 @@
                     "rm_version": "1.0.4",
                     "template_id": {
                         "_type": "TEMPLATE_ID",
-                        "value": "Prozedur"
+                        "value": "GECCO_Prozedur"
                     },
                     "archetype_id": {
                         "_type": "ARCHETYPE_ID",
@@ -143,7 +143,7 @@
                         "archetype_details": {
                             "rm_version": "1.0.4",
                             "template_id": {
-                                "value": "Prozedur"
+                                "value": "GECCO_Prozedur"
                             },
                             "archetype_id": {
                                 "value": "openEHR-EHR-ACTION.procedure.v1"
@@ -180,6 +180,18 @@
                                     },
                                     "_type": "ELEMENT",
                                     "archetype_node_id": "at0049"
+                                },
+                                {
+                                    "name": {
+                                        "value": "Art der Prozedur",
+                                        "_type": "DV_TEXT"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "appendectomy_1"
+                                    },
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0067"
                                 }
                             ]
                         },
