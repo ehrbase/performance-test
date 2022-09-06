@@ -574,6 +574,7 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void truncateDataTables() {
+        log.info("Removing previous data from DB to avoid corrupted EHRs/Compositions...");
         transactionalWritesDsl.truncate(PARTY_IDENTIFIED).cascade().execute();
         transactionalWritesDsl.truncate(AUDIT_DETAILS).cascade().execute();
         transactionalWritesDsl.truncate(CONTRIBUTION).cascade().execute();
@@ -583,9 +584,8 @@ public class LoaderServiceImp implements LoaderService {
         transactionalWritesDsl.truncate(PARTICIPATION).cascade().execute();
         transactionalWritesDsl.truncate(EHR_).cascade().execute();
         transactionalWritesDsl.truncate(STATUS).cascade().execute();
-        getStateDataFromDB("temp_tables", String.class)
-                .forEach(t ->
-                        transactionalWritesDsl.truncate("ehr." + t).cascade().execute());
+        getStateDataFromDB("tmp_tables", String.class)
+                .forEach(t -> runStatementWithTransactionalWrites(String.format("TRUNCATE TABLE ehr.%s CASCADE;",t)));
     }
 
     private void serializeAndStoreAsLoaderState(String key, Object toStore) {
