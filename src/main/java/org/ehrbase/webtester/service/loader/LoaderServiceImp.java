@@ -17,7 +17,9 @@
  */
 package org.ehrbase.webtester.service.loader;
 
-import static org.ehrbase.jooq.pg.Tables.*;
+import static org.ehrbase.jooq.pg.Tables.EHR_;
+import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
+import static org.ehrbase.jooq.pg.Tables.SYSTEM;
 import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
 import static org.ehrbase.jooq.pg.tables.Composition.COMPOSITION;
 import static org.ehrbase.jooq.pg.tables.Contribution.CONTRIBUTION;
@@ -40,16 +42,28 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.PrimitiveIterator.OfInt;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
@@ -83,7 +97,13 @@ import org.ehrbase.webtester.service.loader.creators.EhrCreateDescriptor;
 import org.ehrbase.webtester.service.loader.creators.EhrCreator;
 import org.ehrbase.webtester.service.loader.jooq.LoaderState;
 import org.ehrbase.webtester.service.loader.jooq.LoaderStateRecord;
-import org.jooq.*;
+import org.jooq.DSLContext;
+import org.jooq.JSONB;
+import org.jooq.LoaderError;
+import org.jooq.Record2;
+import org.jooq.Table;
+import org.jooq.TableField;
+import org.jooq.TableRecord;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,7 +120,7 @@ import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
 /**
- * @author Renaud Subiger
+ * @author Vinzenz Müller
  * @since 1.0
  */
 @Service
@@ -562,7 +582,7 @@ public class LoaderServiceImp implements LoaderService {
         transactionalWritesDsl.truncate(ENTRY).cascade().execute();
         transactionalWritesDsl.truncate(PARTICIPATION).cascade().execute();
         transactionalWritesDsl.truncate(EHR_).cascade().execute();
-        transactionalWritesDsl.truncate(EHR_STATUS).cascade().execute();
+        transactionalWritesDsl.truncate(STATUS).cascade().execute();
         getStateDataFromDB("temp_tables", String.class)
                 .forEach(t ->
                         transactionalWritesDsl.truncate("ehr." + t).cascade().execute());
