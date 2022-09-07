@@ -31,6 +31,9 @@ import org.ehrbase.serialisation.matrixencoding.Encoder;
 public class InMemoryEncoder implements Encoder {
 
     private static Set<String> REQUIRED_PATHS = Set.of(
+            // UID
+            "/uid/_type",
+            "/uid/value",
             // Composer
             "/composer/_type",
             "/composer/external_ref/_type",

@@ -203,13 +203,13 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
 
     @Override
     public Row11<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB, String>
-    fieldsRow() {
+            fieldsRow() {
         return (Row11) super.fieldsRow();
     }
 
     @Override
     public Row11<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB, String>
-    valuesRow() {
+            valuesRow() {
         return (Row11) super.valuesRow();
     }
 

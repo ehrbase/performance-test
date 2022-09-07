@@ -139,7 +139,8 @@ public class Entry2 extends TableImpl<Entry2Record> {
      */
     public final TableField<Entry2Record, JSONB> FIELDS = createField(DSL.name("fields"), SQLDataType.JSONB, this, "");
 
-    public final TableField<Entry2Record, String> TEMPLATE_ID = createField(DSL.name("template_id"), SQLDataType.CLOB, this, "");
+    public final TableField<Entry2Record, String> TEMPLATE_ID =
+            createField(DSL.name("template_id"), SQLDataType.CLOB, this, "");
 
     private Entry2(Name alias, Table<Entry2Record> aliased) {
         this(alias, aliased, null);
@@ -238,7 +239,8 @@ public class Entry2 extends TableImpl<Entry2Record> {
     // -------------------------------------------------------------------------
 
     @Override
-    public Row11<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB, String> fieldsRow() {
+    public Row11<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB, String>
+            fieldsRow() {
         return (Row11) super.fieldsRow();
     }
 }

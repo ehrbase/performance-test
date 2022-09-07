@@ -17,6 +17,8 @@
  */
 package org.ehrbase.webtester.service.loader.creators;
 
+import static org.ehrbase.jooq.pg.Tables.SYSTEM;
+
 import com.nedap.archie.rm.RMObject;
 import com.nedap.archie.rm.composition.AdminEntry;
 import com.nedap.archie.rm.composition.CareEntry;
@@ -38,6 +40,7 @@ import org.ehrbase.jooq.pg.enums.PartyType;
 import org.ehrbase.jooq.pg.tables.records.AuditDetailsRecord;
 import org.ehrbase.jooq.pg.tables.records.ContributionRecord;
 import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
+import org.ehrbase.jooq.pg.tables.records.SystemRecord;
 import org.ehrbase.serialisation.dbencoding.RawJson;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
@@ -47,6 +50,7 @@ public abstract class AbstractDataCreator<DESCRIPTOR, PARAM_OBJ> implements Data
     private final DSLContext dsl;
     private final String zoneId;
     private final UUID systemId;
+    private final String systemSetting;
     private final UUID committerId;
     private final Map<String, Integer> territories;
     private final RawJson rawJson = new RawJson();
@@ -59,6 +63,9 @@ public abstract class AbstractDataCreator<DESCRIPTOR, PARAM_OBJ> implements Data
         this.systemId = systemId;
         this.committerId = committerId;
         this.territories = MapUtils.unmodifiableMap(territories);
+        this.systemSetting = dsl.fetchOptional(SYSTEM, SYSTEM.ID.eq(getSystemId()))
+                .map(SystemRecord::getSettings)
+                .orElseThrow();
     }
 
     public DSLContext getDsl() {
@@ -71,6 +78,10 @@ public abstract class AbstractDataCreator<DESCRIPTOR, PARAM_OBJ> implements Data
 
     public UUID getSystemId() {
         return systemId;
+    }
+
+    public String getSystemSetting() {
+        return systemSetting;
     }
 
     public UUID getCommitterId() {

@@ -147,6 +147,12 @@ public class MatrixCompositionCreator
 
         try {
             if (row.getNum() == 0 && data != null) {
+                // UID
+                data.put(pathToEncodedPathMap.get("/uid/_type"), "PARTY_IDENTIFIED");
+                data.put(
+                        pathToEncodedPathMap.get("/uid/value"),
+                        compositionId.toString() + "::" + getSystemSetting() + "::1");
+
                 // Composer
                 data.put(pathToEncodedPathMap.get("/composer/_type"), "PARTY_IDENTIFIED");
                 data.put(pathToEncodedPathMap.get("/composer/external_ref/_type"), "PARTY_REF");
@@ -158,6 +164,7 @@ public class MatrixCompositionCreator
                         composerId.getKey().toString());
                 data.put(pathToEncodedPathMap.get("/composer/external_ref/id/scheme"), "id_scheme");
                 data.put(pathToEncodedPathMap.get("/composer/name"), composerId.getValue());
+
                 // Facility
                 data.put(pathToEncodedPathMap.get("/context/health_care_facility/_type"), "PARTY_IDENTIFIED");
                 data.put(pathToEncodedPathMap.get("/context/health_care_facility/external_ref/_type"), "PARTY_REF");
