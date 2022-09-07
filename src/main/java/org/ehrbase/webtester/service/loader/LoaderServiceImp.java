@@ -1014,7 +1014,7 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
     }
 
-    private Pair<Integer, Double> copyBatchIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData)
+    private Pair<Integer, Double> copyBatchIntoEntryTableWithJsonb(int compositionNumber, String jsonbData)
             throws SQLException {
         try (Connection c = nonTransactionalWritesDataSource.getConnection()) {
             StopWatch sw = new StopWatch();
@@ -1039,7 +1039,7 @@ public class LoaderServiceImp implements LoaderService {
                                 + "  \"rm_version\","
                                 + "  \"name\""
                                 + "FROM del;",
-                        compositionNumber, compositionNumber, JSONB_INSERT_BATCH_SIZE, jsonbData.data());
+                        compositionNumber, compositionNumber, JSONB_INSERT_BATCH_SIZE, jsonbData);
                 int i = s.executeUpdate(statement);
                 sw.stop();
                 return Pair.of(i, sw.getTotalTimeSeconds());
