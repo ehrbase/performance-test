@@ -18,7 +18,11 @@
 package org.ehrbase.webtester.service.loader.jooq;
 
 import java.util.UUID;
-import org.jooq.*;
+import org.jooq.Field;
+import org.jooq.JSONB;
+import org.jooq.Record11;
+import org.jooq.Record2;
+import org.jooq.Row11;
 import org.jooq.impl.UpdatableRecordImpl;
 
 /**
@@ -26,7 +30,7 @@ import org.jooq.impl.UpdatableRecordImpl;
  */
 @SuppressWarnings({"all", "unchecked", "rawtypes"})
 public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
-        implements Record10<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB> {
+        implements Record11<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB, String> {
 
     private static final long serialVersionUID = 1L;
 
@@ -170,6 +174,20 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
         return (JSONB) get(9);
     }
 
+    /**
+     * Setter for <code>ehr.entry2.template_id</code>.
+     */
+    public void setTemplateId(String value) {
+        set(10, value);
+    }
+
+    /**
+     * Getter for <code>ehr.entry2.template_id</code>.
+     */
+    public String getTemplateId() {
+        return (String) get(10);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -180,17 +198,19 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
     }
 
     // -------------------------------------------------------------------------
-    // Record10 type implementation
+    // Record11 type implementation
     // -------------------------------------------------------------------------
 
     @Override
-    public Row10<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB> fieldsRow() {
-        return (Row10) super.fieldsRow();
+    public Row11<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB, String>
+    fieldsRow() {
+        return (Row11) super.fieldsRow();
     }
 
     @Override
-    public Row10<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB> valuesRow() {
-        return (Row10) super.valuesRow();
+    public Row11<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB, String>
+    valuesRow() {
+        return (Row11) super.valuesRow();
     }
 
     @Override
@@ -244,6 +264,11 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
     }
 
     @Override
+    public Field<String> field11() {
+        return Entry2.ENTRY2.TEMPLATE_ID;
+    }
+
+    @Override
     public UUID component1() {
         return getEhrId();
     }
@@ -294,6 +319,11 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
     }
 
     @Override
+    public String component11() {
+        return getTemplateId();
+    }
+
+    @Override
     public UUID value1() {
         return getEhrId();
     }
@@ -341,6 +371,11 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
     @Override
     public JSONB value10() {
         return getFields();
+    }
+
+    @Override
+    public String value11() {
+        return getTemplateId();
     }
 
     @Override
@@ -404,6 +439,12 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
     }
 
     @Override
+    public Entry2Record value11(String value) {
+        setTemplateId(value);
+        return this;
+    }
+
+    @Override
     public Entry2Record values(
             UUID value1,
             UUID value2,
@@ -414,7 +455,8 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
             Integer[] value7,
             Integer[] value8,
             Integer value9,
-            JSONB value10) {
+            JSONB value10,
+            String value11) {
         value1(value1);
         value2(value2);
         value3(value3);
@@ -425,6 +467,7 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
         value8(value8);
         value9(value9);
         value10(value10);
+        value11(value11);
         return this;
     }
 
@@ -452,7 +495,8 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
             Integer[] entityIdx,
             Integer[] fieldIdx,
             Integer fieldIdxLen,
-            JSONB fields) {
+            JSONB fields,
+            String templateId) {
         super(Entry2.ENTRY2);
 
         setEhrId(ehrId);
@@ -465,5 +509,6 @@ public class Entry2Record extends UpdatableRecordImpl<Entry2Record>
         setFieldIdx(fieldIdx);
         setFieldIdxLen(fieldIdxLen);
         setFields(fields);
+        setTemplateId(templateId);
     }
 }

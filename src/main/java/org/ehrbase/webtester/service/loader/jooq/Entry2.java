@@ -23,8 +23,19 @@ import java.util.UUID;
 import org.ehrbase.jooq.pg.Ehr;
 import org.ehrbase.jooq.pg.Keys;
 import org.ehrbase.jooq.pg.tables.records.EhrRecord;
-import org.jooq.*;
+import org.jooq.Field;
+import org.jooq.ForeignKey;
+import org.jooq.Index;
+import org.jooq.JSONB;
+import org.jooq.Name;
+import org.jooq.OrderField;
 import org.jooq.Record;
+import org.jooq.Row11;
+import org.jooq.Schema;
+import org.jooq.Table;
+import org.jooq.TableField;
+import org.jooq.TableOptions;
+import org.jooq.UniqueKey;
 import org.jooq.impl.DSL;
 import org.jooq.impl.Internal;
 import org.jooq.impl.SQLDataType;
@@ -128,6 +139,8 @@ public class Entry2 extends TableImpl<Entry2Record> {
      */
     public final TableField<Entry2Record, JSONB> FIELDS = createField(DSL.name("fields"), SQLDataType.JSONB, this, "");
 
+    public final TableField<Entry2Record, String> TEMPLATE_ID = createField(DSL.name("template_id"), SQLDataType.CLOB, this, "");
+
     private Entry2(Name alias, Table<Entry2Record> aliased) {
         this(alias, aliased, null);
     }
@@ -225,7 +238,7 @@ public class Entry2 extends TableImpl<Entry2Record> {
     // -------------------------------------------------------------------------
 
     @Override
-    public Row10<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB> fieldsRow() {
-        return (Row10) super.fieldsRow();
+    public Row11<UUID, UUID, Integer, String, String, String, Integer[], Integer[], Integer, JSONB, String> fieldsRow() {
+        return (Row11) super.fieldsRow();
     }
 }

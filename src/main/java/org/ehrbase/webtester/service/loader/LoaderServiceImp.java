@@ -93,11 +93,13 @@ import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
 import org.ehrbase.serialisation.dbencoding.RawJson;
 import org.ehrbase.serialisation.matrixencoding.MatrixFormat;
 import org.ehrbase.serialisation.matrixencoding.Row;
+import org.ehrbase.webtester.service.loader.creators.CompositionDataMode;
 import org.ehrbase.webtester.service.loader.creators.DataCreator;
 import org.ehrbase.webtester.service.loader.creators.EhrCreateDescriptor;
 import org.ehrbase.webtester.service.loader.creators.EhrCreator;
 import org.ehrbase.webtester.service.loader.jooq.Encoding;
 import org.ehrbase.webtester.service.loader.jooq.EncodingRecord;
+import org.ehrbase.webtester.service.loader.jooq.Entry2;
 import org.ehrbase.webtester.service.loader.jooq.LoaderState;
 import org.ehrbase.webtester.service.loader.jooq.LoaderStateRecord;
 import org.jooq.DSLContext;
@@ -789,7 +791,7 @@ public class LoaderServiceImp implements LoaderService {
             }
             stopWatch.start("insert-batch" + batch);
             // Insert the already prepared batch
-            currentInsertTask = insertEhrsAsync(ehrDescriptors, properties.getBulkSize());
+            currentInsertTask = insertEhrsAsync(ehrDescriptors, properties);
         }
 
         // wait for the last insert batch to complete
@@ -955,42 +957,34 @@ public class LoaderServiceImp implements LoaderService {
         throw new LoaderException("Task failed");
     }
 
-    private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, int bulkSize) {
-        CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() -> bulkInsert(
-                EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.getEventContexts().stream()), bulkSize));
-        CompletableFuture<Void> composition = CompletableFuture.runAsync(() ->
-                bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.getCompositions().stream()), bulkSize));
-        CompletableFuture<Void> auditDetails = CompletableFuture.runAsync(() -> bulkInsert(
-                AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.getAuditDetails().stream()), bulkSize));
-        CompletableFuture<Void> entry = CompletableFuture.allOf(ehrDescriptors.stream()
-                .flatMap(d -> d.getEntries().stream())
-                .collect(Collectors.groupingBy(EntryRecord::getSequence))
-                .entrySet()
-                .stream()
-                .map(e -> CompletableFuture.runAsync(() ->
-                        bulkInsert(ENTRY.rename(ENTRY.getName() + "_" + e.getKey()), e.getValue().stream(), bulkSize)))
-                .toArray(CompletableFuture[]::new));
-        CompletableFuture<Void> participations = CompletableFuture.runAsync(() -> bulkInsert(
-                PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.getParticipations().stream()), bulkSize));
-        CompletableFuture<Void> contribution = CompletableFuture.runAsync(() -> bulkInsert(
-                CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.getContributions().stream()), bulkSize));
-        CompletableFuture<Void> partyIdentified = CompletableFuture.runAsync(() ->
-                bulkInsert(PARTY_IDENTIFIED, ehrDescriptors.stream().map(EhrCreateDescriptor::getSubject), bulkSize));
-        CompletableFuture<Void> status = CompletableFuture.runAsync(
-                () -> bulkInsert(STATUS, ehrDescriptors.stream().map(EhrCreateDescriptor::getStatus), bulkSize));
-        CompletableFuture<Void> ehr = CompletableFuture.runAsync(
-                () -> bulkInsert(Ehr.EHR_, ehrDescriptors.stream().map(EhrCreateDescriptor::getEhr), bulkSize));
+    private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, LoaderRequestDto properties) {
+        List<CompletableFuture<Void>> tasks = new ArrayList<>();
+        //The tasks are started ordered by the execution times
+        if(properties.getModes().contains(CompositionDataMode.MATRIX)) {
+            tasks.add(CompletableFuture.runAsync(() -> bulkInsert(Entry2.ENTRY2, ehrDescriptors.stream().map(EhrCreateDescriptor::getMatrixRecords).flatMap(List::stream), properties.getBulkSize())));
+        }
+        if(properties.getModes().contains(CompositionDataMode.LEGACY)) {
+            tasks.add(CompletableFuture.runAsync(() -> bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.getEventContexts().stream()), properties.getBulkSize())));
+            tasks.add(CompletableFuture.runAsync(() -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.getCompositions().stream()), properties.getBulkSize())));
+        }
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.getAuditDetails().stream()), properties.getBulkSize())));
+        if(properties.getModes().contains(CompositionDataMode.LEGACY)) {
+            tasks.addAll(ehrDescriptors.stream()
+                    .flatMap(d -> d.getEntries().stream())
+                    .collect(Collectors.groupingBy(EntryRecord::getSequence))
+                    .entrySet()
+                    .stream()
+                    .map(e -> CompletableFuture.runAsync(() ->
+                            bulkInsert(ENTRY.rename(ENTRY.getName() + "_" + e.getKey()), e.getValue().stream(), properties.getBulkSize())))
+                    .collect(Collectors.toList()));
+            tasks.add(CompletableFuture.runAsync(() -> bulkInsert(PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.getParticipations().stream()), properties.getBulkSize())));
+        }
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.getContributions().stream()), properties.getBulkSize())));
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(PARTY_IDENTIFIED, ehrDescriptors.stream().map(EhrCreateDescriptor::getSubject), properties.getBulkSize())));
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(STATUS, ehrDescriptors.stream().map(EhrCreateDescriptor::getStatus), properties.getBulkSize())));
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(Ehr.EHR_, ehrDescriptors.stream().map(EhrCreateDescriptor::getEhr), properties.getBulkSize())));
 
-        return CompletableFuture.allOf(
-                entry,
-                auditDetails,
-                composition,
-                eventContext,
-                participations,
-                status,
-                partyIdentified,
-                contribution,
-                ehr);
+        return CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new));
     }
 
     private void copyIntoEntryTableWithJsonb(int compositionNumber, String jsonbData) {

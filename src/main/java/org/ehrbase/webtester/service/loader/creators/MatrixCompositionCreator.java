@@ -143,6 +143,7 @@ public class MatrixCompositionCreator
         entry2Record.setEntityIdx(row.getEntityIdx());
         entry2Record.setFieldIdx(row.getFieldIdx());
         entry2Record.setFieldIdxLen(row.getFieldIdx().length);
+        entry2Record.setTemplateId(row.getTemplateId());
 
         try {
             if (row.getNum() == 0 && data != null) {
