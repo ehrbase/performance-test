@@ -709,14 +709,15 @@ public class LoaderServiceImp implements LoaderService {
         for (long i = 0; i < loops; i++) {
             sw.start("batch" + i);
             try {
-                int insertCount;
-                insertCount = copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
+                Pair<Integer, Double> insertCountWithTime;
+                insertCountWithTime = copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
                 sw.stop();
                 log.info(
-                        "Copy comp {} batch: {}, count: {}, time: {}ms",
+                        "Copy comp {} batch: {}, count: {}, execution-time: {}s, total-time: {}ms",
                         compositionNumber,
                         i - errorCount,
-                        insertCount,
+                        insertCountWithTime.getLeft(),
+                        insertCountWithTime.getRight(),
                         sw.getLastTaskTimeMillis());
             } catch (SQLException e) {
                 sw.stop();
@@ -737,8 +738,10 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
     }
 
-    private int copyBatchIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) throws SQLException {
+    private Pair<Integer, Double> copyBatchIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) throws SQLException {
         try (Connection c = primaryDataSource.getConnection()) {
+            StopWatch sw = new StopWatch();
+            sw.start();
             try (Statement s = c.createStatement()) {
                 s.setQueryTimeout(0);
                 String statement = String.format(
@@ -760,8 +763,11 @@ public class LoaderServiceImp implements LoaderService {
                                 + "  \"name\""
                                 + "FROM del;",
                         compositionNumber, compositionNumber, JSONB_INSERT_BATCH_SIZE, jsonbData.data());
-                return s.executeUpdate(statement);
+                int i = s.executeUpdate(statement);
+                sw.stop();
+                return Pair.of(i,sw.getTotalTimeSeconds());
             } catch (SQLException e) {
+                sw.stop();
                 // Some errors may result in a broken DB session therefore we evict the connection from the pool
                 primaryDataSource.evictConnection(c);
                 throw e;
