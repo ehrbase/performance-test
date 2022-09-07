@@ -20,6 +20,7 @@ package org.ehrbase.webtester.service.loader;
 import com.nedap.archie.rm.composition.Composition;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.ehrbase.serialisation.matrixencoding.Row;
 
@@ -27,10 +28,13 @@ public class CachedComposition {
     private final int idx;
     private final Composition composition;
     private final String entryJsonb;
-    private final List<Pair<Row, String>> matrixFormatData;
+    private final List<Pair<Row, Map<String, String>>> matrixFormatData;
 
     public CachedComposition(
-            int idx, Composition composition, String entryJsonb, List<Pair<Row, String>> matrixFormatData) {
+            int idx,
+            Composition composition,
+            String entryJsonb,
+            List<Pair<Row, Map<String, String>>> matrixFormatData) {
         this.idx = idx;
         this.composition = composition;
         this.entryJsonb = entryJsonb;
@@ -49,7 +53,7 @@ public class CachedComposition {
         return entryJsonb;
     }
 
-    public List<Pair<Row, String>> getMatrixFormatData() {
+    public List<Pair<Row, Map<String, String>>> getMatrixFormatData() {
         return matrixFormatData;
     }
 }

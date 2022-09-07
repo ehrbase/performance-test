@@ -33,6 +33,7 @@ import static org.ehrbase.webtester.service.loader.RandomHelper.getRandomGaussia
 import static org.ehrbase.webtester.service.loader.RandomHelper.getRandomGaussianWithLimitsLong;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nedap.archie.json.JacksonUtil;
 import com.nedap.archie.rm.composition.Composition;
@@ -41,7 +42,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -63,7 +63,6 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.PrimitiveIterator.OfInt;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -94,10 +93,11 @@ import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
 import org.ehrbase.serialisation.dbencoding.RawJson;
 import org.ehrbase.serialisation.matrixencoding.MatrixFormat;
 import org.ehrbase.serialisation.matrixencoding.Row;
-import org.ehrbase.webtester.service.loader.creators.CompositionCreationInfo;
 import org.ehrbase.webtester.service.loader.creators.DataCreator;
 import org.ehrbase.webtester.service.loader.creators.EhrCreateDescriptor;
 import org.ehrbase.webtester.service.loader.creators.EhrCreator;
+import org.ehrbase.webtester.service.loader.jooq.Encoding;
+import org.ehrbase.webtester.service.loader.jooq.EncodingRecord;
 import org.ehrbase.webtester.service.loader.jooq.LoaderState;
 import org.ehrbase.webtester.service.loader.jooq.LoaderStateRecord;
 import org.jooq.DSLContext;
@@ -229,9 +229,6 @@ public class LoaderServiceImp implements LoaderService {
     private static final String SYS_PERIOD_FIELD_NAME = "sys_period";
     private static final int JSONB_INSERT_BATCH_SIZE = 1000;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
-    // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
-    // otherwise
-    private final ThreadLocal<Random> random = ThreadLocal.withInitial(SecureRandom::new);
     private final Map<String, OPERATIONALTEMPLATE> templates = new HashMap<>();
     private final List<CachedComposition> singleCompositions = new ArrayList<>();
     private final List<List<CachedComposition>> compositionsWithSequenceByType = new ArrayList<>();
@@ -242,7 +239,7 @@ public class LoaderServiceImp implements LoaderService {
     private final HikariDataSource nonTransactionalWritesDataSource;
     private final HikariDataSource transactionalWritesDataSource;
     private final ResourceLoader resourceLoader;
-
+    private InMemoryEncoder encoder;
     private LoaderStateRecord currentStateRecord;
     private EhrCreator ehrCreator;
     private boolean isRunning = false;
@@ -268,7 +265,27 @@ public class LoaderServiceImp implements LoaderService {
         // Initialize everything that does not require DB inserts,
         // because inserts with indexes present are likely to fail with non-transactional writes
         initializeTemplates();
+        Map<String, Long> encodings = transactionalWritesDsl
+                .select()
+                .from(Encoding.ENCODING)
+                .fetchMap(Encoding.ENCODING.PATH, Encoding.ENCODING.CODE);
+        encoder = new InMemoryEncoder(encodings);
         initializeCompositions();
+        bulkInsert(
+                Encoding.ENCODING,
+                encoder.getCodeToPathMap().entrySet().stream().map(e -> {
+                    EncodingRecord record = nonTransactionalWritesDsl.newRecord(Encoding.ENCODING);
+                    record.setCode(e.getKey());
+                    record.setPath(e.getValue());
+                    return record;
+                }),
+                20000);
+        Long currentCode = encoder.getCodeToPathMap().keySet().stream()
+                .max(Long::compareTo)
+                .map(l -> l + 1)
+                .orElse(0L);
+        // We need to set the current sequence value to max(codes) + 1 to avoid conflicts
+        runStatementWithTransactionalWrites("ALTER SEQUENCE encoding_code_seq` RESTART WITH " + currentCode + ";");
         ehrCreator = new EhrCreator(
                 nonTransactionalWritesDsl,
                 ZoneId.systemDefault().toString(),
@@ -277,7 +294,10 @@ public class LoaderServiceImp implements LoaderService {
                 nonTransactionalWritesDsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE).from(TERRITORY).fetch().stream()
                         .collect(Collectors.toMap(Record2::value1, Record2::value2)),
                 singleCompositions,
-                compositionsWithSequenceByType);
+                compositionsWithSequenceByType,
+                encoder.getPathToCodeMap().entrySet().stream()
+                        .collect(Collectors.toUnmodifiableMap(
+                                Map.Entry::getKey, e -> "/" + e.getValue().toString())));
         ensureLoaderStatusTableAndRecord();
         LoaderPhase currentPhase = LoaderPhase.valueOf(currentStateRecord.getValue());
         if (!EnumSet.of(LoaderPhase.NOT_RUN, LoaderPhase.FINISHED).contains(currentPhase)) {
@@ -344,7 +364,7 @@ public class LoaderServiceImp implements LoaderService {
     private void initializeCompositions() {
         try {
             MatrixFormat matrixFormat =
-                    new MatrixFormat(templateId -> Optional.of(templateId).map(templates::get));
+                    new MatrixFormat(templateId -> Optional.of(templateId).map(templates::get), encoder);
             final OfInt sequenceNumIterator = IntStream.iterate(0, i -> i + 1).iterator();
             Map<Integer, List<CachedComposition>> compByGroup = Arrays.stream(
                             ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
@@ -410,9 +430,12 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private Pair<Row, String> toRowDataPair(Row r) {
+    private Pair<Row, Map<String, String>> toRowDataPair(Row r) {
         try {
-            return Pair.of(r, MatrixFormat.MAPPER.writeValueAsString(r.getFields()));
+            return Pair.of(
+                    r,
+                    objectMapper.readValue(
+                            MatrixFormat.MAPPER.writeValueAsString(r.getFields()), new TypeReference<>() {}));
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }
@@ -755,10 +778,7 @@ public class LoaderServiceImp implements LoaderService {
                             batchSize)
                     .stream()
                     .map(ehrInfo -> ehrCreator.create(new EhrCreator.EhrCreationInfo(
-                            ehrInfo.getRight(),
-                            ehrInfo.getLeft(),
-                            facilityIdToHcp,
-                            EnumSet.of(CompositionCreationInfo.CompositionDataMode.LEGACY))))
+                            ehrInfo.getRight(), ehrInfo.getLeft(), facilityIdToHcp, properties.getModes())))
                     .collect(Collectors.toList());
 
             // Wait for the current insert batch to complete

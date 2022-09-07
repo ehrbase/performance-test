@@ -18,9 +18,9 @@
 package org.ehrbase.webtester.service.loader.creators;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.UncheckedIOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PrimitiveIterator;
@@ -41,7 +41,8 @@ public class MatrixCompositionCreator
                 MatrixCompositionCreator.MatrixCompositionData,
                 MatrixCompositionCreator.MatrixCompositionCreationInfo> {
 
-    private ObjectMapper om = new ObjectMapper();
+    private final ObjectMapper om = new ObjectMapper();
+    private final Map<String, String> pathToEncodedPathMap;
 
     public static class MatrixCompositionData {
         private List<Entry2Record> matrixRecords;
@@ -97,17 +98,27 @@ public class MatrixCompositionCreator
     }
 
     protected MatrixCompositionCreator(
-            DSLContext dsl, String zoneId, UUID systemId, UUID committerId, Map<String, Integer> territories) {
+            DSLContext dsl,
+            String zoneId,
+            UUID systemId,
+            UUID committerId,
+            Map<String, Integer> territories,
+            Map<String, String> pathToEncodedPathMap) {
         super(dsl, zoneId, systemId, committerId, territories);
+        this.pathToEncodedPathMap = pathToEncodedPathMap;
     }
 
     public MatrixCompositionData create(MatrixCompositionCreationInfo info) {
         MatrixCompositionData createDescriptor = new MatrixCompositionData();
 
-        // TODO
         List<Entry2Record> records = info.getSelectedComposition().getMatrixFormatData().stream()
                 .map(d -> buildMatrixRecord(
-                        info.getComposerId(), info.getCompositionId(), info.getEhrId(), info.getFacility(), d))
+                        info.getComposerId(),
+                        info.getCompositionId(),
+                        info.getEhrId(),
+                        info.getFacility(),
+                        d.getLeft(),
+                        new HashMap<>(d.getRight())))
                 .collect(Collectors.toList());
         final PrimitiveIterator.OfInt numIterator =
                 IntStream.iterate(0, i -> i + 1).iterator();
@@ -121,48 +132,53 @@ public class MatrixCompositionCreator
             UUID compositionId,
             UUID ehrId,
             Pair<UUID, String> facility,
-            Pair<Row, String> rowWithData) {
+            Row row,
+            Map<String, String> data) {
         Entry2Record entry2Record = getDsl().newRecord(Entry2.ENTRY2);
         entry2Record.setCompId(compositionId);
         entry2Record.setEhrId(ehrId);
-        entry2Record.setEntityConcept(rowWithData.getLeft().getArchetypeId());
-        entry2Record.setRmEntity(rowWithData.getLeft().getRmType());
-        entry2Record.setEntityPath(
-                rowWithData.getLeft().getEntityPath().format(AqlPath.OtherPredicatesFormat.SHORTED, true));
-        entry2Record.setEntityIdx(rowWithData.getLeft().getEntityIdx());
-        entry2Record.setFieldIdx(rowWithData.getLeft().getFieldIdx());
-        entry2Record.setFieldIdxLen(rowWithData.getLeft().getFieldIdx().length);
+        entry2Record.setEntityConcept(row.getArchetypeId());
+        entry2Record.setRmEntity(row.getRmType());
+        entry2Record.setEntityPath(row.getEntityPath().format(AqlPath.OtherPredicatesFormat.SHORTED, true));
+        entry2Record.setEntityIdx(row.getEntityIdx());
+        entry2Record.setFieldIdx(row.getFieldIdx());
+        entry2Record.setFieldIdxLen(row.getFieldIdx().length);
 
-        if (rowWithData.getLeft().getNum() == 0 && rowWithData.getRight() != null) {
-            try {
-                Map<String, String> kvMap = om.readValue(rowWithData.getRight(), new TypeReference<>() {});
-                // Composer data
-                kvMap.put("/composer/_type", "PARTY_IDENTIFIED");
-                kvMap.put("/composer/external_ref/_type", "PARTY_REF");
-                kvMap.put("/composer/external_ref/namespace", "hcp");
-                kvMap.put("/composer/external_ref/type", "PERSON");
-                kvMap.put("/composer/external_ref/id/_type", "GENERIC_ID");
-                kvMap.put("/composer/external_ref/id/value", composerId.getKey().toString());
-                kvMap.put("/composer/external_ref/id/scheme", "id_scheme");
-                kvMap.put("/composer/name", composerId.getValue());
+        try {
+            if (row.getNum() == 0 && data != null) {
+                // Composer
+                data.put(pathToEncodedPathMap.get("/composer/_type"), "PARTY_IDENTIFIED");
+                data.put(pathToEncodedPathMap.get("/composer/external_ref/_type"), "PARTY_REF");
+                data.put(pathToEncodedPathMap.get("/composer/external_ref/namespace"), "hcp");
+                data.put(pathToEncodedPathMap.get("/composer/external_ref/type"), "PERSON");
+                data.put(pathToEncodedPathMap.get("/composer/external_ref/id/_type"), "GENERIC_ID");
+                data.put(
+                        pathToEncodedPathMap.get("/composer/external_ref/id/value"),
+                        composerId.getKey().toString());
+                data.put(pathToEncodedPathMap.get("/composer/external_ref/id/scheme"), "id_scheme");
+                data.put(pathToEncodedPathMap.get("/composer/name"), composerId.getValue());
                 // Facility
-                kvMap.put("/context/health_care_facility/_type", "PARTY_IDENTIFIED");
-                kvMap.put("/context/health_care_facility/external_ref/_type", "PARTY_REF");
-                kvMap.put("/context/health_care_facility/external_ref/namespace", "facilities");
-                kvMap.put("/context/health_care_facility/external_ref/type", "ORGANISATION");
-                kvMap.put("/context/health_care_facility/external_ref/id/_type", "GENERIC_ID");
-                kvMap.put(
-                        "/context/health_care_facility/external_ref/id/value",
+                data.put(pathToEncodedPathMap.get("/context/health_care_facility/_type"), "PARTY_IDENTIFIED");
+                data.put(pathToEncodedPathMap.get("/context/health_care_facility/external_ref/_type"), "PARTY_REF");
+                data.put(
+                        pathToEncodedPathMap.get("/context/health_care_facility/external_ref/namespace"), "facilities");
+                data.put(pathToEncodedPathMap.get("/context/health_care_facility/external_ref/type"), "ORGANISATION");
+                data.put(pathToEncodedPathMap.get("/context/health_care_facility/external_ref/id/_type"), "GENERIC_ID");
+                data.put(
+                        pathToEncodedPathMap.get("/context/health_care_facility/external_ref/id/value"),
                         facility.getKey().toString());
-                kvMap.put("/context/health_care_facility/external_ref/id/scheme", "id_scheme");
-                kvMap.put("/context/health_care_facility/name", facility.getValue());
+                data.put(pathToEncodedPathMap.get("/context/health_care_facility/external_ref/id/scheme"), "id_scheme");
+                data.put(pathToEncodedPathMap.get("/context/health_care_facility/name"), facility.getValue());
 
-                entry2Record.setFields(JSONB.jsonb(om.writeValueAsString(kvMap)));
-            } catch (JsonProcessingException e) {
-                throw new UncheckedIOException(e);
+                entry2Record.setFields(JSONB.jsonb(om.writeValueAsString(data)));
+            } else if (data != null && !data.isEmpty()) {
+                entry2Record.setFields(JSONB.jsonb(om.writeValueAsString(data)));
+            } else {
+                // This might not be needed, but is here for better readability
+                entry2Record.setFields(null);
             }
-        } else {
-            entry2Record.setFields(JSONB.jsonbOrNull(rowWithData.getRight()));
+        } catch (JsonProcessingException e) {
+            throw new UncheckedIOException(e);
         }
 
         return entry2Record;

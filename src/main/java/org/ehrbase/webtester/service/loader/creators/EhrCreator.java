@@ -50,13 +50,13 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
         private final List<Pair<UUID, String>> facilities;
         private final int compositionCount;
         private final Map<UUID, List<Pair<UUID, String>>> facilityIdToHcpId;
-        private final Set<CompositionCreationInfo.CompositionDataMode> modes;
+        private final Set<CompositionDataMode> modes;
 
         public EhrCreationInfo(
                 List<Pair<UUID, String>> facilities,
                 int compositionCount,
                 Map<UUID, List<Pair<UUID, String>>> facilityIdToHcpId,
-                Set<CompositionCreationInfo.CompositionDataMode> modes) {
+                Set<CompositionDataMode> modes) {
             this.facilities = facilities;
             this.compositionCount = compositionCount;
             this.facilityIdToHcpId = facilityIdToHcpId;
@@ -75,7 +75,7 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
             return facilityIdToHcpId;
         }
 
-        public Set<CompositionCreationInfo.CompositionDataMode> getModes() {
+        public Set<CompositionDataMode> getModes() {
             return modes;
         }
     }
@@ -91,11 +91,13 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
             UUID committerId,
             Map<String, Integer> territories,
             List<CachedComposition> singleCompositions,
-            List<List<CachedComposition>> repeatableCompositions) {
+            List<List<CachedComposition>> repeatableCompositions,
+            Map<String, String> pathToEncodedPathMap) {
         super(dsl, zoneId, systemId, committerId, territories);
         this.singleCompositions = singleCompositions;
         this.repeatableCompositions = repeatableCompositions;
-        compositionCreator = new CompositionCreator(dsl, zoneId, systemId, committerId, territories);
+        compositionCreator =
+                new CompositionCreator(dsl, zoneId, systemId, committerId, territories, pathToEncodedPathMap);
     }
 
     @Override

@@ -38,10 +38,16 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
     private final MatrixCompositionCreator matrixCompositionCreator;
 
     CompositionCreator(
-            DSLContext dsl, String zoneId, UUID systemId, UUID committerId, Map<String, Integer> territories) {
+            DSLContext dsl,
+            String zoneId,
+            UUID systemId,
+            UUID committerId,
+            Map<String, Integer> territories,
+            Map<String, String> pathToEncodedPathMap) {
         super(dsl, zoneId, systemId, committerId, territories);
         this.legacyCompositionCreator = new LegacyCompositionCreator(dsl, zoneId, systemId, committerId, territories);
-        this.matrixCompositionCreator = new MatrixCompositionCreator(dsl, zoneId, systemId, committerId, territories);
+        this.matrixCompositionCreator =
+                new MatrixCompositionCreator(dsl, zoneId, systemId, committerId, territories, pathToEncodedPathMap);
     }
 
     @Override
@@ -67,7 +73,7 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
                 info.getEhrId(), createDescriptor.getCompositionAudit().getId(), ContributionDataType.composition));
         UUID compositionId = UUID.randomUUID();
 
-        if (info.getModes().contains(CompositionCreationInfo.CompositionDataMode.LEGACY)) {
+        if (info.getModes().contains(CompositionDataMode.LEGACY)) {
             LegacyCompositionCreator.LegacyCompositionData legacyCompositionData =
                     legacyCompositionCreator.create(new LegacyCompositionCreator.LegacyCompositionCreationInfo(
                             info.getEhrId(),
@@ -85,7 +91,7 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
             createDescriptor.setParticipations(legacyCompositionData.getParticipations());
         }
 
-        if (info.getModes().contains(CompositionCreationInfo.CompositionDataMode.LEGACY)) {
+        if (info.getModes().contains(CompositionDataMode.LEGACY)) {
             MatrixCompositionCreator.MatrixCompositionData matrixCompositionData =
                     matrixCompositionCreator.create(new MatrixCompositionCreator.MatrixCompositionCreationInfo(
                             info.getEhrId(),

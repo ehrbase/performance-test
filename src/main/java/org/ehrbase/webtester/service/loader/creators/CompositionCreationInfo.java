@@ -28,11 +28,6 @@ import org.ehrbase.webtester.service.loader.LoaderException;
 
 public class CompositionCreationInfo {
 
-    public enum CompositionDataMode {
-        LEGACY,
-        MATRIX;
-    }
-
     private final UUID ehrId;
     private final Pair<UUID, String> facility;
     private final List<Pair<UUID, String>> availableHcpIds;
