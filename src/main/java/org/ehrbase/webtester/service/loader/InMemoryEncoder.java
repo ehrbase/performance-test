@@ -65,7 +65,7 @@ public class InMemoryEncoder implements Encoder {
                         codeToPathCache.keySet().stream()
                                 .max(Long::compareTo)
                                 .map(l -> l + 1)
-                                .orElse(0L),
+                                .orElse(1L),
                         l -> l + 1)
                 .iterator();
         // We initialize the paths we will need for setting facility/composer data

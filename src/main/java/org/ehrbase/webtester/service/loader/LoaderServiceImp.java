@@ -267,27 +267,32 @@ public class LoaderServiceImp implements LoaderService {
         // Initialize everything that does not require DB inserts,
         // because inserts with indexes present are likely to fail with non-transactional writes
         initializeTemplates();
-        Map<String, Long> encodings = transactionalWritesDsl
+        Map<String, Long> existingEncodings = transactionalWritesDsl
                 .select()
                 .from(Encoding.ENCODING)
                 .fetchMap(Encoding.ENCODING.PATH, Encoding.ENCODING.CODE);
-        encoder = new InMemoryEncoder(encodings);
+        encoder = new InMemoryEncoder(existingEncodings);
         initializeCompositions();
-        bulkInsert(
-                Encoding.ENCODING,
-                encoder.getCodeToPathMap().entrySet().stream().map(e -> {
+        List<EncodingRecord> encodingsToInsert = encoder.getPathToCodeMap()
+                .entrySet()
+                .stream()
+                .filter(e -> !existingEncodings.containsKey(e.getKey()))
+                .map(e -> {
                     EncodingRecord record = nonTransactionalWritesDsl.newRecord(Encoding.ENCODING);
-                    record.setCode(e.getKey());
-                    record.setPath(e.getValue());
+                    record.setCode(e.getValue());
+                    record.setPath(e.getKey());
                     return record;
-                }),
-                20000);
-        Long currentCode = encoder.getCodeToPathMap().keySet().stream()
-                .max(Long::compareTo)
-                .map(l -> l + 1)
-                .orElse(0L);
-        // We need to set the current sequence value to max(codes) + 1 to avoid conflicts
-        runStatementWithTransactionalWrites("ALTER SEQUENCE encoding_code_seq` RESTART WITH " + currentCode + ";");
+                })
+                .collect(Collectors.toList());
+        if(!encodingsToInsert.isEmpty()) {
+            bulkInsert(Encoding.ENCODING,encodingsToInsert.stream(),20000);
+            Long currentCode = encoder.getCodeToPathMap().keySet().stream()
+                    .max(Long::compareTo)
+                    .map(l -> l + 1)
+                    .orElse(1L);
+            // We need to set the current sequence value to max(codes) + 1 to avoid conflicts
+            runStatementWithTransactionalWrites("ALTER SEQUENCE ehr.encoding_code_seq RESTART WITH " + currentCode + ";");
+        }
         ehrCreator = new EhrCreator(
                 nonTransactionalWritesDsl,
                 ZoneId.systemDefault().toString(),
