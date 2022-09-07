@@ -738,7 +738,8 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
     }
 
-    private Pair<Integer, Double> copyBatchIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) throws SQLException {
+    private Pair<Integer, Double> copyBatchIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData)
+            throws SQLException {
         try (Connection c = primaryDataSource.getConnection()) {
             StopWatch sw = new StopWatch();
             sw.start();
@@ -765,7 +766,7 @@ public class LoaderServiceImp implements LoaderService {
                         compositionNumber, compositionNumber, JSONB_INSERT_BATCH_SIZE, jsonbData.data());
                 int i = s.executeUpdate(statement);
                 sw.stop();
-                return Pair.of(i,sw.getTotalTimeSeconds());
+                return Pair.of(i, sw.getTotalTimeSeconds());
             } catch (SQLException e) {
                 sw.stop();
                 // Some errors may result in a broken DB session therefore we evict the connection from the pool
