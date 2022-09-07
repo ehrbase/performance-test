@@ -4,7 +4,7 @@ spring:
     driver-class-name: com.yugabyte.Driver
     hikari:
       connectionTimeout: 600000
-      maximum-pool-size: 65
+      maximum-pool-size: 40
       connection-init-sql: 'SET yb_disable_transactional_writes=true;SET yb_enable_upsert_mode=true;'
     hikarisecond:
       maximum-pool-size: 2
