@@ -20,6 +20,7 @@ package org.ehrbase.webtester.service.loader.creators;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,7 @@ public class MatrixCompositionCreator
     private final Map<String, String> pathToEncodedPathMap;
 
     public static class MatrixCompositionData {
-        private List<Entry2Record> matrixRecords;
+        private List<Entry2Record> matrixRecords = new ArrayList<>();
 
         public List<Entry2Record> getMatrixRecords() {
             return matrixRecords;
@@ -123,6 +124,7 @@ public class MatrixCompositionCreator
         final PrimitiveIterator.OfInt numIterator =
                 IntStream.iterate(0, i -> i + 1).iterator();
         records.forEach(r -> r.setNum(numIterator.nextInt()));
+        createDescriptor.getMatrixRecords().addAll(records);
 
         return createDescriptor;
     }

@@ -19,12 +19,17 @@ package org.ehrbase.webtester.service.loader.creators;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.ehrbase.jooq.pg.tables.records.*;
+import org.ehrbase.jooq.pg.tables.records.AuditDetailsRecord;
+import org.ehrbase.jooq.pg.tables.records.CompositionRecord;
+import org.ehrbase.jooq.pg.tables.records.ContributionRecord;
+import org.ehrbase.jooq.pg.tables.records.EntryRecord;
+import org.ehrbase.jooq.pg.tables.records.EventContextRecord;
+import org.ehrbase.jooq.pg.tables.records.ParticipationRecord;
 import org.ehrbase.webtester.service.loader.jooq.Entry2Record;
 
 public class CompositionCreateDescriptor {
 
-    private List<Entry2Record> matrixRecords;
+    private List<Entry2Record> matrixRecords = new ArrayList<>();
     private CompositionRecord composition;
     private AuditDetailsRecord compositionAudit;
     private EntryRecord entry;

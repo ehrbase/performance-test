@@ -91,7 +91,7 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
             createDescriptor.setParticipations(legacyCompositionData.getParticipations());
         }
 
-        if (info.getModes().contains(CompositionDataMode.LEGACY)) {
+        if (info.getModes().contains(CompositionDataMode.MATRIX)) {
             MatrixCompositionCreator.MatrixCompositionData matrixCompositionData =
                     matrixCompositionCreator.create(new MatrixCompositionCreator.MatrixCompositionCreationInfo(
                             info.getEhrId(),
@@ -99,7 +99,7 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
                             compositionId,
                             info.getFacility(),
                             info.getSelectedComposition()));
-            createDescriptor.setMatrixRecords(matrixCompositionData.getMatrixRecords());
+            createDescriptor.getMatrixRecords().addAll(matrixCompositionData.getMatrixRecords());
         }
 
         return createDescriptor;

@@ -122,7 +122,6 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
 
         // Compositions
         List<CompositionCreateDescriptor> compositionDescriptors = IntStream.range(0, info.getCompositionCount())
-                .parallel()
                 .mapToObj(i -> compositionCreator.create(new CompositionCreationInfo(
                         ehrId,
                         info.getFacilities().get(i % info.getFacilities().size()),
@@ -134,35 +133,45 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
                         info.modes,
                         i)))
                 .collect(Collectors.toList());
-        ehrDescriptor.setCompositions(compositionDescriptors.stream()
-                .map(CompositionCreateDescriptor::getComposition)
-                .collect(Collectors.toList()));
-        ehrDescriptor.setParticipations(compositionDescriptors.stream()
-                .flatMap(d -> d.getParticipations().stream())
-                .collect(Collectors.toList()));
+        if(info.getModes().contains(CompositionDataMode.LEGACY)){
+            ehrDescriptor.setCompositions(compositionDescriptors.stream()
+                    .map(CompositionCreateDescriptor::getComposition)
+                    .collect(Collectors.toList()));
+            ehrDescriptor.setParticipations(compositionDescriptors.stream()
+                    .flatMap(d -> d.getParticipations().stream())
+                    .collect(Collectors.toList()));
+            ehrDescriptor.setEventContexts(compositionDescriptors.stream()
+                    .map(CompositionCreateDescriptor::getEventContext)
+                    .collect(Collectors.toList()));
+            ehrDescriptor.setEntries(compositionDescriptors.stream()
+                    .map(CompositionCreateDescriptor::getEntry)
+                    .collect(Collectors.toList()));
+
+            ehrDescriptor.setCompositionIdToVersionCount(compositionDescriptors.stream()
+                    .filter(c -> c.getVersions() > 1)
+                    .collect(Collectors.toMap(c -> c.getComposition().getId(), CompositionCreateDescriptor::getVersions)));
+            ehrDescriptor.setEventCtxIdToVersionCount(compositionDescriptors.stream()
+                    .filter(c -> c.getVersions() > 1)
+                    .collect(Collectors.toMap(c -> c.getEventContext().getId(), CompositionCreateDescriptor::getVersions)));
+        }
+        if(info.getModes().contains(CompositionDataMode.MATRIX)) {
+            ehrDescriptor
+                    .getMatrixRecords()
+                    .addAll(compositionDescriptors.stream()
+                            .map(CompositionCreateDescriptor::getMatrixRecords)
+                            .flatMap(List::stream)
+                            .collect(Collectors.toList()));
+        }
         ehrDescriptor
                 .getAuditDetails()
                 .addAll(compositionDescriptors.stream()
                         .flatMap(d -> Stream.of(d.getCompositionAudit(), d.getContributionAudit()))
                         .collect(Collectors.toList()));
-        ehrDescriptor.setEventContexts(compositionDescriptors.stream()
-                .map(CompositionCreateDescriptor::getEventContext)
-                .collect(Collectors.toList()));
-        ehrDescriptor.setEntries(compositionDescriptors.stream()
-                .map(CompositionCreateDescriptor::getEntry)
-                .collect(Collectors.toList()));
         ehrDescriptor
                 .getContributions()
                 .addAll(compositionDescriptors.stream()
                         .map(CompositionCreateDescriptor::getContribution)
                         .collect(Collectors.toList()));
-
-        ehrDescriptor.setCompositionIdToVersionCount(compositionDescriptors.stream()
-                .filter(c -> c.getVersions() > 1)
-                .collect(Collectors.toMap(c -> c.getComposition().getId(), CompositionCreateDescriptor::getVersions)));
-        ehrDescriptor.setEventCtxIdToVersionCount(compositionDescriptors.stream()
-                .filter(c -> c.getVersions() > 1)
-                .collect(Collectors.toMap(c -> c.getEventContext().getId(), CompositionCreateDescriptor::getVersions)));
 
         return ehrDescriptor;
     }

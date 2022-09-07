@@ -273,9 +273,7 @@ public class LoaderServiceImp implements LoaderService {
                 .fetchMap(Encoding.ENCODING.PATH, Encoding.ENCODING.CODE);
         encoder = new InMemoryEncoder(existingEncodings);
         initializeCompositions();
-        List<EncodingRecord> encodingsToInsert = encoder.getPathToCodeMap()
-                .entrySet()
-                .stream()
+        List<EncodingRecord> encodingsToInsert = encoder.getPathToCodeMap().entrySet().stream()
                 .filter(e -> !existingEncodings.containsKey(e.getKey()))
                 .map(e -> {
                     EncodingRecord record = nonTransactionalWritesDsl.newRecord(Encoding.ENCODING);
@@ -284,14 +282,15 @@ public class LoaderServiceImp implements LoaderService {
                     return record;
                 })
                 .collect(Collectors.toList());
-        if(!encodingsToInsert.isEmpty()) {
-            bulkInsert(Encoding.ENCODING,encodingsToInsert.stream(),20000);
+        if (!encodingsToInsert.isEmpty()) {
+            bulkInsert(Encoding.ENCODING, encodingsToInsert.stream(), 20000);
             Long currentCode = encoder.getCodeToPathMap().keySet().stream()
                     .max(Long::compareTo)
                     .map(l -> l + 1)
                     .orElse(1L);
             // We need to set the current sequence value to max(codes) + 1 to avoid conflicts
-            runStatementWithTransactionalWrites("ALTER SEQUENCE ehr.encoding_code_seq RESTART WITH " + currentCode + ";");
+            runStatementWithTransactionalWrites(
+                    "ALTER SEQUENCE ehr.encoding_code_seq RESTART WITH " + currentCode + ";");
         }
         ehrCreator = new EhrCreator(
                 nonTransactionalWritesDsl,
@@ -972,7 +971,7 @@ public class LoaderServiceImp implements LoaderService {
                     ehrDescriptors.stream()
                             .map(EhrCreateDescriptor::getMatrixRecords)
                             .flatMap(List::stream),
-                    properties.getBulkSize())));
+                    properties.getBulkSize()*4)));
         }
         if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
             tasks.add(CompletableFuture.runAsync(() -> bulkInsert(
