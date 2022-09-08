@@ -436,7 +436,7 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private Pair<Row, Map<String, String>> toRowDataPair(Row r) {
+    private Pair<Row, Map<String, Object>> toRowDataPair(Row r) {
         try {
             return Pair.of(
                     r,
@@ -1031,15 +1031,13 @@ public class LoaderServiceImp implements LoaderService {
         for (long i = 0; i < loops; i++) {
             sw.start("batch" + i);
             try {
-                Pair<Integer, Double> insertCountWithTime;
-                insertCountWithTime = copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
+                int insertCountWithTime = copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
                 sw.stop();
                 log.info(
-                        "Copy comp {} batch: {}, count: {}, execution-time: {}s, total-time: {}ms",
+                        "Copy comp {} batch: {}, count: {}, total-time: {}ms",
                         compositionNumber,
                         i - errorCount,
-                        insertCountWithTime.getLeft(),
-                        insertCountWithTime.getRight(),
+                        insertCountWithTime,
                         sw.getLastTaskTimeMillis());
             } catch (SQLException e) {
                 sw.stop();
@@ -1060,11 +1058,9 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
     }
 
-    private Pair<Integer, Double> copyBatchIntoEntryTableWithJsonb(int compositionNumber, String jsonbData)
+    private int copyBatchIntoEntryTableWithJsonb(int compositionNumber, String jsonbData)
             throws SQLException {
         try (Connection c = nonTransactionalWritesDataSource.getConnection()) {
-            StopWatch sw = new StopWatch();
-            sw.start();
             try (Statement s = c.createStatement()) {
                 s.setQueryTimeout(0);
                 String statement = String.format(
@@ -1086,11 +1082,8 @@ public class LoaderServiceImp implements LoaderService {
                                 + "  \"name\""
                                 + "FROM del;",
                         compositionNumber, compositionNumber, JSONB_INSERT_BATCH_SIZE, jsonbData);
-                int i = s.executeUpdate(statement);
-                sw.stop();
-                return Pair.of(i, sw.getTotalTimeSeconds());
+                return s.executeUpdate(statement);
             } catch (SQLException e) {
-                sw.stop();
                 // Some errors may result in a broken DB session therefore we evict the connection from the pool
                 nonTransactionalWritesDataSource.evictConnection(c);
                 throw e;

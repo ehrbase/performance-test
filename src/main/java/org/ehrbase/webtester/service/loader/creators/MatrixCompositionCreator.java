@@ -135,7 +135,7 @@ public class MatrixCompositionCreator
             UUID ehrId,
             Pair<UUID, String> facility,
             Row row,
-            Map<String, String> data) {
+            Map<String, Object> data) {
         Entry2Record entry2Record = getDsl().newRecord(Entry2.ENTRY2);
         entry2Record.setCompId(compositionId);
         entry2Record.setEhrId(ehrId);

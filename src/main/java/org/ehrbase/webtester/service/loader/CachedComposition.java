@@ -28,13 +28,13 @@ public class CachedComposition {
     private final int idx;
     private final Composition composition;
     private final String entryJsonb;
-    private final List<Pair<Row, Map<String, String>>> matrixFormatData;
+    private final List<Pair<Row, Map<String, Object>>> matrixFormatData;
 
     public CachedComposition(
             int idx,
             Composition composition,
             String entryJsonb,
-            List<Pair<Row, Map<String, String>>> matrixFormatData) {
+            List<Pair<Row, Map<String, Object>>> matrixFormatData) {
         this.idx = idx;
         this.composition = composition;
         this.entryJsonb = entryJsonb;
@@ -53,7 +53,7 @@ public class CachedComposition {
         return entryJsonb;
     }
 
-    public List<Pair<Row, Map<String, String>>> getMatrixFormatData() {
+    public List<Pair<Row, Map<String, Object>>> getMatrixFormatData() {
         return matrixFormatData;
     }
 }
