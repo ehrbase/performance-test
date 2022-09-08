@@ -21,7 +21,11 @@ import com.zaxxer.hikari.HikariDataSource;
 import javax.sql.DataSource;
 import org.jooq.ExecuteContext;
 import org.jooq.SQLDialect;
-import org.jooq.impl.*;
+import org.jooq.impl.DataSourceConnectionProvider;
+import org.jooq.impl.DefaultConfiguration;
+import org.jooq.impl.DefaultDSLContext;
+import org.jooq.impl.DefaultExecuteListener;
+import org.jooq.impl.DefaultExecuteListenerProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -69,6 +73,7 @@ public class PersistenceConfig {
 
     // ------------------- Primary DataSource and DSL (Non-transactional-writes)-------------------
 
+    @Primary
     @Bean("nonTransactionalWritesDataSource")
     @ConfigurationProperties(prefix = "spring.datasource.hikari")
     HikariDataSource nonTransactionalWritesDataSource(DataSourceProperties properties) {
@@ -113,7 +118,7 @@ public class PersistenceConfig {
         return new DefaultDSLContext(cfg);
     }
 
-    // ------------------- Secondary DataSource and DSL (transactional-writes)-------------------
+    // ------------------- Secondary DataSource (transactional-writes)-------------------
 
     @Bean("transactionalWritesDataSource")
     @ConfigurationProperties(prefix = "spring.datasource.hikarisecond")
@@ -123,35 +128,5 @@ public class PersistenceConfig {
         dataSource.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
 
         return dataSource;
-    }
-
-    @Bean
-    public DataSourceTransactionManager transactionalWritesTransactionManager(
-            @Qualifier("transactionalWritesDataSource") DataSource dataSource) {
-        return new DataSourceTransactionManager(dataSource);
-    }
-
-    @Bean
-    public DataSourceConnectionProvider transactionalWritesConnectionProvider(
-            @Qualifier("transactionalWritesDataSource") DataSource dataSource) {
-        return new DataSourceConnectionProvider(transactionAwareDataSource(dataSource));
-    }
-
-    @Bean
-    public DefaultDSLContext transactionalWritesDsl(
-            @Qualifier("transactionalWritesConfiguration") DefaultConfiguration cfg) {
-        return new DefaultDSLContext(cfg);
-    }
-
-    @Bean
-    public DefaultConfiguration transactionalWritesConfiguration(
-            @Qualifier("transactionalWritesConnectionProvider") DataSourceConnectionProvider dataSource) {
-        DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
-        jooqConfiguration.set(dataSource);
-        jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));
-        //        jooqConfiguration.set(new PerformanceListener());
-        SQLDialect dialect = SQLDialect.valueOf(sqlDialect);
-        jooqConfiguration.set(dialect);
-        return jooqConfiguration;
     }
 }

@@ -237,7 +237,6 @@ public class LoaderServiceImp implements LoaderService {
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
     private final DSLContext nonTransactionalWritesDsl;
-    private final DSLContext transactionalWritesDsl;
     private final HikariDataSource nonTransactionalWritesDataSource;
     private final HikariDataSource transactionalWritesDataSource;
     private final ResourceLoader resourceLoader;
@@ -248,12 +247,10 @@ public class LoaderServiceImp implements LoaderService {
 
     public LoaderServiceImp(
             @Qualifier("nonTransactionalWritesDsl") DSLContext nonTransactionalWritesDsl,
-            @Qualifier("transactionalWritesDsl") DSLContext transactionalWritesDsl,
             ResourceLoader resourceLoader,
             @Qualifier("nonTransactionalWritesDataSource") HikariDataSource nonTransactionalWritesDataSource,
             @Qualifier("transactionalWritesDataSource") HikariDataSource transactionalWritesDataSource) {
         this.nonTransactionalWritesDsl = nonTransactionalWritesDsl;
-        this.transactionalWritesDsl = transactionalWritesDsl;
         this.transactionalWritesDataSource = transactionalWritesDataSource;
         this.nonTransactionalWritesDataSource = nonTransactionalWritesDataSource;
         this.resourceLoader = resourceLoader;
@@ -267,7 +264,7 @@ public class LoaderServiceImp implements LoaderService {
         // Initialize everything that does not require DB inserts,
         // because inserts with indexes present are likely to fail with non-transactional writes
         initializeTemplates();
-        Map<String, Long> existingEncodings = transactionalWritesDsl
+        Map<String, Long> existingEncodings = nonTransactionalWritesDsl
                 .select()
                 .from(Encoding.ENCODING)
                 .fetchMap(Encoding.ENCODING.PATH, Encoding.ENCODING.CODE);
@@ -314,17 +311,17 @@ public class LoaderServiceImp implements LoaderService {
     private void ensureLoaderStatusTableAndRecord() {
 
         // create the table if necessary
-        transactionalWritesDsl
+        nonTransactionalWritesDsl
                 .createTableIfNotExists(LoaderState.LOADER_STATE)
                 .columns(LoaderState.LOADER_STATE.fields())
                 .primaryKey(LoaderState.LOADER_STATE.ID)
                 .unique(LoaderState.LOADER_STATE.KEY)
                 .execute();
         // create or load current execution progress
-        currentStateRecord = transactionalWritesDsl
+        currentStateRecord = nonTransactionalWritesDsl
                 .fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq("execution_state"))
                 .orElseGet(() -> {
-                    LoaderStateRecord stateRecord = transactionalWritesDsl.newRecord(LoaderState.LOADER_STATE);
+                    LoaderStateRecord stateRecord = nonTransactionalWritesDsl.newRecord(LoaderState.LOADER_STATE);
                     stateRecord.setId(UUID.randomUUID());
                     stateRecord.setKey("execution_state");
                     stateRecord.setValue(LoaderPhase.NOT_RUN.name());
@@ -463,7 +460,7 @@ public class LoaderServiceImp implements LoaderService {
                     "EHR count must be greater or equal to the number of healthcareFacilities and greater than 0");
         }
 
-        Optional<LoaderStateRecord> propertiesFromDB = transactionalWritesDsl.fetchOptional(
+        Optional<LoaderStateRecord> propertiesFromDB = nonTransactionalWritesDsl.fetchOptional(
                 LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq("settings"));
         final LoaderRequestDto settings;
         try {
@@ -479,7 +476,7 @@ public class LoaderServiceImp implements LoaderService {
                     propertiesFromDB.get().setValue(objectMapper.writeValueAsString(properties));
                     propertiesFromDB.get().update(LoaderState.LOADER_STATE.VALUE);
                 } else {
-                    LoaderStateRecord propertyRecord = transactionalWritesDsl.newRecord(LoaderState.LOADER_STATE);
+                    LoaderStateRecord propertyRecord = nonTransactionalWritesDsl.newRecord(LoaderState.LOADER_STATE);
                     propertyRecord.setId(UUID.randomUUID());
                     propertyRecord.setKey("settings");
                     propertyRecord.setValue(objectMapper.writeValueAsString(properties));
@@ -628,28 +625,28 @@ public class LoaderServiceImp implements LoaderService {
 
     private void truncateDataTables() {
         log.info("Removing previous data from DB to avoid corrupted EHRs/Compositions...");
-        transactionalWritesDsl.truncate(PARTY_IDENTIFIED).cascade().execute();
-        transactionalWritesDsl.truncate(AUDIT_DETAILS).cascade().execute();
-        transactionalWritesDsl.truncate(CONTRIBUTION).cascade().execute();
-        transactionalWritesDsl.truncate(COMPOSITION).cascade().execute();
-        transactionalWritesDsl.truncate(EVENT_CONTEXT).cascade().execute();
-        transactionalWritesDsl.truncate(ENTRY).cascade().execute();
-        transactionalWritesDsl.truncate(PARTICIPATION).cascade().execute();
-        transactionalWritesDsl.truncate(EHR_).cascade().execute();
-        transactionalWritesDsl.truncate(STATUS).cascade().execute();
+        nonTransactionalWritesDsl.truncate(PARTY_IDENTIFIED).cascade().execute();
+        nonTransactionalWritesDsl.truncate(AUDIT_DETAILS).cascade().execute();
+        nonTransactionalWritesDsl.truncate(CONTRIBUTION).cascade().execute();
+        nonTransactionalWritesDsl.truncate(COMPOSITION).cascade().execute();
+        nonTransactionalWritesDsl.truncate(EVENT_CONTEXT).cascade().execute();
+        nonTransactionalWritesDsl.truncate(ENTRY).cascade().execute();
+        nonTransactionalWritesDsl.truncate(PARTICIPATION).cascade().execute();
+        nonTransactionalWritesDsl.truncate(EHR_).cascade().execute();
+        nonTransactionalWritesDsl.truncate(STATUS).cascade().execute();
         getStateDataFromDB("tmp_tables", String.class)
                 .forEach(t -> runStatementWithTransactionalWrites(String.format("TRUNCATE TABLE ehr.%s CASCADE;", t)));
     }
 
     private void serializeAndStoreAsLoaderState(String key, Object toStore) {
-        Optional<LoaderStateRecord> indexesRecord = transactionalWritesDsl.fetchOptional(
+        Optional<LoaderStateRecord> indexesRecord = nonTransactionalWritesDsl.fetchOptional(
                 LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq(Objects.requireNonNull(key)));
         try {
             if (indexesRecord.isPresent()) {
                 indexesRecord.get().setValue(objectMapper.writeValueAsString(toStore));
                 indexesRecord.get().update(LoaderState.LOADER_STATE.VALUE);
             } else {
-                LoaderStateRecord newRecord = transactionalWritesDsl.newRecord(LoaderState.LOADER_STATE);
+                LoaderStateRecord newRecord = nonTransactionalWritesDsl.newRecord(LoaderState.LOADER_STATE);
                 newRecord.setId(UUID.randomUUID());
                 newRecord.setKey(key);
                 newRecord.setValue(objectMapper.writeValueAsString(toStore));
@@ -710,6 +707,14 @@ public class LoaderServiceImp implements LoaderService {
         stopWatch.stop();
         log.info("Disabled triggers in {}ms", stopWatch.getLastTaskTimeMillis());
         log.info("Completed pre load operations in {}s", stopWatch.getTotalTimeSeconds());
+
+        log.info("Waiting 60s for load balancing...");
+        try {
+            Thread.sleep(60000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
 
         loadPhase1(settings);
     }
@@ -891,7 +896,7 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private <R> List<R> getStateDataFromDB(String key, Class<R> objClass) {
-        String value = transactionalWritesDsl
+        String value = nonTransactionalWritesDsl
                 .fetchOptional(LoaderState.LOADER_STATE, LoaderState.LOADER_STATE.KEY.eq(Objects.requireNonNull(key)))
                 .map(LoaderStateRecord::getValue)
                 .orElseThrow();
@@ -1292,9 +1297,9 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private UUID getSystemId() {
-        var system = transactionalWritesDsl.fetchOne(SYSTEM);
+        var system = nonTransactionalWritesDsl.fetchOne(SYSTEM);
         if (system == null) {
-            system = transactionalWritesDsl.newRecord(SYSTEM);
+            system = nonTransactionalWritesDsl.newRecord(SYSTEM);
             system.setDescription("Default system");
             system.setSettings("local.ehrbase.org");
             system.store();
@@ -1303,11 +1308,11 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private UUID getCommitterId() {
-        var committerRecord = transactionalWritesDsl.fetchOne(
+        var committerRecord = nonTransactionalWritesDsl.fetchOne(
                 PARTY_IDENTIFIED, PARTY_IDENTIFIED.NAME.eq("EHRbase Internal Test Data Loader"));
 
         if (committerRecord == null) {
-            committerRecord = transactionalWritesDsl.newRecord(PARTY_IDENTIFIED);
+            committerRecord = nonTransactionalWritesDsl.newRecord(PARTY_IDENTIFIED);
             committerRecord.setName("EHRbase Internal Test Data Loader");
             committerRecord.setPartyRefValue(UUID.randomUUID().toString());
             committerRecord.setPartyRefScheme("DEMOGRAPHIC");
@@ -1317,13 +1322,13 @@ public class LoaderServiceImp implements LoaderService {
             committerRecord.setObjectIdType(PartyRefIdType.generic_id);
             committerRecord.store();
 
-            var identifierRecord = transactionalWritesDsl.newRecord(Identifier.IDENTIFIER);
+            var identifierRecord = nonTransactionalWritesDsl.newRecord(Identifier.IDENTIFIER);
             identifierRecord.setIdValue("Test Data Loader");
             identifierRecord.setIssuer("EHRbase");
             identifierRecord.setAssigner("EHRbase");
             identifierRecord.setTypeName("EHRbase Security Authentication User");
             identifierRecord.setParty(committerRecord.getId());
-            transactionalWritesDsl
+            nonTransactionalWritesDsl
                     .insertInto(Identifier.IDENTIFIER)
                     .set(identifierRecord)
                     .execute();
@@ -1333,7 +1338,7 @@ public class LoaderServiceImp implements LoaderService {
 
     private void createTemplate(String templateId, Resource file) throws IOException {
         var existingTemplateStore =
-                transactionalWritesDsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
+                nonTransactionalWritesDsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
         String tpl;
         try (InputStream in = file.getInputStream()) {
             tpl = IOUtils.toString(in, StandardCharsets.UTF_8);
@@ -1344,7 +1349,7 @@ public class LoaderServiceImp implements LoaderService {
         if (existingTemplateStore.isPresent()) {
             log.info("Template {} already exists", templateId);
         } else {
-            var templateStoreRecord = transactionalWritesDsl.newRecord(TEMPLATE_STORE);
+            var templateStoreRecord = nonTransactionalWritesDsl.newRecord(TEMPLATE_STORE);
             templateStoreRecord.setId(UUID.randomUUID());
             templateStoreRecord.setTemplateId(templateId);
             templateStoreRecord.setContent(tpl);
