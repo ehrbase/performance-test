@@ -69,8 +69,9 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
 
         CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
         createDescriptor.setCompositionAudit(createAuditDetails("Create COMPOSITION", sysTransaction));
+        createDescriptor.setContributionAudit(createAuditDetails("Create CONTRIBUTION", sysTransaction));
         createDescriptor.setContribution(createContribution(
-                info.getEhrId(), createDescriptor.getCompositionAudit().getId(), ContributionDataType.composition));
+                info.getEhrId(), createDescriptor.getContributionAudit().getId(), ContributionDataType.composition));
         UUID compositionId = UUID.randomUUID();
 
         if (info.getModes().contains(CompositionDataMode.LEGACY)) {
