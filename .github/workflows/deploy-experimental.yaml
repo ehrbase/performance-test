@@ -39,4 +39,4 @@ jobs:
         with:
           push: true
           tags: ehrbase/webtesteryugar:yugabyte-experimental
-
+          version: v0.7.0
