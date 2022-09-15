@@ -156,7 +156,7 @@
                 <artifactId>bom</artifactId>
                 <type>pom</type>
                 <scope>import</scope>
-                <version>0.21.0-SNAPSHOT</version>
+                <version>0.22.0-SNAPSHOT</version>
             </dependency>
 
         </dependencies>
@@ -165,6 +165,15 @@
     </dependencyManagement>
 
     <dependencies>
+
+        <dependency>
+            <groupId>org.ehrbase.openehr</groupId>
+            <artifactId>jooq-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.ehrbase.openehr.sdk</groupId>
+            <artifactId>serialisation</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
@@ -250,14 +259,6 @@
             <artifactId>testcontainers</artifactId>
             <version>1.17.1</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.ehrbase.openehr</groupId>
-            <artifactId>jooq-pg</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.ehrbase.openehr.sdk</groupId>
-            <artifactId>serialisation</artifactId>
         </dependency>
         <dependency>
             <groupId>com.intuit.karate</groupId>

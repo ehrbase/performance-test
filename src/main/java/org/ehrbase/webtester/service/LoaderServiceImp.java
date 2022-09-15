@@ -29,18 +29,11 @@ import static org.ehrbase.jooq.pg.tables.Status.STATUS;
 import static org.ehrbase.jooq.pg.tables.TemplateStore.TEMPLATE_STORE;
 import static org.ehrbase.jooq.pg.tables.Territory.TERRITORY;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nedap.archie.json.JacksonUtil;
-import com.nedap.archie.rm.composition.AdminEntry;
-import com.nedap.archie.rm.composition.CareEntry;
 import com.nedap.archie.rm.composition.Composition;
-import com.nedap.archie.rm.composition.EventContext;
-import com.nedap.archie.rm.composition.Section;
-import com.nedap.archie.rm.datatypes.CodePhrase;
-import com.nedap.archie.rm.datavalues.DvCodedText;
-import com.nedap.archie.rm.datavalues.DvText;
-import com.nedap.archie.rm.datavalues.TermMapping;
-import com.nedap.archie.rm.support.identification.TerminologyId;
 import com.zaxxer.hikari.HikariDataSource;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,12 +46,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.TemporalAccessor;
-import java.util.AbstractMap;
-import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -76,7 +64,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.BiFunction;
 import java.util.function.IntBinaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -88,40 +75,39 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
-import org.ehrbase.jooq.pg.enums.ContributionChangeType;
-import org.ehrbase.jooq.pg.enums.ContributionDataType;
-import org.ehrbase.jooq.pg.enums.ContributionState;
-import org.ehrbase.jooq.pg.enums.EntryType;
+import org.apache.xmlbeans.XmlException;
 import org.ehrbase.jooq.pg.enums.PartyRefIdType;
 import org.ehrbase.jooq.pg.enums.PartyType;
 import org.ehrbase.jooq.pg.tables.Ehr;
 import org.ehrbase.jooq.pg.tables.Identifier;
-import org.ehrbase.jooq.pg.tables.records.AuditDetailsRecord;
-import org.ehrbase.jooq.pg.tables.records.CompositionRecord;
-import org.ehrbase.jooq.pg.tables.records.ContributionRecord;
-import org.ehrbase.jooq.pg.tables.records.EhrRecord;
 import org.ehrbase.jooq.pg.tables.records.EntryRecord;
-import org.ehrbase.jooq.pg.tables.records.EventContextRecord;
-import org.ehrbase.jooq.pg.tables.records.ParticipationRecord;
 import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
-import org.ehrbase.jooq.pg.tables.records.StatusRecord;
-import org.ehrbase.jooq.pg.udt.records.CodePhraseRecord;
-import org.ehrbase.jooq.pg.udt.records.DvCodedTextRecord;
 import org.ehrbase.serialisation.dbencoding.RawJson;
+import org.ehrbase.serialisation.matrixencoding.MatrixFormat;
+import org.ehrbase.serialisation.matrixencoding.Row;
+import org.ehrbase.webtester.service.loader.CachedComposition;
+import org.ehrbase.webtester.service.loader.InMemoryEncoder;
+import org.ehrbase.webtester.service.loader.creators.CompositionDataMode;
+import org.ehrbase.webtester.service.loader.creators.DataCreator;
+import org.ehrbase.webtester.service.loader.creators.EhrCreateDescriptor;
+import org.ehrbase.webtester.service.loader.creators.EhrCreator;
+import org.ehrbase.webtester.service.loader.jooq.Encoding;
+import org.ehrbase.webtester.service.loader.jooq.EncodingRecord;
+import org.ehrbase.webtester.service.loader.jooq.Entry2;
+import org.ehrbase.webtester.service.loader.jooq.Entry2Record;
 import org.jooq.DSLContext;
-import org.jooq.JSONB;
 import org.jooq.LoaderError;
 import org.jooq.Record2;
 import org.jooq.Table;
-import org.jooq.TableField;
 import org.jooq.TableRecord;
 import org.jooq.impl.DSL;
+import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
+import org.openehr.schemas.v1.TemplateDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -131,7 +117,6 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.support.ResourcePatternUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
 import org.springframework.util.StopWatch;
 import org.springframework.web.server.ResponseStatusException;
 import org.w3c.dom.Document;
@@ -145,6 +130,65 @@ import org.xml.sax.SAXException;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class LoaderServiceImp implements LoaderService {
 
+    private static class Constraint {
+        private String schema;
+        private String table;
+        private String constraintName;
+        private String type;
+        private String definition;
+
+        private Constraint(){
+            //For Jackson
+        }
+
+        private Constraint(String schema, String table, String constraintName, String type, String definition) {
+            this.setSchema(schema);
+            this.setTable(table);
+            this.setConstraintName(constraintName);
+            this.setType(type);
+            this.setDefinition(definition);
+        }
+
+        public String getSchema() {
+            return schema;
+        }
+
+        public void setSchema(String schema) {
+            this.schema = schema;
+        }
+
+        public String getTable() {
+            return table;
+        }
+
+        public void setTable(String table) {
+            this.table = table;
+        }
+
+        public String getConstraintName() {
+            return constraintName;
+        }
+
+        public void setConstraintName(String constraintName) {
+            this.constraintName = constraintName;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public String getDefinition() {
+            return definition;
+        }
+
+        public void setDefinition(String definition) {
+            this.definition = definition;
+        }
+    }
     private static final String TEMPLATES_BASE = "classpath*:templates/**";
     private static final String COMPOSITIONS_REPEATABLE_PATH = "classpath*:compositions/repeatable/**";
     private static final String COMPOSITIONS_SINGLE_PATH = "classpath*:compositions/single/**";
@@ -156,19 +200,18 @@ public class LoaderServiceImp implements LoaderService {
     // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
     // otherwise
     private final ThreadLocal<Random> random = ThreadLocal.withInitial(SecureRandom::new);
-    private final List<Triple<Integer, Composition, JSONB>> singleCompositions = new ArrayList<>();
-    private final List<List<Triple<Integer, Composition, JSONB>>> compositionsWithSequenceByType = new ArrayList<>();
+    private final Map<String, OPERATIONALTEMPLATE> templates = new HashMap<>();
+    private final List<CachedComposition> singleCompositions = new ArrayList<>();
+    private final List<List<CachedComposition>> compositionsWithSequenceByType = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
     private final DSLContext dsl;
     private final HikariDataSource primaryDataSource;
     private final HikariDataSource secondaryDataSource;
     private final ResourceLoader resourceLoader;
-    private final Map<String, Integer> territories = new HashMap<>();
 
-    private UUID systemId;
-    private UUID committerId;
-    private String zoneId;
+    private InMemoryEncoder encoder;
+    private EhrCreator ehrCreator;
     private boolean isRunning = false;
 
     public LoaderServiceImp(
@@ -184,12 +227,49 @@ public class LoaderServiceImp implements LoaderService {
 
     @PostConstruct
     public void initialize() {
-        // Initialize everything that does not require DB inserts,
-        // because inserts with indexes present are likely to fail with non-transactional writes
-        zoneId = ZoneId.systemDefault().toString();
+        System.setProperty(
+                "javax.xml.parsers.DocumentBuilderFactory",
+                "com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl");
+        initializeTemplates();
+        Map<String, Long> existingEncodings = dsl
+                .select()
+                .from(Encoding.ENCODING)
+                .fetchMap(Encoding.ENCODING.PATH, Encoding.ENCODING.CODE);
+        encoder = new InMemoryEncoder(existingEncodings);
         initializeCompositions();
-        territories.putAll(dsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE).from(TERRITORY).fetch().stream()
-                .collect(Collectors.toMap(Record2::value1, Record2::value2)));
+        List<EncodingRecord> encodingsToInsert = encoder.getPathToCodeMap().entrySet().stream()
+                .filter(e -> !existingEncodings.containsKey(e.getKey()))
+                .map(e -> {
+                    EncodingRecord record = dsl.newRecord(Encoding.ENCODING);
+                    record.setCode(e.getValue());
+                    record.setPath(e.getKey());
+                    return record;
+                })
+                .collect(Collectors.toList());
+        if (!encodingsToInsert.isEmpty()) {
+            bulkInsert(Encoding.ENCODING, encodingsToInsert.stream(), 20000);
+            Long currentCode = encoder.getCodeToPathMap().keySet().stream()
+                    .max(Long::compareTo)
+                    .map(l -> l + 1)
+                    .orElse(1L);
+            // We need to set the current sequence value to max(codes) + 1 to avoid conflicts
+            runStatementWithTransactionalWrites(
+                    "ALTER SEQUENCE ehr.encoding_code_seq RESTART WITH " + currentCode + ";");
+        }
+        ehrCreator = new EhrCreator(
+                dsl,
+                ZoneId.systemDefault().toString(),
+                getSystemId(),
+                getCommitterId(),
+                dsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE).from(TERRITORY).fetch().stream()
+                        .collect(Collectors.toMap(Record2::value1, Record2::value2)),
+                singleCompositions,
+                compositionsWithSequenceByType,
+                encoder.getPathToCodeMap()
+                        .entrySet()
+                        .stream()
+                        .collect(Collectors.toUnmodifiableMap(
+                                Map.Entry::getKey, e -> "/" + e.getValue().toString())));
     }
 
     private Set<String> getTableNames() {
@@ -242,10 +322,13 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
+
     private void initializeCompositions() {
         try {
+            MatrixFormat matrixFormat =
+                    new MatrixFormat(templateId -> Optional.of(templateId).map(templates::get), encoder);
             final OfInt sequenceNumIterator = IntStream.iterate(0, i -> i + 1).iterator();
-            Map<Integer, List<Triple<Integer, Composition, JSONB>>> compByGroup = Arrays.stream(
+            Map<Integer, List<CachedComposition>> compByGroup = Arrays.stream(
                             ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
                                     .getResources(COMPOSITIONS_REPEATABLE_PATH))
                     // We need a sequential stream, so we get distinct sequence values
@@ -266,10 +349,13 @@ public class LoaderServiceImp implements LoaderService {
                     .collect(Collectors.groupingBy(
                             p -> Integer.parseInt(p.getLeft().substring(0, 2)),
                             Collectors.mapping(
-                                    p -> Triple.of(
+                                    p -> new CachedComposition(
                                             sequenceNumIterator.next(),
                                             p.getRight(),
-                                            JSONB.jsonb(rawJson.marshal(p.getRight()))),
+                                            rawJson.marshal(p.getRight()),
+                                            matrixFormat.toTable(p.getRight()).stream()
+                                                    .map(this::toRowDataPair)
+                                                    .collect(Collectors.toList())),
                                     Collectors.toList())));
 
             compByGroup.entrySet().stream()
@@ -289,16 +375,30 @@ public class LoaderServiceImp implements LoaderService {
                                         + " filename has to start with a 2 digit composition group number");
                             }
                             Composition composition = objectMapper.readValue(in, Composition.class);
-                            return Triple.of(
+                            return new CachedComposition(
                                     sequenceNumIterator.next(),
                                     composition,
-                                    JSONB.valueOf(rawJson.marshal(composition)));
+                                    rawJson.marshal(composition),
+                                    matrixFormat.toTable(composition).stream()
+                                            .map(this::toRowDataPair)
+                                            .collect(Collectors.toList()));
                         } catch (IOException e) {
                             throw new LoaderException("Failed to read composition file", e);
                         }
                     })
                     .forEach(singleCompositions::add);
         } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private Pair<Row, Map<String, Object>> toRowDataPair(Row r) {
+        try {
+            return Pair.of(
+                    r,
+                    objectMapper.readValue(
+                            MatrixFormat.MAPPER.writeValueAsString(r.getFields()), new TypeReference<>() {}));
+        } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }
     }
@@ -312,13 +412,17 @@ public class LoaderServiceImp implements LoaderService {
                     "A test data loading request is currently being processed. Please try again later...");
         }
 
+        if (properties.getHealthcareFacilities() < 1 || properties.getEhr() < properties.getHealthcareFacilities()) {
+            throw new IllegalArgumentException(
+                    "EHR count must be higher or equal to the number of healthcareFacilities and greater than 0");
+        }
+
         log.info(
-                "Test data loading options [EHRs: {}, Facilities: {}, Bulk insert size {}, EHRs per batch: {}, Create versions: {}]",
+                "Test data loading options [EHRs: {}, Facilities: {}, Bulk insert size {}, EHRs per batch: {}]",
                 properties.getEhr(),
                 properties.getHealthcareFacilities(),
                 properties.getBulkSize(),
-                properties.getEhrsPerBatch(),
-                properties.isInsertVersions());
+                properties.getEhrsPerBatch());
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
@@ -327,9 +431,12 @@ public class LoaderServiceImp implements LoaderService {
                 // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
                 List<Constraint> indexConstraints = findConstraints();
                 List<Triple<String, String, String>> indexes = findIndexes(
-                        indexConstraints.stream().map(c -> c.constraintName).collect(Collectors.toList()));
+                        indexConstraints.stream().map(Constraint::getConstraintName).collect(Collectors.toList()));
                 preLoadOperations(properties, indexes, indexConstraints, tableNames);
-                loadInternal(properties);
+                insertEhrData(properties);
+                if(properties.getModes().contains(CompositionDataMode.LEGACY)){
+                    copyToEntryWithJsonb();
+                }
                 postLoadOperations(indexes, indexConstraints, tableNames);
             } catch (RuntimeException e) {
                 isRunning = false;
@@ -387,22 +494,6 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private static class Constraint {
-        private String schema;
-        private String table;
-        private String constraintName;
-        private String type;
-        private String definition;
-
-        private Constraint(String schema, String table, String constraintName, String type, String definition) {
-            this.schema = schema;
-            this.table = table;
-            this.constraintName = constraintName;
-            this.type = type;
-            this.definition = definition;
-        }
-    }
-
     private List<Constraint> findConstraints() {
         try (Connection c = secondaryDataSource.getConnection();
                 Statement s = c.createStatement()) {
@@ -437,9 +528,9 @@ public class LoaderServiceImp implements LoaderService {
             Set<String> tableNames) {
         log.info("Dropping indexes (including unique constraints) on relevant tables: {}", tableNames);
         constraints.stream()
-                .filter(cs -> "u".equalsIgnoreCase(cs.type))
+                .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
                 .forEach(cs -> runStatementWithTransactionalWrites(String.format(
-                        "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", cs.schema, cs.table, cs.constraintName)));
+                        "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", cs.getSchema(), cs.getTable(), cs.getConstraintName())));
         indexes.forEach(indexInfo -> runStatementWithTransactionalWrites(
                 String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getLeft(), indexInfo.getMiddle())));
 
@@ -448,97 +539,21 @@ public class LoaderServiceImp implements LoaderService {
         // constraints
         tableNames.forEach(table -> runStatementWithTransactionalWrites(
                 String.format("ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
-
-        // We initialize the following stuff, because they might perform DB inserts.
-        // These will fail if indexes are present, because our connections are set for non-transactional writes
-        if (systemId == null) {
-            systemId = getSystemId();
-        }
-        if (committerId == null) {
-            committerId = getCommitterId();
-        }
-        initializeTemplates();
     }
 
-    private void postLoadOperations(
-            List<Triple<String, String, String>> indexes, List<Constraint> constraints, Set<String> tableNames) {
-        final List<String> failedStatements = new ArrayList<>();
-        // All streams are explicitly marked as sequential since parallel catalog updates may lead to conflicts
-        log.info("Re-enabling triggers...");
-        tableNames.stream()
-                .sequential()
-                .filter(t -> !StringUtils.startsWithIgnoreCase(t, "entry_"))
-                .map(table -> String.format(
-                        "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
-                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
-        log.info("Re-Creating indexes...");
-        indexes.stream()
-                .sequential()
-                .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
-                .map(Triple::getRight)
-                .map(s -> s + ";")
-                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
-        log.info("Re-Creating unique constraints...");
-        constraints.stream()
-                .sequential()
-                .filter(cs -> "u".equalsIgnoreCase(cs.type))
-                .map(cs -> String.format(
-                        "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
-                        cs.schema, cs.table, cs.constraintName, cs.definition))
-                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
-
-        log.info("Removing temporary entry tables...");
-        IntStream.range(0, compositionsWithSequenceByType.size())
-                .forEach(i -> runStatementWithTransactionalWrites(
-                        String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
-
-        log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
-                + "because it is a very long running operation. \n"
-                + "Please add it manually! Statement: \n"
-                + "CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
-        if (!failedStatements.isEmpty()) {
-            log.error(
-                    "The following post load SQL statements failed. Please run them manually: \n {}",
-                    String.join("\n", failedStatements));
-        }
-    }
-
-    private void runStatementWithTransactionalWrites(String createStatement) {
-        runStatementWithTransactionalWrites(createStatement, null);
-    }
-
-    private void runStatementWithTransactionalWrites(String createStatement, List<String> errors) {
-        try (Connection c = secondaryDataSource.getConnection();
-                Statement s = c.createStatement()) {
-            s.setQueryTimeout(0);
-            log.info(createStatement);
-            s.execute(createStatement);
-        } catch (SQLException e) {
-            log.error("Error while executing SQL statement", e);
-            if (errors != null) {
-                errors.add(createStatement);
-            } else {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    private void loadInternal(LoaderRequestDto properties) {
+    private void insertEhrData(LoaderRequestDto properties) {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start("prep");
 
-        if (properties.getHealthcareFacilities() < 1 || properties.getEhr() < properties.getHealthcareFacilities()) {
-            throw new IllegalArgumentException(
-                    "EHR count must be higher or equal to the number of healthcareFacilities and greater than 0");
-        }
-
         log.info("Preparing EHR distributions...");
         // Create healthcare facilities and the assigned HCPs in Table party_identified
-        Map<Integer, UUID> facilityNumberToUuid = IntStream.range(0, properties.getHealthcareFacilities())
+        Map<Integer, Pair<UUID, String>> facilityNumberToUuid = IntStream.range(0, properties.getHealthcareFacilities())
                 .parallel()
                 .mapToObj(this::insertHealthcareFacility)
                 .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-        Map<UUID, List<UUID>> facilityIdToHcpId =
+        Map<UUID, String> facilityIdToName =
+                facilityNumberToUuid.values().stream().collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+        Map<UUID, List<Pair<UUID, String>>> facilityIdToHcp =
                 insertHCPsForFacilities(facilityNumberToUuid, properties.getBulkSize());
 
         /* Determine how many facilities should be assigned to each EHR (normal dist. m: 7 sd: 3)
@@ -579,9 +594,14 @@ public class LoaderServiceImp implements LoaderService {
             }
             // Prepare data to insert while current insert task is running
             List<EhrCreateDescriptor> ehrDescriptors = getEhrSettingsBatch(
-                            facilityNumberToUuid, facilityCountToEhrCountDistribution, scaledEhrDistribution, batchSize)
+                    facilityNumberToUuid,
+                    facilityIdToName,
+                    facilityCountToEhrCountDistribution,
+                    scaledEhrDistribution,
+                    batchSize)
                     .stream()
-                    .map(ehrInfo -> buildEhrData(ehrInfo.getRight(), ehrInfo.getLeft(), facilityIdToHcpId))
+                    .map(ehrInfo -> ehrCreator.create(new EhrCreator.EhrCreationInfo(
+                            ehrInfo.getRight(), ehrInfo.getLeft(), facilityIdToHcp, properties.getModes())))
                     .collect(Collectors.toList());
 
             // Wait for the current insert batch to complete
@@ -592,7 +612,7 @@ public class LoaderServiceImp implements LoaderService {
             }
             stopWatch.start("insert-batch" + batch);
             // Insert the already prepared batch
-            currentInsertTask = insertEhrsAsync(ehrDescriptors, properties.getBulkSize());
+            currentInsertTask = insertEhrsAsync(ehrDescriptors, properties);
         }
 
         // wait for the last insert batch to complete
@@ -601,35 +621,207 @@ public class LoaderServiceImp implements LoaderService {
             stopWatch.stop();
         }
         log.info("Last Batch completed in {} ms", stopWatch.getLastTaskTimeMillis());
+        log.info("Test data without ehr.entry.entry contents loaded in {} s", stopWatch.getTotalTimeSeconds());}
+
+    private void copyToEntryWithJsonb(){
+        StopWatch stopWatch = new StopWatch();
         log.info("Copying to ehr.entry with JSONB data...");
-        stopWatch.start("jsonb");
-        waitForTaskToComplete(CompletableFuture.allOf(Stream.concat(
+        stopWatch.start("count");
+        List<Pair<CachedComposition, Long>> compositionsWithCount = Stream.concat(
                         singleCompositions.stream(),
                         compositionsWithSequenceByType.stream().flatMap(List::stream))
-                .map(ci -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(ci.getLeft(), ci.getRight())))
+                .parallel()
+                .map(c -> Pair.of(c, entryTableSize(c.getIdx())))
+                .collect(Collectors.toList());
+        stopWatch.stop();
+        log.info("Getting temporary entry table sizes took {}ms", stopWatch.getLastTaskTimeMillis());
+
+        stopWatch.start("move-entries");
+        waitForTaskToComplete(CompletableFuture.allOf(
+                compositionsWithCount.stream()
+                .map(ci -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(ci.getRight(), ci.getLeft().getIdx(), ci.getLeft().getEntryJsonb())))
                 .toArray(CompletableFuture[]::new)));
         stopWatch.stop();
-        log.info("JSONB data update completed in {} ms", stopWatch.getLastTaskTimeMillis());
-        log.info("Test data loaded in {} s", stopWatch.getTotalTimeSeconds());
+        log.info("Moved entry data and added JSONB in {}s", stopWatch.getTotalTimeSeconds());
     }
 
-    private Map<UUID, List<UUID>> insertHCPsForFacilities(Map<Integer, UUID> facilityNumberToUuid, int bulkSize) {
+    private void postLoadOperations(
+            List<Triple<String, String, String>> indexes, List<Constraint> constraints, Set<String> tableNames) {
+        final List<String> failedStatements = new ArrayList<>();
+        // All streams are explicitly marked as sequential since parallel catalog updates may lead to conflicts
+        log.info("Re-enabling triggers...");
+        tableNames.stream()
+                .sequential()
+                .filter(t -> !StringUtils.startsWithIgnoreCase(t, "entry_"))
+                .map(table -> String.format(
+                        "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
+                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        log.info("Re-Creating indexes...");
+        indexes.stream()
+                .sequential()
+                .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
+                .map(Triple::getRight)
+                .map(s -> s + ";")
+                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        log.info("Re-Creating unique constraints...");
+        constraints.stream()
+                .sequential()
+                .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
+                .map(cs -> String.format(
+                        "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
+                        cs.getSchema(), cs.getTable(), cs.getConstraintName(), cs.getDefinition()))
+                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+
+        log.info("Removing temporary entry tables...");
+        IntStream.range(0, compositionsWithSequenceByType.size())
+                .forEach(i -> runStatementWithTransactionalWrites(
+                        String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
+
+        log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
+                + "because it is a very long running operation. \n"
+                + "Please add it manually! Statement: \n"
+                + "CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
+        if (!failedStatements.isEmpty()) {
+            log.error(
+                    "The following post load SQL statements failed. Please run them manually: \n {}",
+                    String.join("\n", failedStatements));
+        }
+    }
+
+    private void copyIntoEntryTableWithJsonb(long tableSize, int compositionNumber, String jsonbData) {
+
+        if(tableSize < 1L){
+            //if our table is empty we do not need to run anything
+            log.info("Skipping composition {}, because the source table is empty", compositionNumber);
+            return;
+        }
+        //We add one additional iteration for the leftovers
+        long loops = (tableSize / JSONB_INSERT_BATCH_SIZE) + 1;
+        log.info("Comp {} count: {}, batches: {}", compositionNumber, tableSize, loops);
+        int errorCount = 0;
+
+        StopWatch sw = new StopWatch();
+        for (long i = 0; i < loops; i++) {
+            sw.start("batch" + i);
+            try {
+                Triple<Integer, Long, Long> insertResult = copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
+                sw.stop();
+                log.info(
+                        "Copy comp {} batch: {}, count: {}, connection time: {}ms, execution time: {}ms, total time: {}ms",
+                        compositionNumber,
+                        i - errorCount,
+                        insertResult.getLeft(),
+                        insertResult.getMiddle(),
+                        insertResult.getRight(),
+                        sw.getLastTaskTimeMillis());
+            } catch (SQLException e) {
+                sw.stop();
+                log.error(
+                        "Error while processing comp " + compositionNumber + " batch: " + i
+                                + ", time (ms) until error: " + sw.getLastTaskTimeMillis(),
+                        e);
+                errorCount++;
+                // We stop if errors keep piling up for the same composition since this indicates a non
+                // "memory-pressure" issue
+                if (errorCount > 1000) {
+                    throw new RuntimeException(
+                            "Aborting because error threshold was reached for composition " + compositionNumber);
+                }
+                loops++;
+            }
+        }
+        log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
+    }
+
+    private Triple<Integer, Long, Long> copyBatchIntoEntryTableWithJsonb(int compositionNumber, String jsonbData) throws SQLException {
+        StopWatch sw = new StopWatch();
+        sw.start("connection");
+        try (Connection c = primaryDataSource.getConnection()) {
+            sw.stop();
+            long connectionTime = sw.getLastTaskTimeMillis();
+            sw.start("execution");
+            try (Statement s = c.createStatement()) {
+                s.setQueryTimeout(0);
+                String statement = String.format(
+                        "/*+ Leading( (\"ANY_subquery\" a) ) NestLoop(\"ANY_subquery\" a) */"
+                                + "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
+                                + "INSERT INTO ehr.entry "
+                                + "  SELECT \"id\","
+                                + "  \"composition_id\","
+                                + "  0,"
+                                + "  \"item_type\","
+                                + "  \"template_id\","
+                                + "  \"template_uuid\","
+                                + "  \"archetype_id\","
+                                + "  \"category\","
+                                + "  '%s'::JSONB,"
+                                + "  \"sys_transaction\","
+                                + "  \"sys_period\","
+                                + "  \"rm_version\","
+                                + "  \"name\""
+                                + "FROM del;",
+                        compositionNumber, compositionNumber, JSONB_INSERT_BATCH_SIZE, jsonbData);
+                int insertCount = s.executeUpdate(statement);
+                sw.stop();
+                return Triple.of(insertCount, connectionTime, sw.getLastTaskTimeMillis());
+            } catch (SQLException e) {
+                // Some errors may result in a broken DB session therefore we evict the connection from the pool
+                primaryDataSource.evictConnection(c);
+                throw e;
+            }
+        }
+    }
+
+    private long entryTableSize(int compositionNumber) {
+        return dsl.select(
+                        DSL.aggregate("count", Long.class, ENTRY.rename(ENTRY.getName() + "_" + compositionNumber).ID))
+                .from(ENTRY.rename(ENTRY.getName() + "_" + compositionNumber))
+                .fetchOptional(0, Long.class)
+                .orElse(0L);
+    }
+
+    private void runStatementWithTransactionalWrites(String createStatement) {
+        runStatementWithTransactionalWrites(createStatement, null);
+    }
+
+    private void runStatementWithTransactionalWrites(String createStatement, List<String> errors) {
+        try (Connection c = secondaryDataSource.getConnection();
+                Statement s = c.createStatement()) {
+            s.setQueryTimeout(0);
+            log.info(createStatement);
+            s.execute(createStatement);
+        } catch (SQLException e) {
+            log.error("Error while executing SQL statement", e);
+            if (errors != null) {
+                errors.add(createStatement);
+            } else {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private Map<UUID, List<Pair<UUID, String>>> insertHCPsForFacilities(
+            Map<Integer, Pair<UUID, String>> facilityNumberToUuid, int bulkSize) {
         // Generate HCPs according to a normal distribution (m: 20 sd: 5)
         // Names are following a schema of "hcf<facilitynumber>hcp<hcp-number-in-facility>"
         Map<UUID, List<PartyIdentifiedRecord>> facilityIdToHcp = facilityNumberToUuid.entrySet().parallelStream()
-                .collect(Collectors.toMap(
-                        Entry::getValue, e -> IntStream.range(0, (int) getRandomGaussianWithLimitsLong(20, 5, 5, 35))
-                                .mapToObj(i -> createPartyWithRef(
-                                        "hcf" + e.getKey() + "hcp" + i, "hcp", "PERSON", PartyType.party_identified))
-                                .collect(Collectors.toList())));
+                .collect(Collectors.toMap(e -> e.getValue().getKey(), e -> IntStream.range(
+                                0, (int) getRandomGaussianWithLimitsLong(20, 5, 5, 35))
+                        .mapToObj(i -> DataCreator.createPartyWithRef(
+                                dsl,
+                                "hcf" + e.getKey() + "hcp" + i,
+                                "hcp",
+                                "PERSON",
+                                PartyType.party_identified))
+                        .collect(Collectors.toList())));
 
         bulkInsert(
                 PARTY_IDENTIFIED,
-                facilityIdToHcp.entrySet().stream().map(Entry::getValue).flatMap(List::stream),
+                facilityIdToHcp.values().stream().flatMap(List::stream),
                 bulkSize);
 
         return facilityIdToHcp.entrySet().stream().collect(Collectors.toMap(Entry::getKey, e -> e.getValue().stream()
-                .map(PartyIdentifiedRecord::getId)
+                .map(r -> Pair.of(r.getId(), r.getName()))
                 .collect(Collectors.toList())));
     }
 
@@ -659,151 +851,67 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, int bulkSize) {
-        CompletableFuture<Void> eventContext = CompletableFuture.runAsync(() ->
-                bulkInsert(EVENT_CONTEXT, ehrDescriptors.stream().flatMap(e -> e.eventContexts.stream()), bulkSize));
-        CompletableFuture<Void> composition = CompletableFuture.runAsync(
-                () -> bulkInsert(COMPOSITION, ehrDescriptors.stream().flatMap(e -> e.compositions.stream()), bulkSize));
-        CompletableFuture<Void> auditDetails = CompletableFuture.runAsync(() ->
-                bulkInsert(AUDIT_DETAILS, ehrDescriptors.stream().flatMap(e -> e.auditDetails.stream()), bulkSize));
-        CompletableFuture<Void> entry = CompletableFuture.allOf(ehrDescriptors.stream()
-                .flatMap(d -> d.entries.stream())
-                .collect(Collectors.groupingBy(EntryRecord::getSequence))
-                .entrySet()
-                .stream()
-                .map(e -> CompletableFuture.runAsync(() ->
-                        bulkInsert(ENTRY.rename(ENTRY.getName() + "_" + e.getKey()), e.getValue().stream(), bulkSize)))
-                .toArray(CompletableFuture[]::new));
-        CompletableFuture<Void> participations = CompletableFuture.runAsync(() ->
-                bulkInsert(PARTICIPATION, ehrDescriptors.stream().flatMap(e -> e.participations.stream()), bulkSize));
-        CompletableFuture<Void> contribution = CompletableFuture.runAsync(() ->
-                bulkInsert(CONTRIBUTION, ehrDescriptors.stream().flatMap(e -> e.contributions.stream()), bulkSize));
-        CompletableFuture<Void> partyIdentified = CompletableFuture.runAsync(
-                () -> bulkInsert(PARTY_IDENTIFIED, ehrDescriptors.stream().map(e -> e.subject), bulkSize));
-        CompletableFuture<Void> status = CompletableFuture.runAsync(
-                () -> bulkInsert(STATUS, ehrDescriptors.stream().map(e -> e.status), bulkSize));
-        CompletableFuture<Void> ehr = CompletableFuture.runAsync(
-                () -> bulkInsert(Ehr.EHR_, ehrDescriptors.stream().map(e -> e.ehr), bulkSize));
-
-        return CompletableFuture.allOf(
-                entry,
-                auditDetails,
-                composition,
-                eventContext,
-                participations,
-                status,
-                partyIdentified,
-                contribution,
-                ehr);
-    }
-
-    private void copyIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) {
-        StopWatch sw = new StopWatch();
-        sw.start("count");
-        long tableSize = entryTableSize(compositionNumber);
-        long loops = (tableSize / JSONB_INSERT_BATCH_SIZE) + 1;
-        sw.stop();
-        log.info("Count comp {} took {}ms. Result: {}", compositionNumber, sw.getLastTaskTimeMillis(), tableSize);
-        int errorCount = 0;
-
-        for (long i = 0; i < loops; i++) {
-            sw.start("batch" + i);
-            try {
-                int insertCount;
-                insertCount = copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
-                sw.stop();
-                log.info(
-                        "Copy comp {} batch: {}, count: {}, time: {}ms",
-                        compositionNumber,
-                        i - errorCount,
-                        insertCount,
-                        sw.getLastTaskTimeMillis());
-            } catch (SQLException e) {
-                sw.stop();
-                log.error(
-                        "Error while processing comp " + compositionNumber + " batch: " + i
-                                + ", time (ms) until error: " + sw.getLastTaskTimeMillis(),
-                        e);
-                errorCount++;
-                // We stop if errors keep piling up for the same composition since this indicates a non
-                // "memory-pressure" issue
-                if (errorCount > 1000) {
-                    throw new RuntimeException(
-                            "Aborting because error threshold was reached for composition " + compositionNumber);
-                }
-                loops++;
-            }
+    private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, LoaderRequestDto properties) {
+        List<CompletableFuture<Void>> tasks = new ArrayList<>();
+        // The tasks are started ordered by the execution times
+        if (properties.getModes().contains(CompositionDataMode.MATRIX)) {
+            tasks.addAll(ehrDescriptors.stream()
+                    .map(EhrCreateDescriptor::getMatrixRecords)
+                    .flatMap(List::stream)
+                    .collect(Collectors.groupingBy(Entry2Record::getRmEntity))
+                    .entrySet()
+                    .stream()
+                    .map(e -> CompletableFuture.runAsync(
+                            () -> bulkInsert(
+                                    Entry2.ENTRY2,
+                                    e.getValue().stream(),
+                                    properties.getBulkSize()*4)))
+                    .collect(Collectors.toList()));
         }
-        log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
-    }
-
-    private int copyBatchIntoEntryTableWithJsonb(int compositionNumber, JSONB jsonbData) throws SQLException {
-        try (Connection c = primaryDataSource.getConnection()) {
-            try (Statement s = c.createStatement()) {
-                s.setQueryTimeout(0);
-                String statement = String.format(
-                        "/*+ Leading( (\"ANY_subquery\" a) ) NestLoop(\"ANY_subquery\" a) */"
-                                + "WITH del AS(DELETE FROM ehr.entry_%d a WHERE a.id in (SELECT id from ehr.entry_%d limit %d) RETURNING *)"
-                                + "INSERT INTO ehr.entry "
-                                + "  SELECT \"id\","
-                                + "  \"composition_id\","
-                                + "  0,"
-                                + "  \"item_type\","
-                                + "  \"template_id\","
-                                + "  \"template_uuid\","
-                                + "  \"archetype_id\","
-                                + "  \"category\","
-                                + "  '%s'::JSONB,"
-                                + "  \"sys_transaction\","
-                                + "  \"sys_period\","
-                                + "  \"rm_version\","
-                                + "  \"name\""
-                                + "FROM del;",
-                        compositionNumber, compositionNumber, JSONB_INSERT_BATCH_SIZE, jsonbData.data());
-                return s.executeUpdate(statement);
-            } catch (SQLException e) {
-                // Some errors may result in a broken DB session therefore we evict the connection from the pool
-                primaryDataSource.evictConnection(c);
-                throw e;
-            }
+        if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
+            tasks.add(CompletableFuture.runAsync(() -> bulkInsert(
+                    EVENT_CONTEXT,
+                    ehrDescriptors.stream().flatMap(e -> e.getEventContexts().stream()),
+                    properties.getBulkSize())));
+            tasks.add(CompletableFuture.runAsync(() -> bulkInsert(
+                    COMPOSITION,
+                    ehrDescriptors.stream().flatMap(e -> e.getCompositions().stream()),
+                    properties.getBulkSize())));
         }
-    }
-
-    private long entryTableSize(int compositionNumber) {
-        return dsl.select(
-                        DSL.aggregate("count", Long.class, ENTRY.rename(ENTRY.getName() + "_" + compositionNumber).ID))
-                .from(ENTRY.rename(ENTRY.getName() + "_" + compositionNumber))
-                .fetchOptional(0, Long.class)
-                .orElse(0L);
-    }
-
-    private <T extends Table<R>, R extends TableRecord<R>> void updateToAddVersions(
-            T table,
-            TableField<R, UUID> idField,
-            List<EhrCreateDescriptor> descriptors,
-            BiFunction<EhrCreateDescriptor, Integer, Stream<UUID>> descriptorToIdsForVersionCountStreamFunc,
-            OffsetDateTime additionalVersionBaseDateTime) {
-        StopWatch sw = new StopWatch();
-        sw.start();
-
-        for (int i = 2; i <= MAX_COMPOSITION_VERSIONS; i++) {
-            int versionCount = i;
-            dsl.update(table)
-                    .set(
-                            table.field(SYS_TRANSACTION_FIELD_NAME, Timestamp.class),
-                            Timestamp.from(
-                                    additionalVersionBaseDateTime.plusSeconds(i).toInstant()))
-                    .set(
-                            table.field(SYS_PERIOD_FIELD_NAME, SimpleEntry.class),
-                            new AbstractMap.SimpleEntry<>(additionalVersionBaseDateTime.plusSeconds(i), null))
-                    .where(idField.in(descriptors.stream()
-                            .flatMap(e -> descriptorToIdsForVersionCountStreamFunc.apply(e, versionCount))
-                            .collect(Collectors.toList())))
-                    .execute();
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(
+                AUDIT_DETAILS,
+                ehrDescriptors.stream().flatMap(e -> e.getAuditDetails().stream()),
+                properties.getBulkSize())));
+        if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
+            tasks.addAll(ehrDescriptors.stream()
+                    .flatMap(d -> d.getEntries().stream())
+                    .collect(Collectors.groupingBy(EntryRecord::getSequence))
+                    .entrySet()
+                    .stream()
+                    .map(e -> CompletableFuture.runAsync(() -> bulkInsert(
+                            ENTRY.rename(ENTRY.getName() + "_" + e.getKey()),
+                            e.getValue().stream(),
+                            properties.getBulkSize())))
+                    .collect(Collectors.toList()));
+            tasks.add(CompletableFuture.runAsync(() -> bulkInsert(
+                    PARTICIPATION,
+                    ehrDescriptors.stream().flatMap(e -> e.getParticipations().stream()),
+                    properties.getBulkSize())));
         }
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(
+                CONTRIBUTION,
+                ehrDescriptors.stream().flatMap(e -> e.getContributions().stream()),
+                properties.getBulkSize())));
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(
+                PARTY_IDENTIFIED,
+                ehrDescriptors.stream().map(EhrCreateDescriptor::getSubject),
+                properties.getBulkSize())));
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(
+                STATUS, ehrDescriptors.stream().map(EhrCreateDescriptor::getStatus), properties.getBulkSize())));
+        tasks.add(CompletableFuture.runAsync(() -> bulkInsert(
+                Ehr.EHR_, ehrDescriptors.stream().map(EhrCreateDescriptor::getEhr), properties.getBulkSize())));
 
-        sw.stop();
-        log.info("Updates {} for versions took {}", table.getName(), sw.getTotalTimeSeconds());
+        return CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new));
     }
 
     private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(
@@ -837,8 +945,12 @@ public class LoaderServiceImp implements LoaderService {
                             .filter(Objects::nonNull)
                             .forEach(err -> log.error("Error while loading data into DB", err));
                 }
-            } catch (IOException e) {
-                throw new UncheckedIOException("bulk insert failed. table: " + table.getName(), e);
+            } catch (Exception e) {
+                success = false;
+                errorCount++;
+                if(errorCount >= 100){
+                    throw new RuntimeException(e);
+                }
             }
         }
         if (!success) {
@@ -860,12 +972,15 @@ public class LoaderServiceImp implements LoaderService {
      * @return
      */
     private List<MutablePair<UUID, Integer>> buildScaledFacilityToEhrDistribution(
-            LoaderRequestDto properties, Map<Integer, UUID> facilityNumberToUuid, long ehrFacilityCountSum) {
+            LoaderRequestDto properties,
+            Map<Integer, Pair<UUID, String>> facilityNumberToUuid,
+            long ehrFacilityCountSum) {
 
         List<Pair<UUID, Double>> ehrDistribution = IntStream.range(0, properties.getHealthcareFacilities())
                 .boxed()
                 .map(i -> Pair.of(
-                        facilityNumberToUuid.get(i), getRandomGaussianWithLimitsDouble(15_000, 5_000, 1, 30_000)))
+                        facilityNumberToUuid.get(i).getLeft(),
+                        getRandomGaussianWithLimitsDouble(15_000, 5_000, 1, 30_000)))
                 .collect(Collectors.toList());
         Double scaleFactor = ehrFacilityCountSum
                 / ehrDistribution.parallelStream().mapToDouble(Pair::getRight).sum();
@@ -900,17 +1015,19 @@ public class LoaderServiceImp implements LoaderService {
      * Pair::getRight -> Facility-UUIDs to use
      *
      * @param facilityNumberToUuid
+     * @param facilityIdToName
      * @param ehrFacilityCounts
      * @param scaledEhrDistribution
      * @param batchSize
      * @return
      */
-    private List<Pair<Integer, List<UUID>>> getEhrSettingsBatch(
-            Map<Integer, UUID> facilityNumberToUuid,
+    private List<Pair<Integer, List<Pair<UUID, String>>>> getEhrSettingsBatch(
+            Map<Integer, Pair<UUID, String>> facilityNumberToUuid,
+            Map<UUID, String> facilityIdToName,
             List<MutablePair<Integer, Long>> ehrFacilityCounts,
             List<MutablePair<UUID, Integer>> scaledEhrDistribution,
             int batchSize) {
-        List<Pair<Integer, List<UUID>>> ehrSettings = new ArrayList<>();
+        List<Pair<Integer, List<Pair<UUID, String>>>> ehrSettings = new ArrayList<>();
         long processedCount = 0;
         // go through the facility count to number of EHRs mapping until we reach our batch-size or we run out of EHRs
         for (Pair<Integer, Long> ehrFacilityCount : ehrFacilityCounts) {
@@ -930,6 +1047,7 @@ public class LoaderServiceImp implements LoaderService {
                                 .filter(p -> !facilities.contains(p.getValue()))
                                 .min((i1, i2) -> -Integer.compare(i1.getKey(), i2.getKey()))
                                 .map(Entry::getValue)
+                                .map(Pair::getKey)
                                 .ifPresent(facilities::add);
                     } else {
                         MutablePair<UUID, Integer> facilityWithCount = scaledEhrDistribution.get(f);
@@ -940,7 +1058,11 @@ public class LoaderServiceImp implements LoaderService {
                 scaledEhrDistribution.removeIf(p -> p.getRight() == 0);
                 // Determine how many compositions this EHR shall hold according to a normal distribution (m: 200,
                 // sd:50)
-                ehrSettings.add(Pair.of((int) getRandomGaussianWithLimitsLong(200, 50, 50, 350), facilities));
+                ehrSettings.add(Pair.of(
+                        (int) getRandomGaussianWithLimitsLong(200, 50, 50, 350),
+                        facilities.stream()
+                                .map(f -> Pair.of(f, facilityIdToName.get(f)))
+                                .collect(Collectors.toList())));
             }
 
             ehrFacilityCount.setValue(ehrFacilityCount.getValue() - count);
@@ -950,204 +1072,10 @@ public class LoaderServiceImp implements LoaderService {
         return ehrSettings;
     }
 
-    private class EhrCreateDescriptor {
-        EhrRecord ehr;
-        StatusRecord status;
-        PartyIdentifiedRecord subject;
-        List<ContributionRecord> contributions = new ArrayList<>();
-        List<AuditDetailsRecord> auditDetails = new ArrayList<>();
-        List<CompositionRecord> compositions = new ArrayList<>();
-        List<EntryRecord> entries = new ArrayList<>();
-        List<EventContextRecord> eventContexts = new ArrayList<>();
-        List<ParticipationRecord> participations = new ArrayList<>();
-        Map<UUID, Integer> compositionIdToVersionCount = new HashMap<>();
-        Map<UUID, Integer> eventCtxIdToVersionCount = new HashMap<>();
-
-        Stream<UUID> getCompositionIdStreamForVersionCount(int version) {
-            return this.compositions.stream()
-                    .map(CompositionRecord::getId)
-                    .filter(id -> this.compositionIdToVersionCount.getOrDefault(id, 1) >= version);
-        }
-
-        Stream<UUID> getEventCtxIdStreamForVersionCount(int version) {
-            return this.eventContexts.stream()
-                    .map(EventContextRecord::getId)
-                    .filter(id -> this.eventCtxIdToVersionCount.getOrDefault(id, 1) >= version);
-        }
-    }
-
-    private class CompositionCreateDescriptor {
-        CompositionRecord composition;
-        AuditDetailsRecord compositionAudit;
-        EntryRecord entry;
-        EventContextRecord eventContext;
-        ContributionRecord contribution;
-        AuditDetailsRecord contributionAudit;
-        List<ParticipationRecord> participations = new ArrayList<>();
-        int versions;
-    }
-
-    private EhrCreateDescriptor buildEhrData(
-            List<UUID> facilities, int compositionCount, Map<UUID, List<UUID>> facilityIdToHcpId) {
-        EhrCreateDescriptor ehrDescriptor = new EhrCreateDescriptor();
-        UUID ehrId = UUID.randomUUID();
-        OffsetDateTime sysTransaction = OffsetDateTime.now();
-
-        // EHR and status
-        Pair<ContributionRecord, AuditDetailsRecord> statusContribution =
-                createContribution(ehrId, ContributionDataType.ehr, "Create EHR_STATUS", sysTransaction);
-        Triple<StatusRecord, PartyIdentifiedRecord, AuditDetailsRecord> status =
-                createStatus(ehrId, statusContribution.getLeft().getId(), sysTransaction);
-
-        ehrDescriptor.ehr = createEhr(ehrId, sysTransaction);
-        ehrDescriptor.status = status.getLeft();
-        ehrDescriptor.subject = status.getMiddle();
-        ehrDescriptor.contributions.add(statusContribution.getLeft());
-        ehrDescriptor.auditDetails.add(status.getRight());
-        ehrDescriptor.auditDetails.add(statusContribution.getRight());
-
-        // Compositions
-        List<CompositionCreateDescriptor> compositionDescriptors = IntStream.range(0, compositionCount)
-                .parallel()
-                .mapToObj(i -> buildCompositionData(
-                        i,
-                        ehrId,
-                        facilityIdToHcpId.get(facilities.get(i % facilities.size())),
-                        facilities.get(i % facilities.size())))
-                .collect(Collectors.toList());
-        ehrDescriptor.compositions =
-                compositionDescriptors.stream().map(d -> d.composition).collect(Collectors.toList());
-        ehrDescriptor.participations = compositionDescriptors.stream()
-                .flatMap(d -> d.participations.stream())
-                .collect(Collectors.toList());
-        ehrDescriptor.auditDetails.addAll(compositionDescriptors.stream()
-                .flatMap(d -> Stream.of(d.compositionAudit, d.contributionAudit))
-                .collect(Collectors.toList()));
-        ehrDescriptor.eventContexts =
-                compositionDescriptors.stream().map(d -> d.eventContext).collect(Collectors.toList());
-        ehrDescriptor.entries =
-                compositionDescriptors.stream().map(d -> d.entry).collect(Collectors.toList());
-        ehrDescriptor.contributions.addAll(
-                compositionDescriptors.stream().map(d -> d.contribution).collect(Collectors.toList()));
-
-        ehrDescriptor.compositionIdToVersionCount = compositionDescriptors.stream()
-                .filter(c -> c.versions > 1)
-                .collect(Collectors.toMap(c -> c.composition.getId(), c -> c.versions));
-        ehrDescriptor.eventCtxIdToVersionCount = compositionDescriptors.stream()
-                .filter(c -> c.versions > 1)
-                .collect(Collectors.toMap(c -> c.eventContext.getId(), c -> c.versions));
-
-        return ehrDescriptor;
-    }
-
-    private CompositionCreateDescriptor buildCompositionData(
-            int compositionNumber, UUID ehrId, List<UUID> hcpIds, UUID facility) {
-        Triple<Integer, Composition, JSONB> selectedComposition;
-        if (compositionNumber < singleCompositions.size()) {
-            selectedComposition = singleCompositions.get(compositionNumber);
-        } else {
-            List<Triple<Integer, Composition, JSONB>> compositionData = this.compositionsWithSequenceByType.get(
-                    (compositionNumber - singleCompositions.size()) % compositionsWithSequenceByType.size());
-            selectedComposition = compositionData.size() > 1
-                    ? compositionData.get(random.get().nextInt(compositionData.size()))
-                    : compositionData.get(0);
-        }
-
-        int hcpCount = (int) getRandomGaussianWithLimitsLong(0, 1, 1, 3);
-        UUID composerId = hcpIds.get(compositionNumber % hcpIds.size());
-        OffsetDateTime sysTransaction = OffsetDateTime.now();
-
-        CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
-        createDescriptor.versions = (int) getRandomGaussianWithLimitsLong(0, 1, 1, MAX_COMPOSITION_VERSIONS);
-        Pair<ContributionRecord, AuditDetailsRecord> contribution =
-                createContribution(ehrId, ContributionDataType.composition, "Create COMPOSITION", sysTransaction);
-        createDescriptor.contribution = contribution.getLeft();
-        createDescriptor.contributionAudit = contribution.getRight();
-        Pair<CompositionRecord, AuditDetailsRecord> composition = createComposition(
-                ehrId,
-                selectedComposition.getMiddle(),
-                composerId,
-                contribution.getLeft().getId(),
-                sysTransaction);
-        createDescriptor.composition = composition.getLeft();
-        createDescriptor.compositionAudit = composition.getRight();
-        createDescriptor.entry = createEntry(
-                composition.getLeft().getId(),
-                selectedComposition.getMiddle(),
-                selectedComposition.getRight(),
-                sysTransaction,
-                selectedComposition.getLeft());
-        createDescriptor.eventContext = createEventContext(
-                composition.getLeft().getId(), selectedComposition.getMiddle().getContext(), facility, sysTransaction);
-        if (hcpCount > 1 && hcpIds.size() > 1) {
-            List<UUID> participationCandidates =
-                    CollectionUtils.selectRejected(hcpIds, composerId::equals, new ArrayList<>());
-            IntStream.range(0, hcpCount - 1)
-                    .mapToObj(i -> createHcpParticipation(
-                            createDescriptor.eventContext,
-                            participationCandidates.get(random.get().nextInt(participationCandidates.size())),
-                            sysTransaction))
-                    .forEach(createDescriptor.participations::add);
-        }
-
-        return createDescriptor;
-    }
-
-    /**
-     * Creates an {@link EhrRecord}.
-     */
-    private EhrRecord createEhr(UUID ehrId, OffsetDateTime sysTransaction) {
-        var ehrRecord = dsl.newRecord(Ehr.EHR_);
-        ehrRecord.setDateCreated(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
-        ehrRecord.setDateCreatedTzid(zoneId);
-        ehrRecord.setSystemId(systemId);
-        ehrRecord.setId(ehrId);
-
-        return ehrRecord;
-    }
-
-    /**
-     * Creates an {@link StatusRecord} for the given EHR.
-     */
-    private Triple<StatusRecord, PartyIdentifiedRecord, AuditDetailsRecord> createStatus(
-            UUID ehrId, UUID contributionId, OffsetDateTime sysTransaction) {
-
-        AuditDetailsRecord auditDetails = createAuditDetails("Create EHR status", sysTransaction);
-        PartyIdentifiedRecord patient = createPartyWithRef(null, "patients", "PERSON", PartyType.party_self);
-        StatusRecord statusRecord = dsl.newRecord(STATUS);
-        statusRecord.setEhrId(ehrId);
-        statusRecord.setParty(patient.getId());
-        statusRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
-        statusRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
-        statusRecord.setHasAudit(auditDetails.getId());
-        statusRecord.setInContribution(contributionId);
-        statusRecord.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
-        statusRecord.setName(new DvCodedTextRecord("EHR Status", null, null, null, null, null));
-        statusRecord.setId(UUID.randomUUID());
-        statusRecord.setIsModifiable(true);
-        statusRecord.setIsQueryable(true);
-
-        return Triple.of(statusRecord, patient, auditDetails);
-    }
-
-    private PartyIdentifiedRecord createPartyWithRef(String name, String namespace, String type, PartyType partyType) {
-        PartyIdentifiedRecord hcpPartyRecord = dsl.newRecord(PARTY_IDENTIFIED);
-        hcpPartyRecord.setPartyRefValue(UUID.randomUUID().toString());
-        hcpPartyRecord.setPartyRefScheme("id_scheme");
-        hcpPartyRecord.setPartyRefNamespace(namespace);
-        hcpPartyRecord.setPartyRefType(type);
-        hcpPartyRecord.setName(name);
-        hcpPartyRecord.setPartyType(partyType);
-        hcpPartyRecord.setObjectIdType(PartyRefIdType.generic_id);
-        hcpPartyRecord.setId(UUID.randomUUID());
-        return hcpPartyRecord;
-    }
-
-    private Pair<Integer, UUID> insertHealthcareFacility(int number) {
-        PartyIdentifiedRecord record =
-                createPartyWithRef("hcf" + number, "facilities", "ORGANISATION", PartyType.party_identified);
+    private Pair<Integer, Pair<UUID,String>> insertHealthcareFacility(int number) {
+        PartyIdentifiedRecord record = DataCreator.createPartyWithRef(dsl, "hcf" + number, "facilities", "ORGANISATION", PartyType.party_identified);
         record.store();
-        return Pair.of(number, record.getId());
+        return Pair.of(number, Pair.of(record.getId(),record.getName()));
     }
 
     private UUID getSystemId() {
@@ -1188,254 +1116,24 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void createTemplate(String templateId, Resource file) throws IOException {
-        var existingTemplateStore = dsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
-
+        var existingTemplateStore =
+                dsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
+        String tpl;
+        try (InputStream in = file.getInputStream()) {
+            tpl = IOUtils.toString(in, StandardCharsets.UTF_8);
+            templates.put(templateId, TemplateDocument.Factory.parse(tpl).getTemplate());
+        } catch (XmlException e) {
+            throw new LoaderException("Failed to parse template", e);
+        }
         if (existingTemplateStore.isPresent()) {
             log.info("Template {} already exists", templateId);
         } else {
             var templateStoreRecord = dsl.newRecord(TEMPLATE_STORE);
             templateStoreRecord.setId(UUID.randomUUID());
             templateStoreRecord.setTemplateId(templateId);
-            try (InputStream in = file.getInputStream()) {
-                templateStoreRecord.setContent(IOUtils.toString(in, StandardCharsets.UTF_8));
-            }
+            templateStoreRecord.setContent(tpl);
             templateStoreRecord.setSysTransaction(Timestamp.valueOf(LocalDateTime.now()));
             templateStoreRecord.store();
-        }
-    }
-
-    /**
-     * Creates a {@link CompositionRecord} for the given EHR.
-     */
-    private Pair<CompositionRecord, AuditDetailsRecord> createComposition(
-            UUID ehrId, Composition composition, UUID composerId, UUID contributionId, OffsetDateTime sysTransaction) {
-        AuditDetailsRecord auditDetails = createAuditDetails("Create COMPOSITION", sysTransaction);
-
-        var compositionRecord = dsl.newRecord(COMPOSITION);
-        compositionRecord.setEhrId(ehrId);
-        compositionRecord.setInContribution(contributionId);
-        compositionRecord.setLanguage(composition.getLanguage().getCodeString());
-        compositionRecord.setTerritory(getTerritory(composition.getTerritory().getCodeString()));
-        compositionRecord.setComposer(composerId);
-        compositionRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
-        compositionRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
-        compositionRecord.setHasAudit(auditDetails.getId());
-        // AttestationRef
-        // FeederAudit
-        compositionRecord.setLinks(JSONB.jsonb("[]"));
-        compositionRecord.setId(UUID.randomUUID());
-        return Pair.of(compositionRecord, auditDetails);
-    }
-
-    /**
-     * Creates an {@link EntryRecord} for the given composition.
-     */
-    private EntryRecord createEntry(
-            UUID compositionId,
-            Composition composition,
-            JSONB jsonb,
-            OffsetDateTime sysTransaction,
-            int compositionIndex) {
-        Assert.notNull(composition.getArchetypeDetails().getTemplateId(), "Template Id must not be null");
-
-        EntryRecord entryRecord = dsl.newRecord(ENTRY);
-        entryRecord.setCompositionId(compositionId);
-        entryRecord.setSequence(compositionIndex);
-        entryRecord.setItemType(resolveEntryType(composition));
-        entryRecord.setTemplateId(
-                composition.getArchetypeDetails().getTemplateId().getValue());
-        entryRecord.setArchetypeId(composition.getArchetypeNodeId());
-        entryRecord.setCategory(createDvCodedText(composition.getCategory()));
-        // entryRecord.setEntry(jsonb);
-        entryRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
-        entryRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
-        entryRecord.setRmVersion(composition.getArchetypeDetails().getRmVersion());
-        entryRecord.setName(createDvCodedText(composition.getName()));
-        entryRecord.setId(UUID.randomUUID());
-
-        return entryRecord;
-    }
-
-    /**
-     * Creates an {@link EventContextRecord} for the given composition.
-     */
-    private EventContextRecord createEventContext(
-            UUID compositionId, EventContext eventContext, UUID facilityId, OffsetDateTime sysTransaction) {
-        var eventContextRecord = dsl.newRecord(EVENT_CONTEXT);
-        eventContextRecord.setCompositionId(compositionId);
-
-        var startTime = eventContext.getStartTime().getValue();
-        eventContextRecord.setStartTime(Timestamp.valueOf(LocalDateTime.from(startTime)));
-        eventContextRecord.setStartTimeTzid(resolveTimeZone(startTime));
-        eventContextRecord.setLocation(eventContext.getLocation());
-        eventContextRecord.setSetting(createDvCodedText(eventContext.getSetting()));
-        eventContextRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
-        eventContextRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
-        eventContextRecord.setFacility(facilityId);
-
-        if (eventContext.getEndTime() != null) {
-            var endTime = eventContext.getEndTime().getValue();
-            eventContextRecord.setEndTime(Timestamp.valueOf(LocalDateTime.from(endTime)));
-            eventContextRecord.setEndTimeTzid(resolveTimeZone(endTime));
-        }
-
-        if (eventContext.getOtherContext() != null
-                && !CollectionUtils.isEmpty(eventContext.getOtherContext().getItems())) {
-            eventContextRecord.setOtherContext(JSONB.jsonb(rawJson.marshal(eventContext.getOtherContext())));
-        }
-
-        eventContextRecord.setId(UUID.randomUUID());
-        return eventContextRecord;
-    }
-
-    /**
-     * Creates a {@link ParticipationRecord} for the given event context.
-     *
-     * @return
-     */
-    private ParticipationRecord createHcpParticipation(
-            EventContextRecord eventCtx, UUID hcpId, OffsetDateTime sysTransaction) {
-        ParticipationRecord participationRecord = dsl.newRecord(PARTICIPATION);
-        participationRecord.setEventContext(eventCtx.getId());
-        participationRecord.setPerformer(hcpId);
-        participationRecord.setFunction(createDvCodedText(new DvText("function")));
-        participationRecord.setMode(createDvCodedText(
-                new DvCodedText("not specified", new CodePhrase(new TerminologyId("openehr"), "193"))));
-        participationRecord.setSysTransaction(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
-        participationRecord.setSysPeriod(new AbstractMap.SimpleEntry<>(sysTransaction, null));
-        if (eventCtx.getStartTime() != null) {
-            participationRecord.setTimeLower(eventCtx.getStartTime());
-            participationRecord.setTimeLowerTz(eventCtx.getEndTimeTzid());
-        }
-        if (eventCtx.getEndTime() != null) {
-            participationRecord.setTimeUpper(eventCtx.getEndTime());
-            participationRecord.setTimeUpperTz(eventCtx.getEndTimeTzid());
-        }
-        participationRecord.setId(UUID.randomUUID());
-
-        return participationRecord;
-    }
-
-    /**
-     * Creates a {@link ContributionRecord} of the given EHR.
-     */
-    private Pair<ContributionRecord, AuditDetailsRecord> createContribution(
-            UUID ehrId,
-            ContributionDataType contributionType,
-            String auditDetailsDescription,
-            OffsetDateTime sysTransaction) {
-        AuditDetailsRecord auditDetails = createAuditDetails(auditDetailsDescription, sysTransaction);
-
-        ContributionRecord contributionRecord = dsl.newRecord(CONTRIBUTION);
-        contributionRecord.setEhrId(ehrId);
-        contributionRecord.setContributionType(contributionType);
-        contributionRecord.setState(ContributionState.complete);
-        contributionRecord.setHasAudit(auditDetails.getId());
-        contributionRecord.setId(UUID.randomUUID());
-
-        return Pair.of(contributionRecord, auditDetails);
-    }
-
-    /**
-     * Creates an {@link AuditDetailsRecord} with the given description.
-     */
-    private AuditDetailsRecord createAuditDetails(String description, OffsetDateTime sysTransaction) {
-        var auditDetailsRecord = dsl.newRecord(AUDIT_DETAILS);
-        auditDetailsRecord.setSystemId(systemId);
-        auditDetailsRecord.setCommitter(committerId);
-        auditDetailsRecord.setTimeCommitted(Timestamp.valueOf(sysTransaction.toLocalDateTime()));
-        auditDetailsRecord.setTimeCommittedTzid(zoneId);
-        auditDetailsRecord.setChangeType(ContributionChangeType.creation);
-        auditDetailsRecord.setDescription(description);
-        auditDetailsRecord.setId(UUID.randomUUID());
-
-        return auditDetailsRecord;
-    }
-
-    private DvCodedTextRecord createDvCodedText(DvText dvText) {
-        if (dvText == null) {
-            return null;
-        }
-
-        var dvCodedTextRecord = new DvCodedTextRecord();
-        dvCodedTextRecord.setValue(dvText.getValue());
-        dvCodedTextRecord.setFormatting(dvText.getFormatting());
-        dvCodedTextRecord.setLanguage(createCodePhrase(dvText.getLanguage()));
-        dvCodedTextRecord.setEncoding(createCodePhrase(dvText.getEncoding()));
-        dvCodedTextRecord.setTermMapping(createTermMappings(dvText.getMappings()));
-
-        if (dvText instanceof DvCodedText) {
-            dvCodedTextRecord.setDefiningCode(createCodePhrase(((DvCodedText) dvText).getDefiningCode()));
-        }
-
-        return dvCodedTextRecord;
-    }
-
-    private CodePhraseRecord createCodePhrase(CodePhrase codePhrase) {
-        if (codePhrase == null) {
-            return null;
-        }
-        return new CodePhraseRecord(codePhrase.getTerminologyId().getValue(), codePhrase.getCodeString());
-    }
-
-    private String[] createTermMappings(List<TermMapping> termMappings) {
-        if (CollectionUtils.isEmpty(termMappings)) {
-            return new String[0];
-        }
-
-        return termMappings.stream()
-                .map(termMapping -> {
-                    var purpose = Optional.of(termMapping).map(TermMapping::getPurpose);
-                    return Stream.of(
-                                    Character.toString(termMapping.getMatch()),
-                                    purpose.map(DvCodedText::getValue).orElse(""),
-                                    purpose.map(DvCodedText::getDefiningCode)
-                                            .map(CodePhrase::getTerminologyId)
-                                            .map(TerminologyId::getValue)
-                                            .orElse(""),
-                                    purpose.map(DvCodedText::getDefiningCode)
-                                            .map(CodePhrase::getCodeString)
-                                            .orElse(""),
-                                    termMapping.getTarget().getTerminologyId().getValue(),
-                                    termMapping.getTarget().getCodeString())
-                            .collect(Collectors.joining("|"));
-                })
-                .toArray(String[]::new);
-    }
-
-    private Integer getTerritory(String code) {
-        return Optional.ofNullable(territories.get(code))
-                .orElseThrow(() -> new IllegalArgumentException("Territory " + code + " not found"));
-    }
-
-    private EntryType resolveEntryType(Composition composition) {
-        if (CollectionUtils.isEmpty(composition.getContent())) {
-            return EntryType.proxy; // FIXME: not sure which value to return
-        }
-
-        var contentItem = composition.getContent().get(0);
-        if (contentItem instanceof AdminEntry) {
-            return EntryType.admin;
-        } else if (contentItem instanceof CareEntry) {
-            return EntryType.care_entry;
-        } else if (contentItem instanceof Section) {
-            return EntryType.section;
-        } else {
-            return EntryType.proxy; // FIXME: not sure which value to return
-        }
-    }
-
-    private String resolveTimeZone(TemporalAccessor temporal) {
-        if (temporal == null) {
-            return null;
-        }
-
-        if (temporal instanceof ZonedDateTime) {
-            return ((ZonedDateTime) temporal).getZone().toString();
-        } else if (temporal instanceof OffsetDateTime) {
-            return ((OffsetDateTime) temporal).getOffset().toString();
-        } else {
-            return zoneId;
         }
     }
 }

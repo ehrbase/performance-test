@@ -17,6 +17,11 @@
  */
 package org.ehrbase.webtester.service;
 
+import java.util.EnumSet;
+import java.util.Set;
+import org.apache.commons.collections4.CollectionUtils;
+import org.ehrbase.webtester.service.loader.creators.CompositionDataMode;
+
 /**
  * @author Renaud Subiger
  * @since 1.0
@@ -27,7 +32,19 @@ public class LoaderRequestDto {
     private int healthcareFacilities = 5;
     private int bulkSize = 200;
     private int ehrsPerBatch = 10;
-    private boolean insertVersions = false;
+    private Set<CompositionDataMode> modes;
+
+    public Set<CompositionDataMode> getModes() {
+        if (CollectionUtils.isEmpty(modes)) {
+            // No mode defaults to all modes
+            this.modes = EnumSet.allOf(CompositionDataMode.class);
+        }
+        return modes;
+    }
+
+    public void setModes(Set<CompositionDataMode> modes) {
+        this.modes = modes;
+    }
 
     public Integer getEhr() {
         return ehr;
@@ -59,13 +76,5 @@ public class LoaderRequestDto {
 
     public void setEhrsPerBatch(int ehrsPerBatch) {
         this.ehrsPerBatch = ehrsPerBatch;
-    }
-
-    public boolean isInsertVersions() {
-        return insertVersions;
-    }
-
-    public void setInsertVersions(boolean insertVersions) {
-        this.insertVersions = insertVersions;
     }
 }
