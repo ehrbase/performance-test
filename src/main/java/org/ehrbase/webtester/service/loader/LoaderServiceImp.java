@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.ehrbase.webtester.service;
+package org.ehrbase.webtester.service.loader;
 
 import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
 import static org.ehrbase.jooq.pg.Tables.SYSTEM;
@@ -89,9 +89,7 @@ import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
 import org.ehrbase.serialisation.dbencoding.RawJson;
 import org.ehrbase.serialisation.matrixencoding.MatrixFormat;
 import org.ehrbase.serialisation.matrixencoding.Row;
-import org.ehrbase.webtester.service.loader.CachedComposition;
-import org.ehrbase.webtester.service.loader.InMemoryEncoder;
-import org.ehrbase.webtester.service.loader.RandomHelper;
+import org.ehrbase.webtester.service.LoaderException;
 import org.ehrbase.webtester.service.loader.creators.CompositionDataMode;
 import org.ehrbase.webtester.service.loader.creators.DataCreator;
 import org.ehrbase.webtester.service.loader.creators.EhrCreateDescriptor;
@@ -366,12 +364,12 @@ public class LoaderServiceImp implements LoaderService {
                     .map(p -> {
                         try (InputStream in = p.getInputStream()) {
                             if (!p.getFilename().matches("[0-9]{2}_.*")) {
-                                throw new LoaderException("composition resource " + p.getFilename()
+                                throw new org.ehrbase.webtester.service.LoaderException("composition resource " + p.getFilename()
                                         + " filename has to start with a 2 digit composition group number");
                             }
                             return Pair.of(p.getFilename(), objectMapper.readValue(in, Composition.class));
                         } catch (IOException e) {
-                            throw new LoaderException("Failed to read composition file", e);
+                            throw new org.ehrbase.webtester.service.LoaderException("Failed to read composition file", e);
                         }
                     })
                     .collect(Collectors.groupingBy(
@@ -399,7 +397,7 @@ public class LoaderServiceImp implements LoaderService {
                     .map(p -> {
                         try (InputStream in = p.getInputStream()) {
                             if (!p.getFilename().matches("[0-9]{2}_.*")) {
-                                throw new LoaderException("composition resource " + p.getFilename()
+                                throw new org.ehrbase.webtester.service.LoaderException("composition resource " + p.getFilename()
                                         + " filename has to start with a 2 digit composition group number");
                             }
                             Composition composition = objectMapper.readValue(in, Composition.class);
@@ -411,7 +409,7 @@ public class LoaderServiceImp implements LoaderService {
                                             .map(this::toRowDataPair)
                                             .collect(Collectors.toList()));
                         } catch (IOException e) {
-                            throw new LoaderException("Failed to read composition file", e);
+                            throw new org.ehrbase.webtester.service.LoaderException("Failed to read composition file", e);
                         }
                     })
                     .forEach(singleCompositions::add);
@@ -1023,7 +1021,7 @@ public class LoaderServiceImp implements LoaderService {
         }
         if (!success) {
             // If after 100 attempts we still fail, we assume a more general problem and abort data loading
-            throw new LoaderException("bulk insert failed. table: " + table.getName());
+            throw new org.ehrbase.webtester.service.LoaderException("bulk insert failed. table: " + table.getName());
         }
         sw.stop();
         log.info("Insert {} took {}. Attempts: {}", table.getName(), sw.getTotalTimeSeconds(), errorCount + 1);
