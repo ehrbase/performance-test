@@ -39,6 +39,7 @@ logging:
     org.springframework: warn
 loader:
   enabled: false
+  keepIndexes: false
 
 management:
   health:

@@ -35,11 +35,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nedap.archie.json.JacksonUtil;
 import com.nedap.archie.rm.composition.Composition;
 import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -49,6 +49,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,7 +59,6 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.PrimitiveIterator.OfInt;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -92,6 +92,7 @@ import org.ehrbase.serialisation.matrixencoding.MatrixFormat;
 import org.ehrbase.serialisation.matrixencoding.Row;
 import org.ehrbase.webtester.service.loader.CachedComposition;
 import org.ehrbase.webtester.service.loader.InMemoryEncoder;
+import org.ehrbase.webtester.service.loader.RandomHelper;
 import org.ehrbase.webtester.service.loader.creators.CompositionDataMode;
 import org.ehrbase.webtester.service.loader.creators.DataCreator;
 import org.ehrbase.webtester.service.loader.creators.EhrCreateDescriptor;
@@ -103,6 +104,7 @@ import org.ehrbase.webtester.service.loader.jooq.Entry2Record;
 import org.jooq.DSLContext;
 import org.jooq.LoaderError;
 import org.jooq.Record2;
+import org.jooq.SQLDialect;
 import org.jooq.Table;
 import org.jooq.TableRecord;
 import org.jooq.impl.DSL;
@@ -111,6 +113,7 @@ import org.openehr.schemas.v1.TemplateDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -189,17 +192,12 @@ public class LoaderServiceImp implements LoaderService {
             this.definition = definition;
         }
     }
+
     private static final String TEMPLATES_BASE = "classpath*:templates/**";
     private static final String COMPOSITIONS_REPEATABLE_PATH = "classpath*:compositions/repeatable/**";
     private static final String COMPOSITIONS_SINGLE_PATH = "classpath*:compositions/single/**";
-    private static final int MAX_COMPOSITION_VERSIONS = 3;
-    private static final String SYS_TRANSACTION_FIELD_NAME = "sys_transaction";
-    private static final String SYS_PERIOD_FIELD_NAME = "sys_period";
     private static final int JSONB_INSERT_BATCH_SIZE = 1000;
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
-    // Use a ThreadLocal for our SecureRandom since the generation of the distributions can not be parallelized
-    // otherwise
-    private final ThreadLocal<Random> random = ThreadLocal.withInitial(SecureRandom::new);
     private final Map<String, OPERATIONALTEMPLATE> templates = new HashMap<>();
     private final List<CachedComposition> singleCompositions = new ArrayList<>();
     private final List<List<CachedComposition>> compositionsWithSequenceByType = new ArrayList<>();
@@ -209,6 +207,8 @@ public class LoaderServiceImp implements LoaderService {
     private final HikariDataSource primaryDataSource;
     private final HikariDataSource secondaryDataSource;
     private final ResourceLoader resourceLoader;
+    private final SQLDialect dialect;
+    private final boolean keepIndexes;
 
     private InMemoryEncoder encoder;
     private EhrCreator ehrCreator;
@@ -218,11 +218,15 @@ public class LoaderServiceImp implements LoaderService {
             DSLContext dsl,
             ResourceLoader resourceLoader,
             @Qualifier("primaryDataSource") HikariDataSource primaryDataSource,
-            @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource) {
+            @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource,
+            @Value("${spring.jooq.sql-dialect}") String sqlDialect,
+            @Value("${loader.keep-indexes}") boolean keepIndexes) {
         this.dsl = dsl;
         this.secondaryDataSource = secondaryDataSource;
         this.primaryDataSource = primaryDataSource;
         this.resourceLoader = resourceLoader;
+        this.dialect = SQLDialect.valueOf(sqlDialect);
+        this.keepIndexes = keepIndexes;
     }
 
     @PostConstruct
@@ -426,18 +430,20 @@ public class LoaderServiceImp implements LoaderService {
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
-                prepareEntryTables();
+                if(properties.getModes().contains(CompositionDataMode.LEGACY)){
+                    prepareEntryTables();
+                }
                 Set<String> tableNames = getTableNames();
                 // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
                 List<Constraint> indexConstraints = findConstraints();
-                List<Triple<String, String, String>> indexes = findIndexes(
+                List<Triple<String, String, String>> indexes = findIndexes(properties,
                         indexConstraints.stream().map(Constraint::getConstraintName).collect(Collectors.toList()));
                 preLoadOperations(properties, indexes, indexConstraints, tableNames);
                 insertEhrData(properties);
                 if(properties.getModes().contains(CompositionDataMode.LEGACY)){
                     copyToEntryWithJsonb();
                 }
-                postLoadOperations(indexes, indexConstraints, tableNames);
+                postLoadOperations(properties, indexes, indexConstraints, tableNames);
             } catch (RuntimeException e) {
                 isRunning = false;
                 throw e;
@@ -474,7 +480,7 @@ public class LoaderServiceImp implements LoaderService {
                         i)));
     }
 
-    private List<Triple<String, String, String>> findIndexes(List<String> constraintNames) {
+    private List<Triple<String, String, String>> findIndexes(LoaderRequestDto properties, List<String> constraintNames) {
         try (Connection c = secondaryDataSource.getConnection();
                 Statement s = c.createStatement()) {
             s.execute(String.format(
@@ -485,7 +491,13 @@ public class LoaderServiceImp implements LoaderService {
             List<Triple<String, String, String>> parsed = new ArrayList<>();
             try (ResultSet resultSet = s.getResultSet()) {
                 while (resultSet.next()) {
-                    parsed.add(Triple.of(resultSet.getString(1), resultSet.getString(2), resultSet.getString(3)));
+                    parsed.add(Triple.of(
+                            resultSet.getString(1),
+                            resultSet.getString(2),
+                            SQLDialect.YUGABYTEDB.equals(dialect) && properties.isRecreateIndexesNonConcurrently() ?
+                                    //For yugabyte we use nonconcurrent index creation to avoid leaving broken indexes behind
+                                    resultSet.getString(3).replace("CREATE INDEX", "CREATE INDEX NONCONCURRENTLY") :
+                                    resultSet.getString(3)));
                 }
             }
             return parsed;
@@ -526,14 +538,15 @@ public class LoaderServiceImp implements LoaderService {
             List<Triple<String, String, String>> indexes,
             List<Constraint> constraints,
             Set<String> tableNames) {
-        log.info("Dropping indexes (including unique constraints) on relevant tables: {}", tableNames);
-        constraints.stream()
-                .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
-                .forEach(cs -> runStatementWithTransactionalWrites(String.format(
-                        "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", cs.getSchema(), cs.getTable(), cs.getConstraintName())));
-        indexes.forEach(indexInfo -> runStatementWithTransactionalWrites(
-                String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getLeft(), indexInfo.getMiddle())));
-
+        if (!keepIndexes){
+            log.info("Dropping indexes (including unique constraints) on relevant tables: {}", tableNames);
+            constraints.stream()
+                    .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
+                    .forEach(cs -> runStatementWithTransactionalWrites(String.format(
+                            "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", cs.getSchema(), cs.getTable(), cs.getConstraintName())));
+            indexes.forEach(indexInfo -> runStatementWithTransactionalWrites(
+                    String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getLeft(), indexInfo.getMiddle())));
+        }
         log.info("Disabling all triggers...");
         // We assume Postgres or Yugabyte as DB vendor -> disabling triggers will also disable foreign key
         // constraints
@@ -561,7 +574,7 @@ public class LoaderServiceImp implements LoaderService {
         synchronized */
         List<MutablePair<Integer, Long>> facilityCountToEhrCountDistribution = IntStream.range(0, properties.getEhr())
                 .parallel()
-                .mapToObj(e -> (int) getRandomGaussianWithLimitsLong(7, 3, 1, 16))
+                .mapToObj(e -> (int) RandomHelper.getRandomGaussianWithLimitsLong(7, 3, 1, 16))
                 .collect(Collectors.groupingBy(i -> i, Collectors.counting()))
                 .entrySet()
                 .stream()
@@ -646,7 +659,9 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void postLoadOperations(
-            List<Triple<String, String, String>> indexes, List<Constraint> constraints, Set<String> tableNames) {
+            LoaderRequestDto properties, List<Triple<String, String, String>> indexes, List<Constraint> constraints, Set<String> tableNames) {
+        StopWatch sw = new StopWatch();
+        sw.start();
         final List<String> failedStatements = new ArrayList<>();
         // All streams are explicitly marked as sequential since parallel catalog updates may lead to conflicts
         log.info("Re-enabling triggers...");
@@ -656,27 +671,32 @@ public class LoaderServiceImp implements LoaderService {
                 .map(table -> String.format(
                         "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
                 .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
-        log.info("Re-Creating indexes...");
-        indexes.stream()
-                .sequential()
-                .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
-                .map(Triple::getRight)
-                .map(s -> s + ";")
-                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
-        log.info("Re-Creating unique constraints...");
-        constraints.stream()
-                .sequential()
-                .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
-                .map(cs -> String.format(
-                        "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
-                        cs.getSchema(), cs.getTable(), cs.getConstraintName(), cs.getDefinition()))
-                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        if(!keepIndexes){
+            log.info("Re-Creating indexes...");
+            indexes.stream()
+                    .sequential()
+                    .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
+                    .map(Triple::getRight)
+                    .map(s -> s + ";")
+                    .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+            log.info("Re-Creating unique constraints...");
+            constraints.stream()
+                    .sequential()
+                    .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
+                    .map(cs -> String.format(
+                            "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
+                            cs.getSchema(), cs.getTable(), cs.getConstraintName(), cs.getDefinition()))
+                    .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        }
+        if(properties.getModes().contains(CompositionDataMode.LEGACY)) {
+            log.info("Removing temporary entry tables...");
+            IntStream.range(0, (int)compositionsWithSequenceByType.stream().flatMap(List::stream).count() + singleCompositions.size())
+                    .forEach(i -> runStatementWithTransactionalWrites(
+                            String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
+        }
 
-        log.info("Removing temporary entry tables...");
-        IntStream.range(0, compositionsWithSequenceByType.size())
-                .forEach(i -> runStatementWithTransactionalWrites(
-                        String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
-
+        sw.stop();
+        log.info("Post load operations took {}s", sw.getTotalTimeSeconds());
         log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
                 + "because it is a very long running operation. \n"
                 + "Please add it manually! Statement: \n"
@@ -806,7 +826,7 @@ public class LoaderServiceImp implements LoaderService {
         // Names are following a schema of "hcf<facilitynumber>hcp<hcp-number-in-facility>"
         Map<UUID, List<PartyIdentifiedRecord>> facilityIdToHcp = facilityNumberToUuid.entrySet().parallelStream()
                 .collect(Collectors.toMap(e -> e.getValue().getKey(), e -> IntStream.range(
-                                0, (int) getRandomGaussianWithLimitsLong(20, 5, 5, 35))
+                                0, (int) RandomHelper.getRandomGaussianWithLimitsLong(20, 5, 5, 35))
                         .mapToObj(i -> DataCreator.createPartyWithRef(
                                 dsl,
                                 "hcf" + e.getKey() + "hcp" + i,
@@ -823,19 +843,6 @@ public class LoaderServiceImp implements LoaderService {
         return facilityIdToHcp.entrySet().stream().collect(Collectors.toMap(Entry::getKey, e -> e.getValue().stream()
                 .map(r -> Pair.of(r.getId(), r.getName()))
                 .collect(Collectors.toList())));
-    }
-
-    private long getRandomGaussianWithLimitsLong(int mean, int standardDeviation, int lowerBound, int upperBound) {
-        return Math.min(
-                upperBound,
-                Math.max(
-                        lowerBound,
-                        Math.round(Math.ceil(Math.abs(random.get().nextGaussian() * standardDeviation + mean)))));
-    }
-
-    private double getRandomGaussianWithLimitsDouble(int mean, int standardDeviation, int lowerBound, int upperBound) {
-        return Math.min(
-                upperBound, Math.max(lowerBound, Math.abs(random.get().nextGaussian() * standardDeviation + mean)));
     }
 
     private void waitForTaskToComplete(CompletableFuture<Void> insertTask) {
@@ -980,7 +987,7 @@ public class LoaderServiceImp implements LoaderService {
                 .boxed()
                 .map(i -> Pair.of(
                         facilityNumberToUuid.get(i).getLeft(),
-                        getRandomGaussianWithLimitsDouble(15_000, 5_000, 1, 30_000)))
+                        RandomHelper.getRandomGaussianWithLimitsDouble(15_000, 5_000, 1, 30_000)))
                 .collect(Collectors.toList());
         Double scaleFactor = ehrFacilityCountSum
                 / ehrDistribution.parallelStream().mapToDouble(Pair::getRight).sum();
@@ -1059,7 +1066,7 @@ public class LoaderServiceImp implements LoaderService {
                 // Determine how many compositions this EHR shall hold according to a normal distribution (m: 200,
                 // sd:50)
                 ehrSettings.add(Pair.of(
-                        (int) getRandomGaussianWithLimitsLong(200, 50, 50, 350),
+                        (int) RandomHelper.getRandomGaussianWithLimitsLong(200, 50, 50, 350),
                         facilities.stream()
                                 .map(f -> Pair.of(f, facilityIdToName.get(f)))
                                 .collect(Collectors.toList())));

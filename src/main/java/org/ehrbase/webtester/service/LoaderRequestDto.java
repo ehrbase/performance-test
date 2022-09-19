@@ -33,6 +33,7 @@ public class LoaderRequestDto {
     private int bulkSize = 200;
     private int ehrsPerBatch = 10;
     private Set<CompositionDataMode> modes;
+    private boolean recreateIndexesNonConcurrently = true;
 
     public Set<CompositionDataMode> getModes() {
         if (CollectionUtils.isEmpty(modes)) {
@@ -76,5 +77,13 @@ public class LoaderRequestDto {
 
     public void setEhrsPerBatch(int ehrsPerBatch) {
         this.ehrsPerBatch = ehrsPerBatch;
+    }
+
+    public boolean isRecreateIndexesNonConcurrently() {
+        return recreateIndexesNonConcurrently;
+    }
+
+    public void setRecreateIndexesNonConcurrently(boolean recreateIndexesNonConcurrently) {
+        this.recreateIndexesNonConcurrently = recreateIndexesNonConcurrently;
     }
 }

@@ -44,8 +44,14 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class PersistenceConfig {
 
-    @Value("${spring.jooq.sql-dialect}")
-    private String sqlDialect;
+    private SQLDialect sqlDialect;
+    private boolean keepIndexes;
+
+    public PersistenceConfig(@Value("${spring.jooq.sql-dialect}") String sqlDialect,@Value("${loader.keep-indexes}") boolean keepIndexes){
+        this.keepIndexes = keepIndexes;
+        this.sqlDialect = SQLDialect.valueOf(sqlDialect);
+    }
+
 
     static class ExceptionTranslator extends DefaultExecuteListener {
         @Override
@@ -68,6 +74,12 @@ public class PersistenceConfig {
         HikariDataSource dataSource = (HikariDataSource) createDataSource(properties, HikariDataSource.class);
         dataSource.setPoolName("primary-pool");
         dataSource.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
+
+        if(keepIndexes && SQLDialect.YUGABYTEDB.equals(sqlDialect)){
+            dataSource.setConnectionInitSql("SET yb_enable_upsert_mode=true;");
+        }else if(SQLDialect.YUGABYTEDB.equals(sqlDialect)){
+            dataSource.setConnectionInitSql("SET yb_disable_transactional_writes=true;SET yb_enable_upsert_mode=true;");
+        }
 
         return dataSource;
     }
@@ -112,8 +124,7 @@ public class PersistenceConfig {
         DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
         jooqConfiguration.set(dataSource);
         jooqConfiguration.set(new DefaultExecuteListenerProvider(exceptionTransformer()));
-        //        jooqConfiguration.set(new PerformanceListener());
-        SQLDialect dialect = SQLDialect.valueOf(sqlDialect);
+        SQLDialect dialect = sqlDialect;
         jooqConfiguration.set(dialect);
         return jooqConfiguration;
     }
