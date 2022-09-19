@@ -15,19 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.ehrbase.webtester.service;
+package org.ehrbase.webtester.service.loader;
 
-/**
- * @author Renaud Subiger
- * @since 1.0
- */
-public class LoaderException extends RuntimeException {
-
-    public LoaderException(String message) {
-        super(message);
-    }
-
-    public LoaderException(String message, Throwable cause) {
-        super(message, cause);
-    }
+public enum LoaderPhase {
+    NOT_RUN,
+    FINISHED,
+    PRE_LOAD,
+    PHASE_1,
+    PHASE_2,
+    POST_LOAD
 }

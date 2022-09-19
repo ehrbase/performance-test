@@ -17,6 +17,7 @@
  */
 package org.ehrbase.webtester.service.loader;
 
+import static org.ehrbase.jooq.pg.Tables.EHR_;
 import static org.ehrbase.jooq.pg.Tables.PARTY_IDENTIFIED;
 import static org.ehrbase.jooq.pg.Tables.SYSTEM;
 import static org.ehrbase.jooq.pg.tables.AuditDetails.AUDIT_DETAILS;
@@ -51,7 +52,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -89,7 +89,6 @@ import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
 import org.ehrbase.serialisation.dbencoding.RawJson;
 import org.ehrbase.serialisation.matrixencoding.MatrixFormat;
 import org.ehrbase.serialisation.matrixencoding.Row;
-import org.ehrbase.webtester.service.LoaderException;
 import org.ehrbase.webtester.service.loader.creators.CompositionDataMode;
 import org.ehrbase.webtester.service.loader.creators.DataCreator;
 import org.ehrbase.webtester.service.loader.creators.EhrCreateDescriptor;
@@ -130,96 +129,6 @@ import org.xml.sax.SAXException;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class LoaderServiceImp implements LoaderService {
 
-    private static class IndexInfo {
-        private String name;
-        private String ddl;
-
-        private IndexInfo() {
-            // For Jackson
-        }
-
-        private IndexInfo(String name, String ddl) {
-            this.setName(name);
-            this.setDdl(ddl);
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public String getDdl() {
-            return ddl;
-        }
-
-        public void setDdl(String ddl) {
-            this.ddl = ddl;
-        }
-    }
-
-    private static class Constraint {
-        private String schema;
-        private String table;
-        private String constraintName;
-        private String type;
-        private String definition;
-
-        private Constraint() {
-            // For Jackson
-        }
-
-        private Constraint(String schema, String table, String constraintName, String type, String definition) {
-            this.setSchema(schema);
-            this.setTable(table);
-            this.setConstraintName(constraintName);
-            this.setType(type);
-            this.setDefinition(definition);
-        }
-
-        public String getSchema() {
-            return schema;
-        }
-
-        public void setSchema(String schema) {
-            this.schema = schema;
-        }
-
-        public String getTable() {
-            return table;
-        }
-
-        public void setTable(String table) {
-            this.table = table;
-        }
-
-        public String getConstraintName() {
-            return constraintName;
-        }
-
-        public void setConstraintName(String constraintName) {
-            this.constraintName = constraintName;
-        }
-
-        public String getType() {
-            return type;
-        }
-
-        public void setType(String type) {
-            this.type = type;
-        }
-
-        public String getDefinition() {
-            return definition;
-        }
-
-        public void setDefinition(String definition) {
-            this.definition = definition;
-        }
-    }
-
     private static final String TEMPLATES_BASE = "classpath*:templates/**";
     private static final String COMPOSITIONS_REPEATABLE_PATH = "classpath*:compositions/repeatable/**";
     private static final String COMPOSITIONS_SINGLE_PATH = "classpath*:compositions/single/**";
@@ -236,6 +145,7 @@ public class LoaderServiceImp implements LoaderService {
     private final ResourceLoader resourceLoader;
     private final SQLDialect dialect;
     private final boolean keepIndexes;
+    private final LoaderStateService loaderStateService;
 
     private InMemoryEncoder encoder;
     private EhrCreator ehrCreator;
@@ -247,13 +157,15 @@ public class LoaderServiceImp implements LoaderService {
             @Qualifier("primaryDataSource") HikariDataSource primaryDataSource,
             @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource,
             @Value("${spring.jooq.sql-dialect}") String sqlDialect,
-            @Value("${loader.keep-indexes}") boolean keepIndexes) {
+            @Value("${loader.keep-indexes}") boolean keepIndexes,
+            LoaderStateService loaderStateService) {
         this.dsl = dsl;
         this.secondaryDataSource = secondaryDataSource;
         this.primaryDataSource = primaryDataSource;
         this.resourceLoader = resourceLoader;
         this.dialect = SQLDialect.valueOf(sqlDialect);
         this.keepIndexes = keepIndexes;
+        this.loaderStateService = loaderStateService;
     }
 
     @PostConstruct
@@ -297,21 +209,8 @@ public class LoaderServiceImp implements LoaderService {
                 encoder.getPathToCodeMap().entrySet().stream()
                         .collect(Collectors.toUnmodifiableMap(
                                 Map.Entry::getKey, e -> "/" + e.getValue().toString())));
-    }
-
-    private Set<String> getTableNames() {
-        try (Connection c = secondaryDataSource.getConnection();
-                Statement s = c.createStatement()) {
-            Set<String> tableNames = new HashSet<>();
-            s.execute("SELECT tablename FROM pg_tables WHERE schemaname='ehr';");
-            try (ResultSet resultSet = s.getResultSet()) {
-                while (resultSet.next()) {
-                    tableNames.add(resultSet.getString(1));
-                }
-            }
-            return tableNames;
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
+        if (!Set.of(LoaderPhase.NOT_RUN, LoaderPhase.FINISHED).contains(loaderStateService.getCurrentPhase())) {
+            load(null);
         }
     }
 
@@ -364,12 +263,12 @@ public class LoaderServiceImp implements LoaderService {
                     .map(p -> {
                         try (InputStream in = p.getInputStream()) {
                             if (!p.getFilename().matches("[0-9]{2}_.*")) {
-                                throw new org.ehrbase.webtester.service.LoaderException("composition resource " + p.getFilename()
+                                throw new LoaderException("composition resource " + p.getFilename()
                                         + " filename has to start with a 2 digit composition group number");
                             }
                             return Pair.of(p.getFilename(), objectMapper.readValue(in, Composition.class));
                         } catch (IOException e) {
-                            throw new org.ehrbase.webtester.service.LoaderException("Failed to read composition file", e);
+                            throw new LoaderException("Failed to read composition file", e);
                         }
                     })
                     .collect(Collectors.groupingBy(
@@ -397,7 +296,7 @@ public class LoaderServiceImp implements LoaderService {
                     .map(p -> {
                         try (InputStream in = p.getInputStream()) {
                             if (!p.getFilename().matches("[0-9]{2}_.*")) {
-                                throw new org.ehrbase.webtester.service.LoaderException("composition resource " + p.getFilename()
+                                throw new LoaderException("composition resource " + p.getFilename()
                                         + " filename has to start with a 2 digit composition group number");
                             }
                             Composition composition = objectMapper.readValue(in, Composition.class);
@@ -409,7 +308,7 @@ public class LoaderServiceImp implements LoaderService {
                                             .map(this::toRowDataPair)
                                             .collect(Collectors.toList()));
                         } catch (IOException e) {
-                            throw new org.ehrbase.webtester.service.LoaderException("Failed to read composition file", e);
+                            throw new LoaderException("Failed to read composition file", e);
                         }
                     })
                     .forEach(singleCompositions::add);
@@ -430,7 +329,7 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     @Override
-    public void load(LoaderRequestDto properties) {
+    public void load(LoaderRequestDto settings) {
 
         if (isRunning) {
             throw new ResponseStatusException(
@@ -438,37 +337,48 @@ public class LoaderServiceImp implements LoaderService {
                     "A test data loading request is currently being processed. Please try again later...");
         }
 
-        if (properties.getHealthcareFacilities() < 1 || properties.getEhr() < properties.getHealthcareFacilities()) {
+        if (settings != null
+                && (settings.getHealthcareFacilities() < 1 || settings.getEhr() < settings.getHealthcareFacilities())) {
             throw new IllegalArgumentException(
                     "EHR count must be higher or equal to the number of healthcareFacilities and greater than 0");
         }
 
-        log.info(
-                "Test data loading options [EHRs: {}, Facilities: {}, Bulk insert size {}, EHRs per batch: {}]",
-                properties.getEhr(),
-                properties.getHealthcareFacilities(),
-                properties.getBulkSize(),
-                properties.getEhrsPerBatch());
+        final LoaderPhase currentPhase = loaderStateService.getCurrentPhase();
+        final LoaderRequestDto properties;
+        if (settings == null) {
+            if (LoaderPhase.PRE_LOAD.equals(currentPhase)) {
+                throw new LoaderException("Can't resume during PRE_LOAD phase. Please reinitialize the DB!");
+            }
+            properties = loaderStateService.getSettingsFromDB();
+            if (LoaderPhase.PHASE_1.equals(currentPhase)) {
+                log.warn(
+                        "Resuming during PHASE_1. A manual cleanup may be necessary afterwards. Check the logs of the previous run to see which tables might need cleanup.");
+                properties.setEhr(properties.getEhr() - (getEhrCount() - loaderStateService.getPreviousEHRCount()));
+            }
+        } else if (!Set.of(LoaderPhase.NOT_RUN, LoaderPhase.FINISHED).contains(currentPhase)) {
+            throw new LoaderException("Last execution was interrupted. Please resume instead of starting a new run!");
+        } else {
+            properties = settings;
+        }
+
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
-                if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
-                    prepareEntryTables();
+                if (currentPhase.ordinal() <= LoaderPhase.PRE_LOAD.ordinal()) {
+                    preLoadOperations(properties);
                 }
-                Set<String> tableNames = getTableNames();
-                // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
-                List<Constraint> indexConstraints = findConstraints();
-                List<Triple<String, String, String>> indexes = findIndexes(
-                        properties,
-                        indexConstraints.stream()
-                                .map(Constraint::getConstraintName)
-                                .collect(Collectors.toList()));
-                preLoadOperations(properties, indexes, indexConstraints, tableNames);
-                insertEhrData(properties);
-                if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
+                if (currentPhase.ordinal() <= LoaderPhase.PHASE_1.ordinal()) {
+                    insertEhrData(properties);
+                }
+                if (currentPhase.ordinal() <= LoaderPhase.PHASE_2.ordinal()
+                        && properties.getModes().contains(CompositionDataMode.LEGACY)) {
                     copyToEntryWithJsonb();
                 }
-                postLoadOperations(properties, indexes, indexConstraints, tableNames);
+                if (currentPhase.ordinal() <= LoaderPhase.POST_LOAD.ordinal()) {
+                    postLoadOperations(properties);
+                }
+
+                loaderStateService.updateCurrentLoaderPhase(LoaderPhase.FINISHED);
             } catch (RuntimeException e) {
                 isRunning = false;
                 throw e;
@@ -478,54 +388,77 @@ public class LoaderServiceImp implements LoaderService {
         });
     }
 
-    private void prepareEntryTables() {
+    private int getEhrCount() {
+        return dsl.fetchCount(EHR_);
+    }
+
+    private List<String> getTableNames() {
+        try (Connection c = secondaryDataSource.getConnection();
+                Statement s = c.createStatement()) {
+            List<String> tableNames = new ArrayList<>();
+            try (ResultSet resultSet = s.executeQuery("SELECT tablename FROM pg_tables WHERE schemaname='ehr';")) {
+                while (resultSet.next()) {
+                    tableNames.add(resultSet.getString(1));
+                }
+            }
+            return tableNames;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<String> prepareEntryTables() {
         // We will use temporary entry tables for each composition number for faster JSONB inserts in the end
-        IntStream.range(
+        List<String> names = IntStream.range(
                         0,
                         compositionsWithSequenceByType.stream()
                                         .mapToInt(List::size)
                                         .sum()
                                 + singleCompositions.size())
-                .forEach(i -> runStatementWithTransactionalWrites(String.format(
-                        "CREATE TABLE IF NOT EXISTS ehr.entry_%d("
-                                + "    id uuid,"
-                                + "    composition_id uuid,"
-                                + "    sequence integer,"
-                                + "    item_type ehr.entry_type,"
-                                + "    template_id text COLLATE pg_catalog.\"default\","
-                                + "    template_uuid uuid,"
-                                + "    archetype_id text COLLATE pg_catalog.\"default\","
-                                + "    category ehr.dv_coded_text,"
-                                + "    entry jsonb,"
-                                + "    sys_transaction timestamp without time zone,"
-                                + "    sys_period tstzrange,"
-                                + "    rm_version text COLLATE pg_catalog.\"default\","
-                                + "    name ehr.dv_coded_text,"
-                                + "    PRIMARY KEY (id));",
-                        i)));
+                .mapToObj(i -> "entry_" + i)
+                .collect(Collectors.toList());
+        names.forEach(i -> runStatementWithTransactionalWrites(String.format(
+                "CREATE TABLE IF NOT EXISTS ehr.%s("
+                        + "    id uuid,"
+                        + "    composition_id uuid,"
+                        + "    sequence integer,"
+                        + "    item_type ehr.entry_type,"
+                        + "    template_id text COLLATE pg_catalog.\"default\","
+                        + "    template_uuid uuid,"
+                        + "    archetype_id text COLLATE pg_catalog.\"default\","
+                        + "    category ehr.dv_coded_text,"
+                        + "    entry jsonb,"
+                        + "    sys_transaction timestamp without time zone,"
+                        + "    sys_period tstzrange,"
+                        + "    rm_version text COLLATE pg_catalog.\"default\","
+                        + "    name ehr.dv_coded_text,"
+                        + "    PRIMARY KEY (id));",
+                i)));
+        return names;
     }
 
-    private List<Triple<String, String, String>> findIndexes(
-            LoaderRequestDto properties, List<String> constraintNames) {
+    private List<IndexInfo> findIndexes(LoaderRequestDto properties, List<Constraint> constraints) {
         try (Connection c = secondaryDataSource.getConnection();
                 Statement s = c.createStatement()) {
             s.execute(String.format(
                     "SELECT schemaname, indexname, indexdef\n" + "FROM pg_indexes\n"
                             + "WHERE schemaname = 'ehr'"
                             + "AND indexname NOT IN (%s)",
-                    constraintNames.stream().map(t -> "'" + t + "'").collect(Collectors.joining(","))));
-            List<Triple<String, String, String>> parsed = new ArrayList<>();
+                    constraints.stream()
+                            .map(t -> "'" + t.getConstraintName() + "'")
+                            .collect(Collectors.joining(","))));
+            List<IndexInfo> parsed = new ArrayList<>();
             try (ResultSet resultSet = s.getResultSet()) {
                 while (resultSet.next()) {
-                    parsed.add(Triple.of(
+                    parsed.add(new IndexInfo(
                             resultSet.getString(1),
                             resultSet.getString(2),
                             SQLDialect.YUGABYTEDB.equals(dialect) && properties.isRecreateIndexesNonConcurrently()
                                     ?
                                     // For yugabyte we use nonconcurrent index creation to avoid leaving broken indexes
                                     // behind
-                                    resultSet.getString(3).replace("CREATE INDEX", "CREATE INDEX NONCONCURRENTLY")
-                                    : resultSet.getString(3)));
+                                    resultSet.getString(3).replace("INDEX", "INDEX NONCONCURRENTLY IF NOT EXISTS")
+                                    : resultSet.getString(3).replace("INDEX", "INDEX IF NOT EXISTS")));
                 }
             }
             return parsed;
@@ -561,11 +494,35 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private void preLoadOperations(
-            LoaderRequestDto properties,
-            List<Triple<String, String, String>> indexes,
-            List<Constraint> constraints,
-            Set<String> tableNames) {
+    private void preLoadOperations(LoaderRequestDto properties) {
+
+        log.info(
+                "Test data loading options [EHRs: {}, Facilities: {}, Bulk insert size {}, EHRs per batch: {}]",
+                properties.getEhr(),
+                properties.getHealthcareFacilities(),
+                properties.getBulkSize(),
+                properties.getEhrsPerBatch());
+
+        loaderStateService.updateCurrentLoaderPhase(LoaderPhase.PRE_LOAD);
+
+        log.info("Starting PRE_LOAD...");
+
+        List<Constraint> constraints = findConstraints();
+        List<IndexInfo> indexes = findIndexes(properties, constraints);
+        List<String> tableNames = getTableNames();
+        List<String> tmpTableNames =
+                properties.getModes().contains(CompositionDataMode.LEGACY) ? prepareEntryTables() : new ArrayList<>();
+
+        // Save info required for resuming in DB
+        loaderStateService.updateUniqueConstraints(constraints.stream()
+                .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
+                .collect(Collectors.toList()));
+        loaderStateService.updateIndexInfo(indexes);
+        loaderStateService.updateTableNames(tableNames);
+        loaderStateService.updateTemporaryTableNames(tmpTableNames);
+        loaderStateService.updateLoaderSettings(properties);
+        loaderStateService.updatePreviousEHRCount(getEhrCount());
+
         if (!keepIndexes) {
             log.info("Dropping indexes (including unique constraints) on relevant tables: {}", tableNames);
             constraints.stream()
@@ -574,16 +531,24 @@ public class LoaderServiceImp implements LoaderService {
                             "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;",
                             cs.getSchema(), cs.getTable(), cs.getConstraintName())));
             indexes.forEach(indexInfo -> runStatementWithTransactionalWrites(
-                    String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getLeft(), indexInfo.getMiddle())));
+                    String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getSchema(), indexInfo.getName())));
         }
+
         log.info("Disabling all triggers...");
         // We assume Postgres or Yugabyte as DB vendor -> disabling triggers will also disable foreign key
         // constraints
         tableNames.forEach(table -> runStatementWithTransactionalWrites(
                 String.format("ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
+        tmpTableNames.forEach(table -> runStatementWithTransactionalWrites(
+                String.format("ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
     }
 
     private void insertEhrData(LoaderRequestDto properties) {
+
+        loaderStateService.updateCurrentLoaderPhase(LoaderPhase.PHASE_1);
+
+        log.info("Starting PHASE_1...");
+
         StopWatch stopWatch = new StopWatch();
         stopWatch.start("prep");
 
@@ -667,6 +632,11 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void copyToEntryWithJsonb() {
+
+        loaderStateService.updateCurrentLoaderPhase(LoaderPhase.PHASE_2);
+
+        log.info("Starting PHASE_2...");
+
         StopWatch stopWatch = new StopWatch();
         log.info("Copying to ehr.entry with JSONB data...");
         stopWatch.start("count");
@@ -688,34 +658,40 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Moved entry data and added JSONB in {}s", stopWatch.getTotalTimeSeconds());
     }
 
-    private void postLoadOperations(
-            LoaderRequestDto properties,
-            List<Triple<String, String, String>> indexes,
-            List<Constraint> constraints,
-            Set<String> tableNames) {
+    private void postLoadOperations(LoaderRequestDto properties) {
+
+        loaderStateService.updateCurrentLoaderPhase(LoaderPhase.POST_LOAD);
+
+        log.info("Starting POST_LOAD...");
         StopWatch sw = new StopWatch();
         sw.start();
         final List<String> failedStatements = new ArrayList<>();
         // All streams are explicitly marked as sequential since parallel catalog updates may lead to conflicts
         log.info("Re-enabling triggers...");
-        tableNames.stream()
+        loaderStateService.getTableNamesFromDB().stream()
                 .sequential()
-                .filter(t -> !StringUtils.startsWithIgnoreCase(t, "entry_"))
                 .map(table -> String.format(
                         "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
                 .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
         if (!keepIndexes) {
             log.info("Re-Creating indexes...");
-            indexes.stream()
+            // The index statements are modified to include IF NOT EXISTS when the job is started first
+            loaderStateService.getIndexInfoFromDB().stream()
                     .sequential()
-                    .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getMiddle()))
-                    .map(Triple::getRight)
+                    .filter(i -> !"gin_entry_path_idx".equalsIgnoreCase(i.getName()))
+                    .map(IndexInfo::getDdl)
                     .map(s -> s + ";")
                     .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+
             log.info("Re-Creating unique constraints...");
-            constraints.stream()
+            // We make sure that we do not try to add constraints that already exist
+            Set<String> constraints = findConstraints().stream()
+                    .map(Constraint::getConstraintName)
+                    .collect(Collectors.toSet());
+            loaderStateService.getUniqueConstraintsFromDB().stream()
                     .sequential()
                     .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
+                    .filter(cs -> !constraints.contains(cs.getConstraintName()))
                     .map(cs -> String.format(
                             "ALTER TABLE %s.%s ADD CONSTRAINT %s %s;",
                             cs.getSchema(), cs.getTable(), cs.getConstraintName(), cs.getDefinition()))
@@ -723,14 +699,10 @@ public class LoaderServiceImp implements LoaderService {
         }
         if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
             log.info("Removing temporary entry tables...");
-            IntStream.range(
-                            0,
-                            (int) compositionsWithSequenceByType.stream()
-                                            .flatMap(List::stream)
-                                            .count()
-                                    + singleCompositions.size())
+            loaderStateService
+                    .getTemporaryTableNamesFromDB()
                     .forEach(i -> runStatementWithTransactionalWrites(
-                            String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
+                            String.format("DROP TABLE IF EXISTS ehr.%s;", i), failedStatements));
         }
 
         List<String> errorsAfterRetry = retryStatements(failedStatements);
@@ -1021,7 +993,7 @@ public class LoaderServiceImp implements LoaderService {
         }
         if (!success) {
             // If after 100 attempts we still fail, we assume a more general problem and abort data loading
-            throw new org.ehrbase.webtester.service.LoaderException("bulk insert failed. table: " + table.getName());
+            throw new LoaderException("bulk insert failed. table: " + table.getName());
         }
         sw.stop();
         log.info("Insert {} took {}. Attempts: {}", table.getName(), sw.getTotalTimeSeconds(), errorCount + 1);
