@@ -47,11 +47,12 @@ public class PersistenceConfig {
     private SQLDialect sqlDialect;
     private boolean keepIndexes;
 
-    public PersistenceConfig(@Value("${spring.jooq.sql-dialect}") String sqlDialect,@Value("${loader.keep-indexes}") boolean keepIndexes){
+    public PersistenceConfig(
+            @Value("${spring.jooq.sql-dialect}") String sqlDialect,
+            @Value("${loader.keep-indexes}") boolean keepIndexes) {
         this.keepIndexes = keepIndexes;
         this.sqlDialect = SQLDialect.valueOf(sqlDialect);
     }
-
 
     static class ExceptionTranslator extends DefaultExecuteListener {
         @Override
@@ -75,9 +76,9 @@ public class PersistenceConfig {
         dataSource.setPoolName("primary-pool");
         dataSource.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
 
-        if(keepIndexes && SQLDialect.YUGABYTEDB.equals(sqlDialect)){
+        if (keepIndexes && SQLDialect.YUGABYTEDB.equals(sqlDialect)) {
             dataSource.setConnectionInitSql("SET yb_enable_upsert_mode=true;");
-        }else if(SQLDialect.YUGABYTEDB.equals(sqlDialect)){
+        } else if (SQLDialect.YUGABYTEDB.equals(sqlDialect)) {
             dataSource.setConnectionInitSql("SET yb_disable_transactional_writes=true;SET yb_enable_upsert_mode=true;");
         }
 

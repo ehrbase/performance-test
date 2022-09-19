@@ -38,7 +38,8 @@ public class CachedComposition {
         this.idx = idx;
         this.composition = composition;
         this.entryJsonb = entryJsonb;
-        this.matrixFormatData = matrixFormatData == null ? Collections.emptyList() : Collections.unmodifiableList(matrixFormatData);
+        this.matrixFormatData =
+                matrixFormatData == null ? Collections.emptyList() : Collections.unmodifiableList(matrixFormatData);
     }
 
     public int getIdx() {

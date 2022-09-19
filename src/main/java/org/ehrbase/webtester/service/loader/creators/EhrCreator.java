@@ -133,7 +133,7 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
                         info.modes,
                         i)))
                 .collect(Collectors.toList());
-        if(info.getModes().contains(CompositionDataMode.LEGACY)){
+        if (info.getModes().contains(CompositionDataMode.LEGACY)) {
             ehrDescriptor.setCompositions(compositionDescriptors.stream()
                     .map(CompositionCreateDescriptor::getComposition)
                     .collect(Collectors.toList()));
@@ -149,12 +149,14 @@ public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCrea
 
             ehrDescriptor.setCompositionIdToVersionCount(compositionDescriptors.stream()
                     .filter(c -> c.getVersions() > 1)
-                    .collect(Collectors.toMap(c -> c.getComposition().getId(), CompositionCreateDescriptor::getVersions)));
+                    .collect(Collectors.toMap(
+                            c -> c.getComposition().getId(), CompositionCreateDescriptor::getVersions)));
             ehrDescriptor.setEventCtxIdToVersionCount(compositionDescriptors.stream()
                     .filter(c -> c.getVersions() > 1)
-                    .collect(Collectors.toMap(c -> c.getEventContext().getId(), CompositionCreateDescriptor::getVersions)));
+                    .collect(Collectors.toMap(
+                            c -> c.getEventContext().getId(), CompositionCreateDescriptor::getVersions)));
         }
-        if(info.getModes().contains(CompositionDataMode.MATRIX)) {
+        if (info.getModes().contains(CompositionDataMode.MATRIX)) {
             ehrDescriptor
                     .getMatrixRecords()
                     .addAll(compositionDescriptors.stream()

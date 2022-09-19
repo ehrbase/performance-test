@@ -264,10 +264,8 @@ public class LoaderServiceImp implements LoaderService {
                 "javax.xml.parsers.DocumentBuilderFactory",
                 "com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl");
         initializeTemplates();
-        Map<String, Long> existingEncodings = dsl
-                .select()
-                .from(Encoding.ENCODING)
-                .fetchMap(Encoding.ENCODING.PATH, Encoding.ENCODING.CODE);
+        Map<String, Long> existingEncodings =
+                dsl.select().from(Encoding.ENCODING).fetchMap(Encoding.ENCODING.PATH, Encoding.ENCODING.CODE);
         encoder = new InMemoryEncoder(existingEncodings);
         initializeCompositions();
         List<EncodingRecord> encodingsToInsert = encoder.getPathToCodeMap().entrySet().stream()
@@ -298,9 +296,7 @@ public class LoaderServiceImp implements LoaderService {
                         .collect(Collectors.toMap(Record2::value1, Record2::value2)),
                 singleCompositions,
                 compositionsWithSequenceByType,
-                encoder.getPathToCodeMap()
-                        .entrySet()
-                        .stream()
+                encoder.getPathToCodeMap().entrySet().stream()
                         .collect(Collectors.toUnmodifiableMap(
                                 Map.Entry::getKey, e -> "/" + e.getValue().toString())));
     }
@@ -354,7 +350,6 @@ public class LoaderServiceImp implements LoaderService {
             throw new RuntimeException(e);
         }
     }
-
 
     private void initializeCompositions() {
         try {
@@ -459,17 +454,20 @@ public class LoaderServiceImp implements LoaderService {
         isRunning = true;
         ForkJoinPool.commonPool().execute(() -> {
             try {
-                if(properties.getModes().contains(CompositionDataMode.LEGACY)){
+                if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
                     prepareEntryTables();
                 }
                 Set<String> tableNames = getTableNames();
                 // Loading costraints/indexes assumes postgres/yugabyte as DB vendor
                 List<Constraint> indexConstraints = findConstraints();
-                List<Triple<String, String, String>> indexes = findIndexes(properties,
-                        indexConstraints.stream().map(Constraint::getConstraintName).collect(Collectors.toList()));
+                List<Triple<String, String, String>> indexes = findIndexes(
+                        properties,
+                        indexConstraints.stream()
+                                .map(Constraint::getConstraintName)
+                                .collect(Collectors.toList()));
                 preLoadOperations(properties, indexes, indexConstraints, tableNames);
                 insertEhrData(properties);
-                if(properties.getModes().contains(CompositionDataMode.LEGACY)){
+                if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
                     copyToEntryWithJsonb();
                 }
                 postLoadOperations(properties, indexes, indexConstraints, tableNames);
@@ -509,7 +507,8 @@ public class LoaderServiceImp implements LoaderService {
                         i)));
     }
 
-    private List<Triple<String, String, String>> findIndexes(LoaderRequestDto properties, List<String> constraintNames) {
+    private List<Triple<String, String, String>> findIndexes(
+            LoaderRequestDto properties, List<String> constraintNames) {
         try (Connection c = secondaryDataSource.getConnection();
                 Statement s = c.createStatement()) {
             s.execute(String.format(
@@ -523,10 +522,12 @@ public class LoaderServiceImp implements LoaderService {
                     parsed.add(Triple.of(
                             resultSet.getString(1),
                             resultSet.getString(2),
-                            SQLDialect.YUGABYTEDB.equals(dialect) && properties.isRecreateIndexesNonConcurrently() ?
-                                    //For yugabyte we use nonconcurrent index creation to avoid leaving broken indexes behind
-                                    resultSet.getString(3).replace("CREATE INDEX", "CREATE INDEX NONCONCURRENTLY") :
-                                    resultSet.getString(3)));
+                            SQLDialect.YUGABYTEDB.equals(dialect) && properties.isRecreateIndexesNonConcurrently()
+                                    ?
+                                    // For yugabyte we use nonconcurrent index creation to avoid leaving broken indexes
+                                    // behind
+                                    resultSet.getString(3).replace("CREATE INDEX", "CREATE INDEX NONCONCURRENTLY")
+                                    : resultSet.getString(3)));
                 }
             }
             return parsed;
@@ -567,12 +568,13 @@ public class LoaderServiceImp implements LoaderService {
             List<Triple<String, String, String>> indexes,
             List<Constraint> constraints,
             Set<String> tableNames) {
-        if (!keepIndexes){
+        if (!keepIndexes) {
             log.info("Dropping indexes (including unique constraints) on relevant tables: {}", tableNames);
             constraints.stream()
                     .filter(cs -> "u".equalsIgnoreCase(cs.getType()))
                     .forEach(cs -> runStatementWithTransactionalWrites(String.format(
-                            "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;", cs.getSchema(), cs.getTable(), cs.getConstraintName())));
+                            "ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s;",
+                            cs.getSchema(), cs.getTable(), cs.getConstraintName())));
             indexes.forEach(indexInfo -> runStatementWithTransactionalWrites(
                     String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getLeft(), indexInfo.getMiddle())));
         }
@@ -636,11 +638,11 @@ public class LoaderServiceImp implements LoaderService {
             }
             // Prepare data to insert while current insert task is running
             List<EhrCreateDescriptor> ehrDescriptors = getEhrSettingsBatch(
-                    facilityNumberToUuid,
-                    facilityIdToName,
-                    facilityCountToEhrCountDistribution,
-                    scaledEhrDistribution,
-                    batchSize)
+                            facilityNumberToUuid,
+                            facilityIdToName,
+                            facilityCountToEhrCountDistribution,
+                            scaledEhrDistribution,
+                            batchSize)
                     .stream()
                     .map(ehrInfo -> ehrCreator.create(new EhrCreator.EhrCreationInfo(
                             ehrInfo.getRight(), ehrInfo.getLeft(), facilityIdToHcp, properties.getModes())))
@@ -663,9 +665,10 @@ public class LoaderServiceImp implements LoaderService {
             stopWatch.stop();
         }
         log.info("Last Batch completed in {} ms", stopWatch.getLastTaskTimeMillis());
-        log.info("Test data without ehr.entry.entry contents loaded in {} s", stopWatch.getTotalTimeSeconds());}
+        log.info("Test data without ehr.entry.entry contents loaded in {} s", stopWatch.getTotalTimeSeconds());
+    }
 
-    private void copyToEntryWithJsonb(){
+    private void copyToEntryWithJsonb() {
         StopWatch stopWatch = new StopWatch();
         log.info("Copying to ehr.entry with JSONB data...");
         stopWatch.start("count");
@@ -679,16 +682,19 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Getting temporary entry table sizes took {}ms", stopWatch.getLastTaskTimeMillis());
 
         stopWatch.start("move-entries");
-        waitForTaskToComplete(CompletableFuture.allOf(
-                compositionsWithCount.stream()
-                .map(ci -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(ci.getRight(), ci.getLeft().getIdx(), ci.getLeft().getEntryJsonb())))
+        waitForTaskToComplete(CompletableFuture.allOf(compositionsWithCount.stream()
+                .map(ci -> CompletableFuture.runAsync(() -> copyIntoEntryTableWithJsonb(
+                        ci.getRight(), ci.getLeft().getIdx(), ci.getLeft().getEntryJsonb())))
                 .toArray(CompletableFuture[]::new)));
         stopWatch.stop();
         log.info("Moved entry data and added JSONB in {}s", stopWatch.getTotalTimeSeconds());
     }
 
     private void postLoadOperations(
-            LoaderRequestDto properties, List<Triple<String, String, String>> indexes, List<Constraint> constraints, Set<String> tableNames) {
+            LoaderRequestDto properties,
+            List<Triple<String, String, String>> indexes,
+            List<Constraint> constraints,
+            Set<String> tableNames) {
         StopWatch sw = new StopWatch();
         sw.start();
         final List<String> failedStatements = new ArrayList<>();
@@ -700,7 +706,7 @@ public class LoaderServiceImp implements LoaderService {
                 .map(table -> String.format(
                         "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
                 .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
-        if(!keepIndexes){
+        if (!keepIndexes) {
             log.info("Re-Creating indexes...");
             indexes.stream()
                     .sequential()
@@ -717,9 +723,14 @@ public class LoaderServiceImp implements LoaderService {
                             cs.getSchema(), cs.getTable(), cs.getConstraintName(), cs.getDefinition()))
                     .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
         }
-        if(properties.getModes().contains(CompositionDataMode.LEGACY)) {
+        if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
             log.info("Removing temporary entry tables...");
-            IntStream.range(0, (int)compositionsWithSequenceByType.stream().flatMap(List::stream).count() + singleCompositions.size())
+            IntStream.range(
+                            0,
+                            (int) compositionsWithSequenceByType.stream()
+                                            .flatMap(List::stream)
+                                            .count()
+                                    + singleCompositions.size())
                     .forEach(i -> runStatementWithTransactionalWrites(
                             String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
         }
@@ -740,7 +751,7 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private List<String> retryStatements(List<String> statements) {
-        if(statements.isEmpty()){
+        if (statements.isEmpty()) {
             return Collections.emptyList();
         }
         List<String> toRetry = new ArrayList<>(statements);
@@ -748,7 +759,7 @@ public class LoaderServiceImp implements LoaderService {
             List<String> errors = new ArrayList<>();
             toRetry.forEach(s -> {
                 try {
-                    //We wait 30s to avoid overloading the DB
+                    // We wait 30s to avoid overloading the DB
                     Thread.sleep(30000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -757,7 +768,7 @@ public class LoaderServiceImp implements LoaderService {
                 runStatementWithTransactionalWrites(s, errors);
             });
             toRetry.retainAll(errors);
-            if(errors.isEmpty()){
+            if (errors.isEmpty()) {
                 break;
             }
         }
@@ -767,12 +778,12 @@ public class LoaderServiceImp implements LoaderService {
 
     private void copyIntoEntryTableWithJsonb(long tableSize, int compositionNumber, String jsonbData) {
 
-        if(tableSize < 1L){
-            //if our table is empty we do not need to run anything
+        if (tableSize < 1L) {
+            // if our table is empty we do not need to run anything
             log.info("Skipping composition {}, because the source table is empty", compositionNumber);
             return;
         }
-        //We add one additional iteration for the leftovers
+        // We add one additional iteration for the leftovers
         long loops = (tableSize / JSONB_INSERT_BATCH_SIZE) + 1;
         log.info("Comp {} count: {}, batches: {}", compositionNumber, tableSize, loops);
         int errorCount = 0;
@@ -781,7 +792,8 @@ public class LoaderServiceImp implements LoaderService {
         for (long i = 0; i < loops; i++) {
             sw.start("batch" + i);
             try {
-                Triple<Integer, Long, Long> insertResult = copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
+                Triple<Integer, Long, Long> insertResult =
+                        copyBatchIntoEntryTableWithJsonb(compositionNumber, jsonbData);
                 sw.stop();
                 log.info(
                         "Copy comp {} batch: {}, count: {}, connection time: {}ms, execution time: {}ms, total time: {}ms",
@@ -810,7 +822,8 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Copying comp {} done in {}s", compositionNumber, sw.getTotalTimeSeconds());
     }
 
-    private Triple<Integer, Long, Long> copyBatchIntoEntryTableWithJsonb(int compositionNumber, String jsonbData) throws SQLException {
+    private Triple<Integer, Long, Long> copyBatchIntoEntryTableWithJsonb(int compositionNumber, String jsonbData)
+            throws SQLException {
         StopWatch sw = new StopWatch();
         sw.start("connection");
         try (Connection c = primaryDataSource.getConnection()) {
@@ -885,17 +898,10 @@ public class LoaderServiceImp implements LoaderService {
                 .collect(Collectors.toMap(e -> e.getValue().getKey(), e -> IntStream.range(
                                 0, (int) RandomHelper.getRandomGaussianWithLimitsLong(20, 5, 5, 35))
                         .mapToObj(i -> DataCreator.createPartyWithRef(
-                                dsl,
-                                "hcf" + e.getKey() + "hcp" + i,
-                                "hcp",
-                                "PERSON",
-                                PartyType.party_identified))
+                                dsl, "hcf" + e.getKey() + "hcp" + i, "hcp", "PERSON", PartyType.party_identified))
                         .collect(Collectors.toList())));
 
-        bulkInsert(
-                PARTY_IDENTIFIED,
-                facilityIdToHcp.values().stream().flatMap(List::stream),
-                bulkSize);
+        bulkInsert(PARTY_IDENTIFIED, facilityIdToHcp.values().stream().flatMap(List::stream), bulkSize);
 
         return facilityIdToHcp.entrySet().stream().collect(Collectors.toMap(Entry::getKey, e -> e.getValue().stream()
                 .map(r -> Pair.of(r.getId(), r.getName()))
@@ -915,7 +921,8 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
-    private CompletableFuture<Void> insertEhrsAsync(List<EhrCreateDescriptor> ehrDescriptors, LoaderRequestDto properties) {
+    private CompletableFuture<Void> insertEhrsAsync(
+            List<EhrCreateDescriptor> ehrDescriptors, LoaderRequestDto properties) {
         List<CompletableFuture<Void>> tasks = new ArrayList<>();
         // The tasks are started ordered by the execution times
         if (properties.getModes().contains(CompositionDataMode.MATRIX)) {
@@ -926,10 +933,7 @@ public class LoaderServiceImp implements LoaderService {
                     .entrySet()
                     .stream()
                     .map(e -> CompletableFuture.runAsync(
-                            () -> bulkInsert(
-                                    Entry2.ENTRY2,
-                                    e.getValue().stream(),
-                                    properties.getBulkSize()*4)))
+                            () -> bulkInsert(Entry2.ENTRY2, e.getValue().stream(), properties.getBulkSize() * 4)))
                     .collect(Collectors.toList()));
         }
         if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
@@ -1012,7 +1016,7 @@ public class LoaderServiceImp implements LoaderService {
             } catch (Exception e) {
                 success = false;
                 errorCount++;
-                if(errorCount >= 100){
+                if (errorCount >= 100) {
                     throw new RuntimeException(e);
                 }
             }
@@ -1136,10 +1140,11 @@ public class LoaderServiceImp implements LoaderService {
         return ehrSettings;
     }
 
-    private Pair<Integer, Pair<UUID,String>> insertHealthcareFacility(int number) {
-        PartyIdentifiedRecord record = DataCreator.createPartyWithRef(dsl, "hcf" + number, "facilities", "ORGANISATION", PartyType.party_identified);
+    private Pair<Integer, Pair<UUID, String>> insertHealthcareFacility(int number) {
+        PartyIdentifiedRecord record = DataCreator.createPartyWithRef(
+                dsl, "hcf" + number, "facilities", "ORGANISATION", PartyType.party_identified);
         record.store();
-        return Pair.of(number, Pair.of(record.getId(),record.getName()));
+        return Pair.of(number, Pair.of(record.getId(), record.getName()));
     }
 
     private UUID getSystemId() {
@@ -1180,8 +1185,7 @@ public class LoaderServiceImp implements LoaderService {
     }
 
     private void createTemplate(String templateId, Resource file) throws IOException {
-        var existingTemplateStore =
-                dsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
+        var existingTemplateStore = dsl.fetchOptional(TEMPLATE_STORE, TEMPLATE_STORE.TEMPLATE_ID.eq(templateId));
         String tpl;
         try (InputStream in = file.getInputStream()) {
             tpl = IOUtils.toString(in, StandardCharsets.UTF_8);

@@ -68,14 +68,14 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
         }
 
         CompositionCreateDescriptor createDescriptor = new CompositionCreateDescriptor();
-        //Model independent data
+        // Model independent data
         createDescriptor.setCompositionAudit(createAuditDetails("Create COMPOSITION", sysTransaction));
         createDescriptor.setContributionAudit(createAuditDetails("Create CONTRIBUTION", sysTransaction));
         createDescriptor.setContribution(createContribution(
                 info.getEhrId(), createDescriptor.getContributionAudit().getId(), ContributionDataType.composition));
         UUID compositionId = UUID.randomUUID();
 
-        //Old model (composition + event_ctx + entry + participation tables)
+        // Old model (composition + event_ctx + entry + participation tables)
         if (info.getModes().contains(CompositionDataMode.LEGACY)) {
             LegacyCompositionCreator.LegacyCompositionData legacyCompositionData =
                     legacyCompositionCreator.create(new LegacyCompositionCreator.LegacyCompositionCreationInfo(
@@ -94,8 +94,8 @@ class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor
             createDescriptor.setParticipations(legacyCompositionData.getParticipations());
         }
 
-        //flattened matrix model (entry2 table)
-        //Currently we ignore participants here for saving complexity
+        // flattened matrix model (entry2 table)
+        // Currently we ignore participants here for saving complexity
         if (info.getModes().contains(CompositionDataMode.MATRIX)) {
             MatrixCompositionCreator.MatrixCompositionData matrixCompositionData =
                     matrixCompositionCreator.create(new MatrixCompositionCreator.MatrixCompositionCreationInfo(
