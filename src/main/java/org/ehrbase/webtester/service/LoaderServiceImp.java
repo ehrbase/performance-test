@@ -35,7 +35,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nedap.archie.json.JacksonUtil;
 import com.nedap.archie.rm.composition.Composition;
 import com.zaxxer.hikari.HikariDataSource;
-import com.zaxxer.hikari.HikariPoolMXBean;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -133,6 +132,36 @@ import org.xml.sax.SAXException;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class LoaderServiceImp implements LoaderService {
 
+    private static class IndexInfo {
+        private String name;
+        private String ddl;
+
+        private IndexInfo() {
+            // For Jackson
+        }
+
+        private IndexInfo(String name, String ddl) {
+            this.setName(name);
+            this.setDdl(ddl);
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getDdl() {
+            return ddl;
+        }
+
+        public void setDdl(String ddl) {
+            this.ddl = ddl;
+        }
+    }
+
     private static class Constraint {
         private String schema;
         private String table;
@@ -140,8 +169,8 @@ public class LoaderServiceImp implements LoaderService {
         private String type;
         private String definition;
 
-        private Constraint(){
-            //For Jackson
+        private Constraint() {
+            // For Jackson
         }
 
         private Constraint(String schema, String table, String constraintName, String type, String definition) {
@@ -695,17 +724,45 @@ public class LoaderServiceImp implements LoaderService {
                             String.format("DROP TABLE ehr.entry_%d;", i), failedStatements));
         }
 
+        List<String> errorsAfterRetry = retryStatements(failedStatements);
         sw.stop();
         log.info("Post load operations took {}s", sw.getTotalTimeSeconds());
-        log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
-                + "because it is a very long running operation. \n"
-                + "Please add it manually! Statement: \n"
-                + "CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
-        if (!failedStatements.isEmpty()) {
+
+        if (!errorsAfterRetry.isEmpty()) {
             log.error(
                     "The following post load SQL statements failed. Please run them manually: \n {}",
                     String.join("\n", failedStatements));
         }
+        log.info("GIN index on ehr.entry.entry will not be recreated automatically, "
+                + "because it is a very long running operation. \n"
+                + "Please add it manually! Statement: \n"
+                + "CREATE INDEX gin_entry_path_idx ON ehr.entry USING gin (entry jsonb_path_ops);");
+    }
+
+    private List<String> retryStatements(List<String> statements) {
+        if(statements.isEmpty()){
+            return Collections.emptyList();
+        }
+        List<String> toRetry = new ArrayList<>(statements);
+        for (int i = 0; i < 10; i++) {
+            List<String> errors = new ArrayList<>();
+            toRetry.forEach(s -> {
+                try {
+                    //We wait 30s to avoid overloading the DB
+                    Thread.sleep(30000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+                runStatementWithTransactionalWrites(s, errors);
+            });
+            toRetry.retainAll(errors);
+            if(errors.isEmpty()){
+                break;
+            }
+        }
+
+        return toRetry;
     }
 
     private void copyIntoEntryTableWithJsonb(long tableSize, int compositionNumber, String jsonbData) {
