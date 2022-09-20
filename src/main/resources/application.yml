@@ -39,7 +39,8 @@ logging:
     org.springframework: warn
 loader:
   enabled: false
-  keepIndexes: false
+  keepIndexes: true
+  matrixInsertThreads: 10
 
 management:
   health:
