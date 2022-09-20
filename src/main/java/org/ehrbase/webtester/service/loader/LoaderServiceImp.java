@@ -74,6 +74,7 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
+import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
@@ -145,6 +146,7 @@ public class LoaderServiceImp implements LoaderService {
     private final ResourceLoader resourceLoader;
     private final SQLDialect dialect;
     private final boolean keepIndexes;
+    private final int matrixThreadCount;
     private final LoaderStateService loaderStateService;
 
     private InMemoryEncoder encoder;
@@ -158,6 +160,7 @@ public class LoaderServiceImp implements LoaderService {
             @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource,
             @Value("${spring.jooq.sql-dialect}") String sqlDialect,
             @Value("${loader.keep-indexes}") boolean keepIndexes,
+            @Value("${loader.matrix-insert-threads:10}") int matrixThreadCount,
             LoaderStateService loaderStateService) {
         this.dsl = dsl;
         this.secondaryDataSource = secondaryDataSource;
@@ -165,6 +168,7 @@ public class LoaderServiceImp implements LoaderService {
         this.resourceLoader = resourceLoader;
         this.dialect = SQLDialect.valueOf(sqlDialect);
         this.keepIndexes = keepIndexes;
+        this.matrixThreadCount = matrixThreadCount;
         this.loaderStateService = loaderStateService;
     }
 
@@ -896,14 +900,15 @@ public class LoaderServiceImp implements LoaderService {
         List<CompletableFuture<Void>> tasks = new ArrayList<>();
         // The tasks are started ordered by the execution times
         if (properties.getModes().contains(CompositionDataMode.MATRIX)) {
-            tasks.addAll(ehrDescriptors.stream()
+            List<Entry2Record> matrixRecords = ehrDescriptors.stream()
                     .map(EhrCreateDescriptor::getMatrixRecords)
                     .flatMap(List::stream)
-                    .collect(Collectors.groupingBy(Entry2Record::getRmEntity))
-                    .entrySet()
-                    .stream()
+                    .collect(Collectors.toList());
+            // We add one to account for the remainder
+            final int recordsPerThread = (matrixRecords.size() / matrixThreadCount) + 1;
+            tasks.addAll(ListUtils.partition(matrixRecords, recordsPerThread).stream()
                     .map(e -> CompletableFuture.runAsync(
-                            () -> bulkInsert(Entry2.ENTRY2, e.getValue().stream(), properties.getBulkSize() * 4)))
+                            () -> bulkInsert(Entry2.ENTRY2, e.stream(), properties.getBulkSize() * 4)))
                     .collect(Collectors.toList()));
         }
         if (properties.getModes().contains(CompositionDataMode.LEGACY)) {
