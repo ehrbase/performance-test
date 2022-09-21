@@ -398,7 +398,7 @@ public class LoaderServiceImp implements LoaderService {
     @Override
     public ExecutionState isRunning() {
         LoaderPhase currentPhase = loaderStateService.getCurrentPhase();
-        return new ExecutionState(isRunning, currentPhase, LoaderPhase.FINISHED.equals(currentPhase));
+        return new ExecutionState(!isRunning, currentPhase, LoaderPhase.FINISHED.equals(currentPhase));
     }
 
     private int getEhrCount() {
