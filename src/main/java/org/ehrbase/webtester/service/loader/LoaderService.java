@@ -22,4 +22,42 @@ package org.ehrbase.webtester.service.loader;
  */
 public interface LoaderService {
     void load(LoaderRequestDto properties1);
+
+    ExecutionState isRunning();
+
+    class ExecutionState {
+        private boolean done;
+        private LoaderPhase phase;
+        private boolean success;
+
+        public ExecutionState(boolean done, LoaderPhase phase, boolean success) {
+            this.done = done;
+            this.phase = phase;
+            this.success = success;
+        }
+
+        public boolean isDone() {
+            return done;
+        }
+
+        public void setDone(boolean done) {
+            this.done = done;
+        }
+
+        public LoaderPhase getPhase() {
+            return phase;
+        }
+
+        public void setPhase(LoaderPhase phase) {
+            this.phase = phase;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public void setSuccess(boolean success) {
+            this.success = success;
+        }
+    }
 }

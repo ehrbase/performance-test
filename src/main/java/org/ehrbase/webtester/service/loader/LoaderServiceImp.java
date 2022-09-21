@@ -146,6 +146,7 @@ public class LoaderServiceImp implements LoaderService {
     private final ResourceLoader resourceLoader;
     private final SQLDialect dialect;
     private final boolean keepIndexes;
+    private final boolean dbAdmin;
     private final int matrixThreadCount;
     private final LoaderStateService loaderStateService;
 
@@ -160,6 +161,7 @@ public class LoaderServiceImp implements LoaderService {
             @Qualifier("secondaryDataSource") HikariDataSource secondaryDataSource,
             @Value("${spring.jooq.sql-dialect}") String sqlDialect,
             @Value("${loader.keep-indexes}") boolean keepIndexes,
+            @Value("${loader.db-admin}") boolean dbAdmin,
             @Value("${loader.matrix-insert-threads:10}") int matrixThreadCount,
             LoaderStateService loaderStateService) {
         this.dsl = dsl;
@@ -168,6 +170,7 @@ public class LoaderServiceImp implements LoaderService {
         this.resourceLoader = resourceLoader;
         this.dialect = SQLDialect.valueOf(sqlDialect);
         this.keepIndexes = keepIndexes;
+        this.dbAdmin = dbAdmin;
         this.matrixThreadCount = matrixThreadCount;
         this.loaderStateService = loaderStateService;
     }
@@ -392,6 +395,12 @@ public class LoaderServiceImp implements LoaderService {
         });
     }
 
+    @Override
+    public ExecutionState isRunning() {
+        LoaderPhase currentPhase = loaderStateService.getCurrentPhase();
+        return new ExecutionState(isRunning, currentPhase, LoaderPhase.FINISHED.equals(currentPhase));
+    }
+
     private int getEhrCount() {
         return dsl.fetchCount(EHR_);
     }
@@ -538,13 +547,15 @@ public class LoaderServiceImp implements LoaderService {
                     String.format("DROP INDEX IF EXISTS %s.%s;", indexInfo.getSchema(), indexInfo.getName())));
         }
 
-        log.info("Disabling all triggers...");
-        // We assume Postgres or Yugabyte as DB vendor -> disabling triggers will also disable foreign key
-        // constraints
-        tableNames.forEach(table -> runStatementWithTransactionalWrites(
-                String.format("ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
-        tmpTableNames.forEach(table -> runStatementWithTransactionalWrites(
-                String.format("ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
+        if (dbAdmin) {
+            log.info("Disabling all triggers...");
+            // We assume Postgres or Yugabyte as DB vendor -> disabling triggers will also disable foreign key
+            // constraints
+            tableNames.forEach(table -> runStatementWithTransactionalWrites(String.format(
+                    "ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
+            tmpTableNames.forEach(table -> runStatementWithTransactionalWrites(String.format(
+                    "ALTER TABLE %s.%s DISABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table)));
+        }
     }
 
     private void insertEhrData(LoaderRequestDto properties) {
@@ -671,12 +682,14 @@ public class LoaderServiceImp implements LoaderService {
         sw.start();
         final List<String> failedStatements = new ArrayList<>();
         // All streams are explicitly marked as sequential since parallel catalog updates may lead to conflicts
-        log.info("Re-enabling triggers...");
-        loaderStateService.getTableNamesFromDB().stream()
-                .sequential()
-                .map(table -> String.format(
-                        "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
-                .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        if (dbAdmin) {
+            log.info("Re-enabling triggers...");
+            loaderStateService.getTableNamesFromDB().stream()
+                    .sequential()
+                    .map(table -> String.format(
+                            "ALTER TABLE %s.%s ENABLE TRIGGER ALL;", org.ehrbase.jooq.pg.Ehr.EHR.getName(), table))
+                    .forEach(s -> runStatementWithTransactionalWrites(s, failedStatements));
+        }
         if (!keepIndexes) {
             log.info("Re-Creating indexes...");
             // The index statements are modified to include IF NOT EXISTS when the job is started first

@@ -20,6 +20,7 @@ package org.ehrbase.webtester.web.rest;
 import org.ehrbase.webtester.service.loader.LoaderRequestDto;
 import org.ehrbase.webtester.service.loader.LoaderService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,5 +45,18 @@ public class LoaderController {
         loaderService.load(properties);
 
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("resume")
+    public ResponseEntity<Void> resume(@RequestBody LoaderRequestDto properties) {
+
+        loaderService.load(null);
+
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("status")
+    public LoaderService.ExecutionState load() {
+        return loaderService.isRunning();
     }
 }

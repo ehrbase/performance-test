@@ -29,7 +29,11 @@ import org.springframework.stereotype.Service;
 public class LoaderServiceDummyImp implements LoaderService {
     @Override
     public void load(LoaderRequestDto properties1) {
+        throw new WebTesterException("Loader not enabled");
+    }
 
+    @Override
+    public ExecutionState isRunning() {
         throw new WebTesterException("Loader not enabled");
     }
 }

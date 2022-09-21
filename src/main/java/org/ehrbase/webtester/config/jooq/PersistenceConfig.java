@@ -19,6 +19,7 @@ package org.ehrbase.webtester.config.jooq;
 
 import com.zaxxer.hikari.HikariDataSource;
 import javax.sql.DataSource;
+import org.apache.commons.lang3.StringUtils;
 import org.jooq.ExecuteContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DataSourceConnectionProvider;
@@ -44,12 +45,15 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 public class PersistenceConfig {
 
-    private SQLDialect sqlDialect;
-    private boolean keepIndexes;
+    private final SQLDialect sqlDialect;
+    private final boolean dbAdmin;
+    private final boolean keepIndexes;
 
     public PersistenceConfig(
             @Value("${spring.jooq.sql-dialect}") String sqlDialect,
+            @Value("${loader.db-admin}") boolean dbAdmin,
             @Value("${loader.keep-indexes}") boolean keepIndexes) {
+        this.dbAdmin = dbAdmin;
         this.keepIndexes = keepIndexes;
         this.sqlDialect = SQLDialect.valueOf(sqlDialect);
     }
@@ -76,10 +80,20 @@ public class PersistenceConfig {
         dataSource.setPoolName("primary-pool");
         dataSource.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
 
-        if (keepIndexes && SQLDialect.YUGABYTEDB.equals(sqlDialect)) {
-            dataSource.setConnectionInitSql("SET yb_enable_upsert_mode=true;");
-        } else if (SQLDialect.YUGABYTEDB.equals(sqlDialect)) {
-            dataSource.setConnectionInitSql("SET yb_disable_transactional_writes=true;SET yb_enable_upsert_mode=true;");
+        StringBuilder sb = new StringBuilder();
+        if (!dbAdmin) {
+            sb.append("SET session_replication_role to replica;");
+        }
+        if (!keepIndexes && SQLDialect.YUGABYTEDB.equals(sqlDialect)) {
+            sb.append("SET yb_disable_transactional_writes=true;");
+        }
+        if (SQLDialect.YUGABYTEDB.equals(sqlDialect)) {
+            sb.append("SET yb_enable_upsert_mode=true;");
+        }
+
+        String initSql = sb.toString();
+        if (StringUtils.isNotBlank(initSql)) {
+            dataSource.setConnectionInitSql(initSql);
         }
 
         return dataSource;

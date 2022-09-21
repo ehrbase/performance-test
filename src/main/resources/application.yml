@@ -41,6 +41,7 @@ loader:
   enabled: false
   keepIndexes: true
   matrixInsertThreads: 10
+  dbAdmin: true
 
 management:
   health:
