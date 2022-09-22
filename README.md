@@ -64,16 +64,72 @@ $ mvn clean install
 
 ## Data Loading
 
-The WebTester can also fill the DB with dummy data. For this you need to configure. 
+The WebTester can also fill the DB with semi realistic data for testing purposes. When using the loader it is recommended to terminate all other connections (including ehrbase) to the database.
+There are several application configuration parameters related to the data loading that you should be aware of:
 
-| Name                         | Description                     | Default Value                              |
-|------------------------------|---------------------------------|--------------------------------------------|
-| `loader.enabled`             | Set to true to enable it.       | false                                      |
-| `spring.datasource.url`      | JDBC URL of the database.       | `jdbc:postgresql://localhost:5432/ehrbase` |
-| `spring.datasource.username` | Login username of the database. | `ehrbase`                                  |
-| `spring.datasource.password` | Login password of the database. | `ehrbase`                                  |
+| Name                                               | Description                                                            | Default Value                              | Comment                                  |
+|----------------------------------------------------|------------------------------------------------------------------------|--------------------------------------------|------------------------------------------|
+| `loader.enabled`                                   | Set to true to enable it.                                              | false                                      |                                          |
+| `spring.datasource.url`                            | JDBC URL of the database.                                              | `jdbc:postgresql://localhost:5432/ehrbase` |                                          |
+| `spring.datasource.username`                       | Login username of the database.                                        | `ehrbase`                                  |                                          |
+| `spring.datasource.password`                       | Login password of the database.                                        | `ehrbase`                                  |                                          |
+| `spring.datasource.hikari.maximum-pool-size`       | Max. number of connections to use for inserting data                   | `15`                                       |                                          |
+| `spring.datasource.hikarisecond.maximum-pool-size` | Max. number of connections to use for DDL statements.                  | `2`                                        |                                          |
+| `loader.keepIndexes`                               | Whether the loader will delete indexes before inserting.               | `true`                                     |                                          |
+| `loader.dbAdmin`                                   | Whether the DB user specified has superuser permissions.               | `true`                                     |                                          |
+| `loader.matrixInsertThreads`                       | Number of threads to use for inserting data in the (PoC) Matrix model. | `10`                                       |                                          |
+| `spring.profiles.active`                           | Regular spring setting to activate different profiles                  | ` `                                        | When using yugabyteDB set this to `yuga` |
 
-For the API Call see [REST API](https://github.com/ehrbase/webtester/wiki/Test-Data-Loader)
+It is recommended to start the service with the -Xmx and -XX:ActiveProcessorCount JVM options:
+- Xmx:
+  - will effectively limit the size of the EHR batches
+  - with Xmx4G a batch size of 100 is safe (probably more, but since the size of the EHRs varies according to the distributions, it is best to leave some room)
+- XX:ActiveProcessorCount: 
+  - should be <= spring.datasource.hikari.maximum-pool-size
+  - it is possible to use more threads than connections, but this may cause timeouts since the additional threads will have to wait for connections from the connection pool to become available.
+
+When using yugabyteDB please make sure to set the "yuga" spring profile as active and set all the mentioned parameters, since the yugabyte profile changes some default values.
+
+There are two modes for how compositions are inserted:
+1. LEGACY:
+   - inserts compositions compliant with the old data model queryable by the old AQL engine (tables: composition, entry, event_context, participation)
+2. MATRIX:
+   - inserts compositions in the model for the new PoC Matrix AQL engine (tables: entry2)
+
+These modes can be combined. Please note that, if you insert in both models, it will take significantly longer.
+
+
+A loader job consists of the following phases:
+1. PRE_LOAD: 
+   - collect necessary DB schema information
+   - prepare the DB schema for data loading
+2. PHASE_1:
+   - Generate gaussian distributions
+   - Create health_care_facilities and health care professionals for the facilities
+   - Create and insert batches of EHRs and their associated data according to the distributions
+   - If composition mode "LEGACY" was specified in the modes list:
+     - For ehr.entry the data is inserted into temporary tables (ehr.entry_0 - ehr.entry_<n>, where n is the number of composition available in the loaders resources)
+   - If composition mode "MATRIX" was specified in the modes list:
+     - composition data including JSONB is inserted into ehr.entry2
+3. PHASE_2:
+   - If composition mode "LEGACY" was specified in the modes list:
+     - Runs a batched DML statement for each composition "type" in parallel which deletes the data from the temporary entry tables and inserts into ehr.entry whilst adding the JSONB
+4. POST_LOAD:
+   - Restore the DB schema to the original state
+     - If necessary recreate deleted indexes and unique constraints
+     - If necessary reenable triggers on all tables
+     - If composition mode "LEGACY" was specified in the modes list, remove the temporary entry tables
+
+There are two additional "pseduo-phases" called NOT_RUN and FINISHED. NOT_RUN indicates that the loader was not run on this DB before. FINISHED indicates that a previous loader job was completed. It is safe to start a new job from the FINISHED state. Note that this will add new health_care_facilities and health care professionals with the same names as the ones from the previous job and that the distributions of the existing data and the new data wil not be independent.
+
+Where possible the loader has simple retry mechanisms for failed DML/DDL statements. These mechanisms only allow retries up to a certain error count. If the error count is exceeded in any mechanism the loader will throw an Exception and stop the current execution.
+To allow for resuming jobs that were interrupted by outside termination of the service or an Exception due to too many SQL errors, the loader will create a table in the "ehr" schema called loader_state. On startup the loader will check if the last "execution_state" in the DB indicates that the last job was interrupted. In that case it will automatically resume the last job. If the job was terminated by an Exception it can be resumed manually via the REST-API (see the link below).
+The resume functionality currently comes with the following hints/limitations: 
+1. Resuming is not allowed if the last phase is PRE_LOAD, since this phase collects statements for the POST_LOAD phase to restore the DB schema to its original state, saves them to ehr.loader_state and then runs some DDL statements to temporarily adapt the DB for the loading process. If an error happens during this phase it is recommended to reinitialize the DB. You can circumvent this measure by changing the "execution_state" in the loader_state table to "NOT_RUN" and start another job via the REST-API, after making sure the DB schema is still intact.
+2. When resuming in PHASE_1 a new set of health_care_facilities is created with the same names as the previous ones and their own data distributions, because the distribution state is currently not persistent. 
+3. If a resume during PHASE_1 happens, you should check the logs to see which part of the failed batch were already inserted and decide if you want to clean up rows with violated foreign keys after the job is finished (Common cleanups would be: missing ehr, missing ehr_status). For most test cases the cleanup is optional, since ehrbase should work fine, even if i.e. and ehr is missing, with the limitation that you may get the missing ehrs id through AQL.
+
+For information on the REST-API see [https://github.com/ehrbase/webtester/wiki/Test-Data-Loader](https://github.com/ehrbase/webtester/wiki/Test-Data-Loader)
 
 ## Credentials
 
