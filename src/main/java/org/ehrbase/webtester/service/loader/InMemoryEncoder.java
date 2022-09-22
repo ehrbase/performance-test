@@ -28,8 +28,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.ehrbase.aql.dto.path.AqlPath;
 import org.ehrbase.serialisation.matrixencoding.Encoder;
 
+/**
+ * AQL-Path encoder for the PoC matrix datamodel. Works caches encodings in-memory.
+ * IMPORTANT: when writing compositions using these encodings to the DB make sure you persist the encodings as well and adjust the sequence state in the DB. Also make sure to initialize thi encoder with encodings already present in the database
+ */
 public class InMemoryEncoder implements Encoder {
 
+    /**
+     * These paths can be encoded on init since we will need them later
+     */
     private static Set<String> REQUIRED_PATHS = Set.of(
             // UID
             "/uid/_type",

@@ -17,11 +17,26 @@
  */
 package org.ehrbase.webtester.service.loader.creators;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
-import org.ehrbase.jooq.pg.tables.records.*;
+import org.ehrbase.jooq.pg.tables.records.AuditDetailsRecord;
+import org.ehrbase.jooq.pg.tables.records.CompositionRecord;
+import org.ehrbase.jooq.pg.tables.records.ContributionRecord;
+import org.ehrbase.jooq.pg.tables.records.EhrRecord;
+import org.ehrbase.jooq.pg.tables.records.EntryRecord;
+import org.ehrbase.jooq.pg.tables.records.EventContextRecord;
+import org.ehrbase.jooq.pg.tables.records.ParticipationRecord;
+import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
+import org.ehrbase.jooq.pg.tables.records.StatusRecord;
 import org.ehrbase.webtester.service.loader.jooq.Entry2Record;
 
+/**
+ * Contains all records that have to be inserted into the DB for one complete EHR including compositions.
+ */
 public class EhrCreateDescriptor {
     private EhrRecord ehr;
     private StatusRecord status;

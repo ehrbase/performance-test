@@ -20,12 +20,23 @@ package org.ehrbase.webtester.service.loader;
 import java.security.SecureRandom;
 import java.util.Random;
 
+/**
+ * utility class to get random numbers. uses thread local to allow parallelization
+ */
 public final class RandomHelper {
 
     public static ThreadLocal<Random> RND = ThreadLocal.withInitial(SecureRandom::new);
 
     private RandomHelper() {}
 
+    /**
+     * get a random natural number according to a gaussian distribution using the mean and standard deviation provided. the nummber is capped by the provided min and max bound.
+     * @param mean
+     * @param standardDeviation
+     * @param lowerBound
+     * @param upperBound
+     * @return
+     */
     public static long getRandomGaussianWithLimitsLong(
             int mean, int standardDeviation, int lowerBound, int upperBound) {
         return Math.min(
@@ -35,6 +46,14 @@ public final class RandomHelper {
                         Math.round(Math.ceil(Math.abs(RND.get().nextGaussian() * standardDeviation + mean)))));
     }
 
+    /**
+     * get a random rational number > 0 according to a gaussian distribution using the mean and standard deviation provided. the nummber is capped by the provided min and max bound.
+     * @param mean
+     * @param standardDeviation
+     * @param lowerBound
+     * @param upperBound
+     * @return
+     */
     public static double getRandomGaussianWithLimitsDouble(
             int mean, int standardDeviation, int lowerBound, int upperBound) {
         return Math.min(

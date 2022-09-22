@@ -17,6 +17,9 @@
  */
 package org.ehrbase.webtester.service.loader;
 
+/**
+ * holds all information necessary to remove and restore a table-constraint
+ */
 class Constraint {
     private String schema;
     private String table;

@@ -17,6 +17,9 @@
  */
 package org.ehrbase.webtester.service.loader;
 
+/**
+ * Holds all information necessary to remove and restore an index
+ */
 public class IndexInfo {
     private String schema;
     private String name;

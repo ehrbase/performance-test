@@ -17,7 +17,17 @@
  */
 package org.ehrbase.webtester.service.loader.creators;
 
+/**
+ * indicates which records need to be created for inserting a composition.
+ * using multiple modes at once is allowed
+ */
 public enum CompositionDataMode {
+    /**
+     * create data for the old model
+     */
     LEGACY,
+    /**
+     * create data for the new PoC model
+     */
     MATRIX;
 }

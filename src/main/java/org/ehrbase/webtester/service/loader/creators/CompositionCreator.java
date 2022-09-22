@@ -32,6 +32,9 @@ import org.ehrbase.jooq.pg.enums.ContributionDataType;
 import org.ehrbase.webtester.service.loader.RandomHelper;
 import org.jooq.DSLContext;
 
+/**
+ * creates composition data (contribution, audit, etc.) and then delegates to the specific creators indicated by the {@link CompositionDataMode}s given in the parameters object. The result will contain all data that has to be inserted for the composition.
+ */
 class CompositionCreator extends AbstractDataCreator<CompositionCreateDescriptor, CompositionCreationInfo> {
 
     private final LegacyCompositionCreator legacyCompositionCreator;

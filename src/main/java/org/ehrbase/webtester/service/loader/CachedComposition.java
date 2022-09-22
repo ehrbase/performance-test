@@ -24,6 +24,9 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.ehrbase.serialisation.matrixencoding.Row;
 
+/**
+ * represents one of the available compositions for data creation and insert. holds a serialized JSONB version for the old model and a deserialized, immutable representation of the PoC matrix format. the "idx" attribute must be unique amongst all compositions.
+ */
 public class CachedComposition {
     private final int idx;
     private final Composition composition;

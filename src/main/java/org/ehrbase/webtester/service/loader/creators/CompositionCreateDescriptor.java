@@ -27,6 +27,9 @@ import org.ehrbase.jooq.pg.tables.records.EventContextRecord;
 import org.ehrbase.jooq.pg.tables.records.ParticipationRecord;
 import org.ehrbase.webtester.service.loader.jooq.Entry2Record;
 
+/**
+ * Holds all records that need to be inserted for one complete composition
+ */
 public class CompositionCreateDescriptor {
 
     private List<Entry2Record> matrixRecords = new ArrayList<>();

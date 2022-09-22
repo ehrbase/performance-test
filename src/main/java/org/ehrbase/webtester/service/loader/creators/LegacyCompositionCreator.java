@@ -46,6 +46,9 @@ import org.jooq.DSLContext;
 import org.jooq.JSONB;
 import org.springframework.util.Assert;
 
+/**
+ * Creates composition data specific to the legacy/old data model
+ */
 public class LegacyCompositionCreator
         extends AbstractDataCreator<
                 LegacyCompositionCreator.LegacyCompositionData,

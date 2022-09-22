@@ -45,6 +45,11 @@ import org.ehrbase.serialisation.dbencoding.RawJson;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
 
+/**
+ * provides some common methods used by multiple {@link DataCreator} implementations
+ * @param <DESCRIPTOR>
+ * @param <PARAM_OBJ>
+ */
 public abstract class AbstractDataCreator<DESCRIPTOR, PARAM_OBJ> implements DataCreator<DESCRIPTOR, PARAM_OBJ> {
 
     private final DSLContext dsl;

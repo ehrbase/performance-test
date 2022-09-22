@@ -26,6 +26,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.ehrbase.webtester.service.loader.CachedComposition;
 import org.ehrbase.webtester.service.loader.LoaderException;
 
+/**
+ * information necessary to create the records to insert for a composition
+ */
 public class CompositionCreationInfo {
 
     private final UUID ehrId;

@@ -36,6 +36,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+/**
+ * Use this service to read and update state information of the loader in the DB
+ */
 @Service
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
 // We do not use JOOQ here intentionally
@@ -79,64 +82,120 @@ public class LoaderStateService {
         }
     }
 
+    /**
+     * Update the loder phase in the DB
+     * @param phase
+     */
     public void updateCurrentLoaderPhase(LoaderPhase phase) {
         Objects.requireNonNull(phase);
         update("execution_state", phase.name());
     }
 
+    /**
+     * Retrieve the current loader phase from the DB
+     * @return
+     */
     public LoaderPhase getCurrentPhase() {
         return LoaderPhase.valueOf(load("execution_state"));
     }
 
+    /**
+     * Get information about all required indexes from the DB
+     * @return
+     */
     public List<IndexInfo> getIndexInfoFromDB() {
         return loadAndDeserializeList("indexes", IndexInfo.class);
     }
 
+    /**
+     * Update information about all required indexes in the DB
+     * @return
+     */
     public void updateIndexInfo(List<IndexInfo> indexInfo) {
         Objects.requireNonNull(indexInfo);
         serializeAndUpdate("indexes", indexInfo);
     }
 
+    /**
+     * Get information about all required unique constraints from the DB
+     * @return
+     */
     public List<Constraint> getUniqueConstraintsFromDB() {
         return loadAndDeserializeList("unique_constraints", Constraint.class);
     }
 
+    /**
+     * Update information about all required unique constrains in the DB
+     * @return
+     */
     public void updateUniqueConstraints(List<Constraint> constraints) {
         Objects.requireNonNull(constraints);
         serializeAndUpdate("unique_constraints", constraints);
     }
 
+    /**
+     * Get all relevant non-temporary table names from the DB
+     * @return
+     */
     public List<String> getTableNamesFromDB() {
         return loadAndDeserializeList("tables", String.class);
     }
 
+    /**
+     * Update list of relevant non-temporary table names in the DB
+     * @return
+     */
     public void updateTableNames(List<String> tableNames) {
         Objects.requireNonNull(tableNames);
         serializeAndUpdate("tables", tableNames);
     }
 
+    /**
+     * Get all relevant temporary table names from the DB
+     * @return
+     */
     public List<String> getTemporaryTableNamesFromDB() {
         return loadAndDeserializeList("tmp_tables", String.class);
     }
 
+    /**
+     * Update list of relevant temporary table names in the DB
+     * @return
+     */
     public void updateTemporaryTableNames(List<String> temporaryTableNames) {
         Objects.requireNonNull(temporaryTableNames);
         serializeAndUpdate("tmp_tables", temporaryTableNames);
     }
 
+    /**
+     * Get parameters for the latest loader job from the DB
+     * @return
+     */
     public LoaderRequestDto getSettingsFromDB() {
         return loadAndDeserialize("settings", LoaderRequestDto.class);
     }
 
+    /**
+     * Update parameters for the latest loader job in the DB
+     * @return
+     */
     public void updateLoaderSettings(LoaderRequestDto loaderSettings) {
         Objects.requireNonNull(loaderSettings);
         serializeAndUpdate("settings", loaderSettings);
     }
 
+    /**
+     * Get ehr count before the latest loader job from the DB
+     * @return
+     */
     public int getPreviousEHRCount() {
         return Integer.parseInt(load("ehr_count"));
     }
 
+    /**
+     * Update ehr count before the latest loader job in the DB
+     * @return
+     */
     public void updatePreviousEHRCount(int count) {
         update("ehr_count", Integer.toString(count));
     }

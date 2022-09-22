@@ -123,8 +123,7 @@ import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
 /**
- * @author Renaud Subiger
- * @since 1.0
+ * Manages data creation and runs DB inserts
  */
 @Service
 @ConditionalOnProperty(prefix = "loader", name = "enabled", havingValue = "true")
@@ -137,7 +136,7 @@ public class LoaderServiceImp implements LoaderService {
     private final Logger log = LoggerFactory.getLogger(LoaderServiceImp.class);
     private final Map<String, OPERATIONALTEMPLATE> templates = new HashMap<>();
     private final List<CachedComposition> singleCompositions = new ArrayList<>();
-    private final List<List<CachedComposition>> compositionsWithSequenceByType = new ArrayList<>();
+    private final List<List<CachedComposition>> repeatableCompositions = new ArrayList<>();
     private final ObjectMapper objectMapper = JacksonUtil.getObjectMapper();
     private final RawJson rawJson = new RawJson();
     private final DSLContext dsl;
@@ -181,6 +180,7 @@ public class LoaderServiceImp implements LoaderService {
                 "javax.xml.parsers.DocumentBuilderFactory",
                 "com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl");
         initializeTemplates();
+        // We have to reuse existing encodings to keep the data consistent
         Map<String, Long> existingEncodings =
                 dsl.select().from(Encoding.ENCODING).fetchMap(Encoding.ENCODING.PATH, Encoding.ENCODING.CODE);
         encoder = new InMemoryEncoder(existingEncodings);
@@ -212,7 +212,7 @@ public class LoaderServiceImp implements LoaderService {
                 dsl.select(TERRITORY.TWOLETTER, TERRITORY.CODE).from(TERRITORY).fetch().stream()
                         .collect(Collectors.toMap(Record2::value1, Record2::value2)),
                 singleCompositions,
-                compositionsWithSequenceByType,
+                repeatableCompositions,
                 encoder.getPathToCodeMap().entrySet().stream()
                         .collect(Collectors.toUnmodifiableMap(
                                 Map.Entry::getKey, e -> "/" + e.getValue().toString())));
@@ -260,68 +260,84 @@ public class LoaderServiceImp implements LoaderService {
             MatrixFormat matrixFormat =
                     new MatrixFormat(templateId -> Optional.of(templateId).map(templates::get), encoder);
             final OfInt sequenceNumIterator = IntStream.iterate(0, i -> i + 1).iterator();
-            Map<Integer, List<CachedComposition>> compByGroup = Arrays.stream(
-                            ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
-                                    .getResources(COMPOSITIONS_REPEATABLE_PATH))
-                    // We need a sequential stream, so we get distinct sequence values
-                    .sequential()
-                    .filter(r -> StringUtils.endsWith(r.getFilename(), ".json"))
-                    .sorted(Comparator.comparing(Resource::getFilename))
-                    .map(p -> {
-                        try (InputStream in = p.getInputStream()) {
-                            if (!p.getFilename().matches("[0-9]{2}_.*")) {
-                                throw new LoaderException("composition resource " + p.getFilename()
-                                        + " filename has to start with a 2 digit composition group number");
-                            }
-                            return Pair.of(p.getFilename(), objectMapper.readValue(in, Composition.class));
-                        } catch (IOException e) {
-                            throw new LoaderException("Failed to read composition file", e);
-                        }
-                    })
-                    .collect(Collectors.groupingBy(
-                            p -> Integer.parseInt(p.getLeft().substring(0, 2)),
-                            Collectors.mapping(
-                                    p -> new CachedComposition(
-                                            sequenceNumIterator.next(),
-                                            p.getRight(),
-                                            rawJson.marshal(p.getRight()),
-                                            matrixFormat.toTable(p.getRight()).stream()
-                                                    .map(this::toRowDataPair)
-                                                    .collect(Collectors.toList())),
-                                    Collectors.toList())));
 
-            compByGroup.entrySet().stream()
-                    .sorted(Entry.comparingByKey())
-                    .map(Entry::getValue)
-                    .forEach(compositionsWithSequenceByType::add);
+            /*
+            These compositions may appear multiple times within the same EHR
+            Repeatable Composition files MUST be prefixed with a two-digit number
+            Having the same number means there will be random picks from them when creating an EHR
+             */
+            initalizeRepeatableCompositions(matrixFormat, sequenceNumIterator);
 
-            Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
-                            .getResources(COMPOSITIONS_SINGLE_PATH))
-                    // We need a sequential stream, so we get distinct sequence values
-                    .sequential()
-                    .filter(r -> StringUtils.endsWith(r.getFilename(), ".json"))
-                    .map(p -> {
-                        try (InputStream in = p.getInputStream()) {
-                            if (!p.getFilename().matches("[0-9]{2}_.*")) {
-                                throw new LoaderException("composition resource " + p.getFilename()
-                                        + " filename has to start with a 2 digit composition group number");
-                            }
-                            Composition composition = objectMapper.readValue(in, Composition.class);
-                            return new CachedComposition(
-                                    sequenceNumIterator.next(),
-                                    composition,
-                                    rawJson.marshal(composition),
-                                    matrixFormat.toTable(composition).stream()
-                                            .map(this::toRowDataPair)
-                                            .collect(Collectors.toList()));
-                        } catch (IOException e) {
-                            throw new LoaderException("Failed to read composition file", e);
-                        }
-                    })
-                    .forEach(singleCompositions::add);
+            // These compositions will appear once per EHR provided the total amount of compositions allows it
+            initializeSingleCompositions(matrixFormat, sequenceNumIterator);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private void initializeSingleCompositions(MatrixFormat matrixFormat, OfInt sequenceNumIterator) throws IOException {
+        Arrays.stream(ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
+                        .getResources(COMPOSITIONS_SINGLE_PATH))
+                // We need a sequential stream, so we get distinct sequence values
+                .sequential()
+                .filter(r -> StringUtils.endsWith(r.getFilename(), ".json"))
+                .map(p -> {
+                    try (InputStream in = p.getInputStream()) {
+                        if (!p.getFilename().matches("[0-9]{2}_.*")) {
+                            throw new LoaderException("composition resource " + p.getFilename()
+                                    + " filename has to start with a 2 digit composition group number");
+                        }
+                        Composition composition = objectMapper.readValue(in, Composition.class);
+                        return new CachedComposition(
+                                sequenceNumIterator.next(),
+                                composition,
+                                rawJson.marshal(composition),
+                                matrixFormat.toTable(composition).stream()
+                                        .map(this::toRowDataPair)
+                                        .collect(Collectors.toList()));
+                    } catch (IOException e) {
+                        throw new LoaderException("Failed to read composition file", e);
+                    }
+                })
+                .forEach(singleCompositions::add);
+    }
+
+    private void initalizeRepeatableCompositions(MatrixFormat matrixFormat, OfInt sequenceNumIterator)
+            throws IOException {
+        Map<Integer, List<CachedComposition>> compByGroup = Arrays.stream(
+                        ResourcePatternUtils.getResourcePatternResolver(resourceLoader)
+                                .getResources(COMPOSITIONS_REPEATABLE_PATH))
+                // We need a sequential stream, so we get distinct sequence values
+                .sequential()
+                .filter(r -> StringUtils.endsWith(r.getFilename(), ".json"))
+                .sorted(Comparator.comparing(Resource::getFilename))
+                .map(p -> {
+                    try (InputStream in = p.getInputStream()) {
+                        if (!p.getFilename().matches("[0-9]{2}_.*")) {
+                            throw new LoaderException("composition resource " + p.getFilename()
+                                    + " filename has to start with a 2 digit composition group number");
+                        }
+                        return Pair.of(p.getFilename(), objectMapper.readValue(in, Composition.class));
+                    } catch (IOException e) {
+                        throw new LoaderException("Failed to read composition file", e);
+                    }
+                })
+                .collect(Collectors.groupingBy(
+                        p -> Integer.parseInt(p.getLeft().substring(0, 2)),
+                        Collectors.mapping(
+                                p -> new CachedComposition(
+                                        sequenceNumIterator.next(),
+                                        p.getRight(),
+                                        rawJson.marshal(p.getRight()),
+                                        matrixFormat.toTable(p.getRight()).stream()
+                                                .map(this::toRowDataPair)
+                                                .collect(Collectors.toList())),
+                                Collectors.toList())));
+
+        compByGroup.entrySet().stream()
+                .sorted(Entry.comparingByKey())
+                .map(Entry::getValue)
+                .forEach(repeatableCompositions::add);
     }
 
     private Pair<Row, Map<String, Object>> toRowDataPair(Row r) {
@@ -335,6 +351,10 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
+    /**
+     * start a new or resume the last loader job.
+     * @param settings params for new job; if null -> resume last or repeat last if already finished
+     */
     @Override
     public void load(LoaderRequestDto settings) {
 
@@ -420,14 +440,14 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
+    /**
+     * create temporary tables ehr.entry_x and return the table names
+     * @return
+     */
     private List<String> prepareEntryTables() {
         // We will use temporary entry tables for each composition number for faster JSONB inserts in the end
         List<String> names = IntStream.range(
-                        0,
-                        compositionsWithSequenceByType.stream()
-                                        .mapToInt(List::size)
-                                        .sum()
-                                + singleCompositions.size())
+                        0, repeatableCompositions.stream().mapToInt(List::size).sum() + singleCompositions.size())
                 .mapToObj(i -> "entry_" + i)
                 .collect(Collectors.toList());
         names.forEach(i -> runStatementWithTransactionalWrites(String.format(
@@ -450,6 +470,12 @@ public class LoaderServiceImp implements LoaderService {
         return names;
     }
 
+    /**
+     * Find all not constraint related indexes and their DDL statements
+     * @param properties
+     * @param constraints
+     * @return
+     */
     private List<IndexInfo> findIndexes(LoaderRequestDto properties, List<Constraint> constraints) {
         try (Connection c = secondaryDataSource.getConnection();
                 Statement s = c.createStatement()) {
@@ -480,6 +506,10 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
+    /**
+     * Find all pkey and unique constraints
+     * @return
+     */
     private List<Constraint> findConstraints() {
         try (Connection c = secondaryDataSource.getConnection();
                 Statement s = c.createStatement()) {
@@ -507,6 +537,10 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
+    /**
+     * prepare the DB schema for inserting data and save schema information for restoring it later
+     * @param properties
+     */
     private void preLoadOperations(LoaderRequestDto properties) {
 
         log.info(
@@ -558,6 +592,11 @@ public class LoaderServiceImp implements LoaderService {
         }
     }
 
+    /**
+     * generate distributions and insert data.
+     * for mode LEGACY: uses temporary ehr.entry_x tables without JSONB
+     * @param properties
+     */
     private void insertEhrData(LoaderRequestDto properties) {
 
         loaderStateService.updateCurrentLoaderPhase(LoaderPhase.PHASE_1);
@@ -646,6 +685,9 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Test data without ehr.entry.entry contents loaded in {} s", stopWatch.getTotalTimeSeconds());
     }
 
+    /**
+     * move data from temporary entry tables to ehr.entry and add JSONBs in the process
+     */
     private void copyToEntryWithJsonb() {
 
         loaderStateService.updateCurrentLoaderPhase(LoaderPhase.PHASE_2);
@@ -657,7 +699,7 @@ public class LoaderServiceImp implements LoaderService {
         stopWatch.start("count");
         List<Pair<CachedComposition, Long>> compositionsWithCount = Stream.concat(
                         singleCompositions.stream(),
-                        compositionsWithSequenceByType.stream().flatMap(List::stream))
+                        repeatableCompositions.stream().flatMap(List::stream))
                 .parallel()
                 .map(c -> Pair.of(c, entryTableSize(c.getIdx())))
                 .collect(Collectors.toList());
@@ -673,6 +715,10 @@ public class LoaderServiceImp implements LoaderService {
         log.info("Moved entry data and added JSONB in {}s", stopWatch.getTotalTimeSeconds());
     }
 
+    /**
+     * restore DB schema
+     * @param properties
+     */
     private void postLoadOperations(LoaderRequestDto properties) {
 
         loaderStateService.updateCurrentLoaderPhase(LoaderPhase.POST_LOAD);
@@ -970,6 +1016,14 @@ public class LoaderServiceImp implements LoaderService {
         return CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new));
     }
 
+    /**
+     * insert all records from the given stream into the given table
+     * @param table
+     * @param recordStream
+     * @param bulkSize
+     * @param <T> Table Type
+     * @param <R> Record Type
+     */
     private <T extends Table<R>, R extends TableRecord<R>> void bulkInsert(
             T table, Stream<R> recordStream, int bulkSize) {
         StopWatch sw = new StopWatch();

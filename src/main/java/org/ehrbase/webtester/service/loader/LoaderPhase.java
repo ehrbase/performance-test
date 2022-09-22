@@ -17,11 +17,32 @@
  */
 package org.ehrbase.webtester.service.loader;
 
+/**
+ * represents a steps in the loading process
+ */
 public enum LoaderPhase {
+    /**
+     * Not yet run on this DB
+     */
     NOT_RUN,
+    /**
+     * A previous run was completed on this DB
+     */
     FINISHED,
+    /**
+     * prepare the DB schema and save restoration info
+     */
     PRE_LOAD,
+    /**
+     * insert ehr batches excluding JSONB in ehr.entry.entry column
+     */
     PHASE_1,
+    /**
+     * remove data from temporary ehr.entry_x tables and insert into target table with JSONB
+     */
     PHASE_2,
+    /**
+     * restore DB schema to the intial state
+     */
     POST_LOAD
 }

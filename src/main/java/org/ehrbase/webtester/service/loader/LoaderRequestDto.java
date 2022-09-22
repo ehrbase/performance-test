@@ -23,8 +23,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.ehrbase.webtester.service.loader.creators.CompositionDataMode;
 
 /**
- * @author Renaud Subiger
- * @since 1.0
+ * Parameters for starting or continuing a loader job
  */
 public class LoaderRequestDto {
 

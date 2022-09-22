@@ -34,7 +34,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
-import org.ehrbase.jooq.pg.enums.*;
+import org.ehrbase.jooq.pg.enums.ContributionChangeType;
+import org.ehrbase.jooq.pg.enums.ContributionDataType;
+import org.ehrbase.jooq.pg.enums.ContributionState;
+import org.ehrbase.jooq.pg.enums.PartyRefIdType;
+import org.ehrbase.jooq.pg.enums.PartyType;
 import org.ehrbase.jooq.pg.tables.records.AuditDetailsRecord;
 import org.ehrbase.jooq.pg.tables.records.ContributionRecord;
 import org.ehrbase.jooq.pg.tables.records.PartyIdentifiedRecord;
@@ -42,6 +46,13 @@ import org.ehrbase.jooq.pg.udt.records.CodePhraseRecord;
 import org.ehrbase.jooq.pg.udt.records.DvCodedTextRecord;
 import org.jooq.DSLContext;
 
+/**
+ * common interface for all classes creating data to be inserted into the DB.
+ * A creator may delegate to other creators.
+ * Provides some static utility methods for creating EHR related JOOQ-Records.
+ * @param <DESCRIPTOR> Wrapper type around all record types created by the creator
+ * @param <PARAM_OBJ> Wrapper type for parameters required by this creator
+ */
 public interface DataCreator<DESCRIPTOR, PARAM_OBJ> {
 
     DESCRIPTOR create(PARAM_OBJ info);

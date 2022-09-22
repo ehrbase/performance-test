@@ -37,6 +37,9 @@ import org.ehrbase.webtester.service.loader.jooq.Entry2Record;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
 
+/**
+ * creates composition data specific to the new PoC matrix data model
+ */
 public class MatrixCompositionCreator
         extends AbstractDataCreator<
                 MatrixCompositionCreator.MatrixCompositionData,

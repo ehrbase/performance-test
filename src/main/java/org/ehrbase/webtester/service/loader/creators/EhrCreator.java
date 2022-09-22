@@ -44,6 +44,9 @@ import org.ehrbase.webtester.service.loader.CachedComposition;
 import org.ehrbase.webtester.service.loader.RandomHelper;
 import org.jooq.DSLContext;
 
+/**
+ * takes care of creating a full EHR including compositions
+ */
 public class EhrCreator extends AbstractDataCreator<EhrCreateDescriptor, EhrCreator.EhrCreationInfo> {
 
     public static class EhrCreationInfo {

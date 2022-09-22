@@ -22,6 +22,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
+ * Dummy to statisfy spring injection
  * @author Stefan Spiska
  */
 @Service
