@@ -118,7 +118,7 @@
               <elementProp name="" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">{&#xd;
-    &quot;q&quot;: &quot;SELECT e/ehr_id/value FROM EHR e CONTAINS COMPOSITION c[openEHR-EHR-COMPOSITION.report.v1] CONTAINS OBSERVATION o [openEHR-EHR-OBSERVATION.body_temperature.v2] LIMIT 1&quot;&#xd;
+    &quot;q&quot;: &quot;SELECT e/ehr_id/value FROM EHR e LIMIT 1&quot;&#xd;
 }</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
               </elementProp>
