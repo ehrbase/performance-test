@@ -56,7 +56,7 @@
               <elementProp name="" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">{&#xd;
-&quot;q&quot;: &quot;select e/ehr_id/value from EHR e LIMIT 10 OFFSET ${__Random(1,100)}&quot;&#xd;
+&quot;q&quot;: &quot;SELECT e/ehr_id/value as ehr_id,c/uid/value as composition_id  FROM EHR e  CONTAINS COMPOSITION c LIMIT 10 OFFSET ${__Random(1,100)}&quot;&#xd;
 }</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
               </elementProp>
@@ -66,7 +66,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql</stringProp>
+          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?use_new_engine=true</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
