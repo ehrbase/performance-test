@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.5">
   <hashTree>
-    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="New AQL Engine Queries" enabled="true">
-      <stringProp name="TestPlan.comments"></stringProp>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="New AQL Engine Load Compositions On EHRs" enabled="true">
+      <stringProp name="TestPlan.comments">https://jira.vitagroup.ag/browse/CDR-557</stringProp>
       <boolProp name="TestPlan.functional_mode">false</boolProp>
       <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
       <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
@@ -49,31 +49,14 @@
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
       </ThreadGroup>
       <hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Create EHR" enabled="true">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Retrieve 10 EHRs" enabled="true">
           <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
             <collectionProp name="Arguments.arguments">
               <elementProp name="" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">{&#xd;
-    &quot;_type&quot;: &quot;EHR_STATUS&quot;,&#xd;
-    &quot;archetype_node_id&quot;: &quot;openEHR-EHR-EHR_STATUS.generic.v1&quot;,&#xd;
-    &quot;name&quot;: {&#xd;
-        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
-        &quot;value&quot;: &quot;EHR Status&quot;&#xd;
-    },&#xd;
-    &quot;subject&quot;: {&#xd;
-        &quot;external_ref&quot;: {&#xd;
-            &quot;namespace&quot;: &quot;DEMOGRAPHIC&quot;,&#xd;
-            &quot;type&quot;: &quot;PERSON&quot;,&#xd;
-            &quot;id&quot;: {&#xd;
-                &quot;_type&quot;: &quot;HIER_OBJECT_ID&quot;,&#xd;
-                &quot;value&quot;: &quot;${subjectId}&quot;&#xd;
-            }&#xd;
-        }&#xd;
-    },&#xd;
-    &quot;is_modifiable&quot;: true,&#xd;
-    &quot;is_queryable&quot;: true&#xd;
+&quot;q&quot;: &quot;SELECT e/ehr_id/value as ehr_id,c/uid/value as composition_id  FROM EHR e  CONTAINS COMPOSITION c LIMIT 10 OFFSET ${__Random(1,100)}&quot;&#xd;
 }</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
               </elementProp>
@@ -83,7 +66,7 @@
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr</stringProp>
+          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?use_new_engine=true</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -94,30 +77,37 @@
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
         </HTTPSamplerProxy>
         <hashTree>
-          <BeanShellPreProcessor guiclass="TestBeanGUI" testclass="BeanShellPreProcessor" testname="BeanShell PreProcessor" enabled="true">
-            <stringProp name="filename"></stringProp>
-            <stringProp name="parameters"></stringProp>
-            <boolProp name="resetInterpreter">false</boolProp>
-            <stringProp name="script">vars.put(&quot;subjectId&quot;, UUID.randomUUID().toString())</stringProp>
-          </BeanShellPreProcessor>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.custom_message"></stringProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">16</intProp>
+          </ResponseAssertion>
           <hashTree/>
-          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
-            <stringProp name="RegexExtractor.useHeaders">true</stringProp>
-            <stringProp name="RegexExtractor.refname">ehrId</stringProp>
-            <stringProp name="RegexExtractor.regex">ETag: &quot;([a-f0-9-]+)&quot;</stringProp>
-            <stringProp name="RegexExtractor.template">$1$</stringProp>
-            <stringProp name="RegexExtractor.default"></stringProp>
-            <stringProp name="RegexExtractor.match_number"></stringProp>
-          </RegexExtractor>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="JSON Extractor" enabled="true">
+            <stringProp name="JSONPostProcessor.referenceNames">all_ehrs</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.rows.*.[0]</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">-1</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues">NA</stringProp>
+          </JSONPostProcessor>
           <hashTree/>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Create composition: Corona Anamnese" enabled="true">
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&#xd;
+        <ForeachController guiclass="ForeachControlPanel" testclass="ForeachController" testname="ForEach Controller" enabled="true">
+          <stringProp name="ForeachController.inputVal">all_ehrs</stringProp>
+          <stringProp name="ForeachController.returnVal">ehrId_index</stringProp>
+          <boolProp name="ForeachController.useSeparator">true</boolProp>
+        </ForeachController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="1. Create composition: Corona Anamnese" enabled="true">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&#xd;
   &quot;_type&quot;: &quot;COMPOSITION&quot;,&#xd;
   &quot;name&quot;: {&#xd;
     &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
@@ -1482,71 +1472,52 @@
     }&#xd;
   ]&#xd;
 }</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-          <stringProp name="HTTPSampler.domain"></stringProp>
-          <stringProp name="HTTPSampler.port"></stringProp>
-          <stringProp name="HTTPSampler.protocol"></stringProp>
-          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${ehrId}/composition</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
-          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
-          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
-          <stringProp name="HTTPSampler.response_timeout"></stringProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
-            <stringProp name="RegexExtractor.useHeaders">true</stringProp>
-            <stringProp name="RegexExtractor.refname">compositionId</stringProp>
-            <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
-            <stringProp name="RegexExtractor.template">$1$</stringProp>
-            <stringProp name="RegexExtractor.default"></stringProp>
-            <stringProp name="RegexExtractor.match_number"></stringProp>
-          </RegexExtractor>
-          <hashTree/>
-        </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Get composition: Corona Anamnese by version ID" enabled="true">
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
-            <collectionProp name="Arguments.arguments"/>
-          </elementProp>
-          <stringProp name="HTTPSampler.domain"></stringProp>
-          <stringProp name="HTTPSampler.port"></stringProp>
-          <stringProp name="HTTPSampler.protocol"></stringProp>
-          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${ehrId}/composition/${compositionId}</stringProp>
-          <stringProp name="HTTPSampler.method">GET</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
-          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
-          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
-          <stringProp name="HTTPSampler.response_timeout"></stringProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
-            <stringProp name="RegexExtractor.useHeaders">true</stringProp>
-            <stringProp name="RegexExtractor.refname">compositionId</stringProp>
-            <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
-            <stringProp name="RegexExtractor.template">$1$</stringProp>
-            <stringProp name="RegexExtractor.default"></stringProp>
-            <stringProp name="RegexExtractor.match_number"></stringProp>
-          </RegexExtractor>
-          <hashTree/>
-        </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Create composition: International Patient Summary" enabled="true">
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&#xd;
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+            <stringProp name="HTTPSampler.domain"></stringProp>
+            <stringProp name="HTTPSampler.port"></stringProp>
+            <stringProp name="HTTPSampler.protocol"></stringProp>
+            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${ehrId_index}/composition</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+            <stringProp name="HTTPSampler.response_timeout"></stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49587">201</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.custom_message"></stringProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">16</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+              <stringProp name="RegexExtractor.useHeaders">true</stringProp>
+              <stringProp name="RegexExtractor.refname">compositionId</stringProp>
+              <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default"></stringProp>
+              <stringProp name="RegexExtractor.match_number"></stringProp>
+            </RegexExtractor>
+            <hashTree/>
+          </hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="2. Create composition: International Patient Summary" enabled="true">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&#xd;
   &quot;_type&quot;: &quot;COMPOSITION&quot;,&#xd;
   &quot;name&quot;: {&#xd;
     &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
@@ -10547,125 +10518,6 @@
     }&#xd;
   ]&#xd;
 }</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-          <stringProp name="HTTPSampler.domain"></stringProp>
-          <stringProp name="HTTPSampler.port"></stringProp>
-          <stringProp name="HTTPSampler.protocol"></stringProp>
-          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${ehrId}/composition</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
-          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
-          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
-          <stringProp name="HTTPSampler.response_timeout"></stringProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
-            <stringProp name="RegexExtractor.useHeaders">true</stringProp>
-            <stringProp name="RegexExtractor.refname">compositionId</stringProp>
-            <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
-            <stringProp name="RegexExtractor.template">$1$</stringProp>
-            <stringProp name="RegexExtractor.default"></stringProp>
-            <stringProp name="RegexExtractor.match_number"></stringProp>
-          </RegexExtractor>
-          <hashTree/>
-        </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Get composition: International Patient Summary by version ID" enabled="true">
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
-            <collectionProp name="Arguments.arguments"/>
-          </elementProp>
-          <stringProp name="HTTPSampler.domain"></stringProp>
-          <stringProp name="HTTPSampler.port"></stringProp>
-          <stringProp name="HTTPSampler.protocol"></stringProp>
-          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${ehrId}/composition/${compositionId}</stringProp>
-          <stringProp name="HTTPSampler.method">GET</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
-          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
-          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
-          <stringProp name="HTTPSampler.response_timeout"></stringProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
-            <stringProp name="RegexExtractor.useHeaders">true</stringProp>
-            <stringProp name="RegexExtractor.refname">compositionId</stringProp>
-            <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
-            <stringProp name="RegexExtractor.template">$1$</stringProp>
-            <stringProp name="RegexExtractor.default"></stringProp>
-            <stringProp name="RegexExtractor.match_number"></stringProp>
-          </RegexExtractor>
-          <hashTree/>
-        </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Retrieve 10 EHRs" enabled="true">
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&#xd;
-&quot;q&quot;: &quot;SELECT e/ehr_id/value as ehr_id,c/uid/value as composition_id  FROM EHR e  CONTAINS COMPOSITION c LIMIT 10 OFFSET ${__Random(1,100)}&quot;&#xd;
-}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-          <stringProp name="HTTPSampler.domain"></stringProp>
-          <stringProp name="HTTPSampler.port"></stringProp>
-          <stringProp name="HTTPSampler.protocol"></stringProp>
-          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?use_new_engine=true</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
-          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
-          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
-          <stringProp name="HTTPSampler.response_timeout"></stringProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="49586">200</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.custom_message"></stringProp>
-            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">16</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="JSON Extractor" enabled="true">
-            <stringProp name="JSONPostProcessor.referenceNames">all_ehrs</stringProp>
-            <stringProp name="JSONPostProcessor.jsonPathExprs">$.rows.*.[0]</stringProp>
-            <stringProp name="JSONPostProcessor.match_numbers">-1</stringProp>
-            <stringProp name="JSONPostProcessor.defaultValues">NA</stringProp>
-          </JSONPostProcessor>
-          <hashTree/>
-        </hashTree>
-        <ForeachController guiclass="ForeachControlPanel" testclass="ForeachController" testname="ForEach Controller" enabled="true">
-          <stringProp name="ForeachController.inputVal">all_ehrs</stringProp>
-          <stringProp name="ForeachController.returnVal">ehrId_index</stringProp>
-          <boolProp name="ForeachController.useSeparator">true</boolProp>
-        </ForeachController>
-        <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Query 1: Body Weight Measure" enabled="true">
-            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-              <collectionProp name="Arguments.arguments">
-                <elementProp name="" elementType="HTTPArgument">
-                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                  <stringProp name="Argument.value">{&#xd;
-	&quot;q&quot;: &quot;select a_a/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.body_weight.v2] WHERE e/ehr_id/value=&apos;${ehrId_index}&apos;&quot;&#xd;
-}</stringProp>
                   <stringProp name="Argument.metadata">=</stringProp>
                 </elementProp>
               </collectionProp>
@@ -10674,7 +10526,7 @@
             <stringProp name="HTTPSampler.port"></stringProp>
             <stringProp name="HTTPSampler.protocol"></stringProp>
             <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?explain=false&amp;use_new_engine=true</stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${ehrId_index}/composition</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
             <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -10683,12 +10535,11 @@
             <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
             <stringProp name="HTTPSampler.connect_timeout"></stringProp>
             <stringProp name="HTTPSampler.response_timeout"></stringProp>
-            <stringProp name="TestPlan.comments">https://jira.vitagroup.ag/browse/CDR-549</stringProp>
           </HTTPSamplerProxy>
           <hashTree>
             <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
               <collectionProp name="Asserion.test_strings">
-                <stringProp name="49586">200</stringProp>
+                <stringProp name="49587">201</stringProp>
               </collectionProp>
               <stringProp name="Assertion.custom_message"></stringProp>
               <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
@@ -10696,15 +10547,297 @@
               <intProp name="Assertion.test_type">16</intProp>
             </ResponseAssertion>
             <hashTree/>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+              <stringProp name="RegexExtractor.useHeaders">true</stringProp>
+              <stringProp name="RegexExtractor.refname">compositionId</stringProp>
+              <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default"></stringProp>
+              <stringProp name="RegexExtractor.match_number"></stringProp>
+            </RegexExtractor>
+            <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Query 2: COVID Symptoms" enabled="true">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="3. Create composition: ECG Result" enabled="true">
             <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
             <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
               <collectionProp name="Arguments.arguments">
                 <elementProp name="" elementType="HTTPArgument">
                   <boolProp name="HTTPArgument.always_encode">false</boolProp>
                   <stringProp name="Argument.value">{&#xd;
-	&quot;q&quot;: &quot;select a_a/data[at0001]/events[at0002]/time/value, a_a/data[at0001]/events[at0002]/data[at0003]/items[at0022]/name/value, a_a/data[at0001]/events[at0002]/data[at0003]/items[at0022]/items[at0004]/value/value from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0] WHERE e/ehr_id/value= &apos;${ehrId_index}&apos; &quot;&#xd;
+    &quot;_type&quot;: &quot;COMPOSITION&quot;,&#xd;
+    &quot;name&quot;: {&#xd;
+        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+        &quot;value&quot;: &quot;ecg_result&quot;&#xd;
+    },&#xd;
+    &quot;archetype_details&quot;: {&#xd;
+        &quot;archetype_id&quot;: {&#xd;
+            &quot;value&quot;: &quot;openEHR-EHR-COMPOSITION.report.v1&quot;&#xd;
+        },&#xd;
+        &quot;template_id&quot;: {&#xd;
+            &quot;value&quot;: &quot;ecg_result&quot;&#xd;
+        },&#xd;
+        &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+    },&#xd;
+    &quot;language&quot;: {&#xd;
+        &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+        &quot;terminology_id&quot;: {&#xd;
+            &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+            &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+        },&#xd;
+        &quot;code_string&quot;: &quot;de&quot;&#xd;
+    },&#xd;
+    &quot;territory&quot;: {&#xd;
+        &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+        &quot;terminology_id&quot;: {&#xd;
+            &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+            &quot;value&quot;: &quot;ISO_3166-1&quot;&#xd;
+        },&#xd;
+        &quot;code_string&quot;: &quot;DE&quot;&#xd;
+    },&#xd;
+    &quot;category&quot;: {&#xd;
+        &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+        &quot;value&quot;: &quot;event&quot;,&#xd;
+        &quot;defining_code&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                &quot;value&quot;: &quot;openehr&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;433&quot;&#xd;
+        }&#xd;
+    },&#xd;
+    &quot;composer&quot;: {&#xd;
+        &quot;_type&quot;: &quot;PARTY_IDENTIFIED&quot;,&#xd;
+        &quot;name&quot;: &quot;Markus Stein&quot;&#xd;
+    },&#xd;
+    &quot;context&quot;: {&#xd;
+        &quot;_type&quot;: &quot;EVENT_CONTEXT&quot;,&#xd;
+        &quot;start_time&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+            &quot;value&quot;: &quot;2022-02-03T04:05:06.000&quot;&#xd;
+        },&#xd;
+        &quot;end_time&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+            &quot;value&quot;: &quot;2022-02-03T04:05:06.000&quot;&#xd;
+        },&#xd;
+        &quot;setting&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;home&quot;,&#xd;
+            &quot;defining_code&quot;: {&#xd;
+                &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                &quot;terminology_id&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                    &quot;value&quot;: &quot;openehr&quot;&#xd;
+                },&#xd;
+                &quot;code_string&quot;: &quot;225&quot;&#xd;
+            }&#xd;
+        },&#xd;
+        &quot;other_context&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                &quot;value&quot;: &quot;Tree&quot;&#xd;
+            },&#xd;
+            &quot;items&quot;: [&#xd;
+                {&#xd;
+                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                    &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Bericht ID&quot;&#xd;
+                    },&#xd;
+                    &quot;value&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Lorem ipsum&quot;&#xd;
+                    },&#xd;
+                    &quot;archetype_node_id&quot;: &quot;at0002&quot;&#xd;
+                },&#xd;
+                {&#xd;
+                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                    &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Status&quot;&#xd;
+                    },&#xd;
+                    &quot;value&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Lorem ipsum&quot;&#xd;
+                    },&#xd;
+                    &quot;archetype_node_id&quot;: &quot;at0005&quot;&#xd;
+                }&#xd;
+            ],&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;&#xd;
+        },&#xd;
+        &quot;health_care_facility&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_IDENTIFIED&quot;,&#xd;
+            &quot;name&quot;: &quot;DOE, John&quot;&#xd;
+        }&#xd;
+    },&#xd;
+    &quot;content&quot;: [&#xd;
+        {&#xd;
+            &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                &quot;value&quot;: &quot;EKG Ergebnis&quot;&#xd;
+            },&#xd;
+            &quot;archetype_details&quot;: {&#xd;
+                &quot;archetype_id&quot;: {&#xd;
+                    &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.ecg_result.v1&quot;&#xd;
+                },&#xd;
+                &quot;template_id&quot;: {&#xd;
+                    &quot;value&quot;: &quot;ecg_result&quot;&#xd;
+                },&#xd;
+                &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+            },&#xd;
+            &quot;language&quot;: {&#xd;
+                &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                &quot;terminology_id&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                    &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+                },&#xd;
+                &quot;code_string&quot;: &quot;de&quot;&#xd;
+            },&#xd;
+            &quot;encoding&quot;: {&#xd;
+                &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                &quot;terminology_id&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                    &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+                },&#xd;
+                &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+            },&#xd;
+            &quot;subject&quot;: {&#xd;
+                &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+            },&#xd;
+            &quot;data&quot;: {&#xd;
+                &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Event Series&quot;&#xd;
+                },&#xd;
+                &quot;origin&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                    &quot;value&quot;: &quot;2022-02-03T04:05:06.000&quot;&#xd;
+                },&#xd;
+                &quot;events&quot;: [&#xd;
+                    {&#xd;
+                        &quot;_type&quot;: &quot;INTERVAL_EVENT&quot;,&#xd;
+                        &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                        },&#xd;
+                        &quot;time&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                            &quot;value&quot;: &quot;2022-02-05T04:05:06.000&quot;&#xd;
+                        },&#xd;
+                        &quot;data&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                            &quot;name&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Tree&quot;&#xd;
+                            },&#xd;
+                            &quot;items&quot;: [&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;Globale QT-Zeit&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;ms&quot;,&#xd;
+                                        &quot;magnitude&quot;: 60.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0007&quot;&#xd;
+                                },&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;Globale PQ-Zeit&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;ms&quot;,&#xd;
+                                        &quot;magnitude&quot;: 20.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0012&quot;&#xd;
+                                },&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;Globale QRS-Dauer&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;ms&quot;,&#xd;
+                                        &quot;magnitude&quot;: 8.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0014&quot;&#xd;
+                                },&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;P-Achse&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;deg&quot;,&#xd;
+                                        &quot;magnitude&quot;: 70.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0020&quot;&#xd;
+                                },&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;Atriale Frequenz&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;/min&quot;,&#xd;
+                                        &quot;magnitude&quot;: 60.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0094&quot;&#xd;
+                                }&#xd;
+                            ],&#xd;
+                            &quot;archetype_node_id&quot;: &quot;at0005&quot;&#xd;
+                        },&#xd;
+                        &quot;width&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_DURATION&quot;,&#xd;
+                            &quot;value&quot;: &quot;PT42H&quot;&#xd;
+                        },&#xd;
+                        &quot;math_function&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;minimum&quot;,&#xd;
+                            &quot;defining_code&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                                &quot;terminology_id&quot;: {&#xd;
+                                    &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                    &quot;value&quot;: &quot;openehr&quot;&#xd;
+                                },&#xd;
+                                &quot;code_string&quot;: &quot;145&quot;&#xd;
+                            }&#xd;
+                        },&#xd;
+                        &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                        &quot;uid&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;HIER_OBJECT_ID&quot;,&#xd;
+                            &quot;value&quot;: &quot;d6ae69e7-1030-3525-bb73-1da9e03989cd&quot;&#xd;
+                        }&#xd;
+                    }&#xd;
+                ],&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0001&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.ecg_result.v1&quot;,&#xd;
+            &quot;uid&quot;: {&#xd;
+                &quot;_type&quot;: &quot;HIER_OBJECT_ID&quot;,&#xd;
+                &quot;value&quot;: &quot;a77acf3b-d10f-3171-9300-6991899819b7&quot;&#xd;
+            }&#xd;
+        }&#xd;
+    ],&#xd;
+    &quot;archetype_node_id&quot;: &quot;openEHR-EHR-COMPOSITION.report.v1&quot;,&#xd;
+    &quot;uid&quot;: {&#xd;
+        &quot;_type&quot;: &quot;OBJECT_VERSION_ID&quot;,&#xd;
+        &quot;value&quot;: &quot;3762a102-a318-4ce3-a9c6-e9883b2b09c3::local.ehrbase.org::1&quot;&#xd;
+    }&#xd;
 }</stringProp>
                   <stringProp name="Argument.metadata">=</stringProp>
                 </elementProp>
@@ -10714,7 +10847,7 @@
             <stringProp name="HTTPSampler.port"></stringProp>
             <stringProp name="HTTPSampler.protocol"></stringProp>
             <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?explain=false&amp;use_new_engine=true</stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${ehrId_index}/composition</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
             <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -10723,12 +10856,12 @@
             <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
             <stringProp name="HTTPSampler.connect_timeout"></stringProp>
             <stringProp name="HTTPSampler.response_timeout"></stringProp>
-            <stringProp name="TestPlan.comments">https://jira.vitagroup.ag/browse/CDR-549</stringProp>
+            <stringProp name="TestPlan.comments">based on: https://github.com/ehrbase/performance-test/blob/feature/CDR-510_load_matrix_data/src/main/resources/compositions/repeatable/05_ecg_result_2.json</stringProp>
           </HTTPSamplerProxy>
           <hashTree>
             <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
               <collectionProp name="Asserion.test_strings">
-                <stringProp name="49586">200</stringProp>
+                <stringProp name="49587">201</stringProp>
               </collectionProp>
               <stringProp name="Assertion.custom_message"></stringProp>
               <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
@@ -10736,84 +10869,14 @@
               <intProp name="Assertion.test_type">16</intProp>
             </ResponseAssertion>
             <hashTree/>
-          </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Query 3: ECG Result" enabled="true">
-            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-              <collectionProp name="Arguments.arguments">
-                <elementProp name="" elementType="HTTPArgument">
-                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                  <stringProp name="Argument.value">{&#xd;
-	&quot;q&quot;: &quot;select a_a/data[at0001]/events[at0002]/time/value, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0012]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0012]/value/unit, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0014]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/unit, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0094]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/unit, a/uid/value, a/name/value from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.ecg_result.v1] WHERE e/ehr_id/value= &apos;${ehrId_index}&apos;&quot;&#xd;
-}</stringProp>
-                  <stringProp name="Argument.metadata">=</stringProp>
-                </elementProp>
-              </collectionProp>
-            </elementProp>
-            <stringProp name="HTTPSampler.domain"></stringProp>
-            <stringProp name="HTTPSampler.port"></stringProp>
-            <stringProp name="HTTPSampler.protocol"></stringProp>
-            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?explain=false&amp;use_new_engine=true</stringProp>
-            <stringProp name="HTTPSampler.method">POST</stringProp>
-            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
-            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
-            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
-            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
-            <stringProp name="HTTPSampler.response_timeout"></stringProp>
-            <stringProp name="TestPlan.comments">https://jira.vitagroup.ag/browse/CDR-549</stringProp>
-          </HTTPSamplerProxy>
-          <hashTree>
-            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
-              <collectionProp name="Asserion.test_strings">
-                <stringProp name="49586">200</stringProp>
-              </collectionProp>
-              <stringProp name="Assertion.custom_message"></stringProp>
-              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-              <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">16</intProp>
-            </ResponseAssertion>
-            <hashTree/>
-          </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Query 4: Get First Document" enabled="true">
-            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-              <collectionProp name="Arguments.arguments">
-                <elementProp name="" elementType="HTTPArgument">
-                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                  <stringProp name="Argument.value">{&#xd;
-    &quot;q&quot;: &quot;SELECT e/ehr_id/value as ehr_id,c/uid/value as composition_id ,c  FROM EHR e  CONTAINS COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.ecg_result.v1]  where e/ehr_id/value = &apos;${ehrId_index}&apos; ORDER BY c/context/start_time/value DESC limit 1&quot;&#xd;
-}</stringProp>
-                  <stringProp name="Argument.metadata">=</stringProp>
-                </elementProp>
-              </collectionProp>
-            </elementProp>
-            <stringProp name="HTTPSampler.domain"></stringProp>
-            <stringProp name="HTTPSampler.port"></stringProp>
-            <stringProp name="HTTPSampler.protocol"></stringProp>
-            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?explain=false&amp;use_new_engine=true</stringProp>
-            <stringProp name="HTTPSampler.method">POST</stringProp>
-            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
-            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
-            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
-            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
-            <stringProp name="HTTPSampler.response_timeout"></stringProp>
-          </HTTPSamplerProxy>
-          <hashTree>
-            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
-              <collectionProp name="Asserion.test_strings">
-                <stringProp name="49586">200</stringProp>
-              </collectionProp>
-              <stringProp name="Assertion.custom_message"></stringProp>
-              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-              <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">16</intProp>
-            </ResponseAssertion>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+              <stringProp name="RegexExtractor.useHeaders">true</stringProp>
+              <stringProp name="RegexExtractor.refname">compositionId</stringProp>
+              <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default"></stringProp>
+              <stringProp name="RegexExtractor.match_number"></stringProp>
+            </RegexExtractor>
             <hashTree/>
           </hashTree>
         </hashTree>
