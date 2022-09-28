@@ -10664,7 +10664,7 @@
                 <elementProp name="" elementType="HTTPArgument">
                   <boolProp name="HTTPArgument.always_encode">false</boolProp>
                   <stringProp name="Argument.value">{&#xd;
-	&quot;q&quot;: &quot;select a_a/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.body_weight.v2] WHERE e/ehr_id/value=&apos;${ehrId_index}&apos;&quot;&#xd;
+	&quot;q&quot;: &quot;select a_a/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.body_weight.v2] WHERE e/ehr_id/value=&apos;${ehrId_index}&apos; LIMIT 10&quot;&#xd;
 }</stringProp>
                   <stringProp name="Argument.metadata">=</stringProp>
                 </elementProp>
@@ -10704,7 +10704,7 @@
                 <elementProp name="" elementType="HTTPArgument">
                   <boolProp name="HTTPArgument.always_encode">false</boolProp>
                   <stringProp name="Argument.value">{&#xd;
-	&quot;q&quot;: &quot;select a_a/data[at0001]/events[at0002]/time/value, a_a/data[at0001]/events[at0002]/data[at0003]/items[at0022]/name/value, a_a/data[at0001]/events[at0002]/data[at0003]/items[at0022]/items[at0004]/value/value from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0] WHERE e/ehr_id/value= &apos;${ehrId_index}&apos; &quot;&#xd;
+	&quot;q&quot;: &quot;select a_a/data[at0001]/events[at0002]/time/value, a_a/data[at0001]/events[at0002]/data[at0003]/items[at0022]/name/value, a_a/data[at0001]/events[at0002]/data[at0003]/items[at0022]/items[at0004]/value/value from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0] WHERE e/ehr_id/value= &apos;${ehrId_index}&apos; LIMIT 10&quot;&#xd;
 }</stringProp>
                   <stringProp name="Argument.metadata">=</stringProp>
                 </elementProp>
@@ -10744,7 +10744,7 @@
                 <elementProp name="" elementType="HTTPArgument">
                   <boolProp name="HTTPArgument.always_encode">false</boolProp>
                   <stringProp name="Argument.value">{&#xd;
-	&quot;q&quot;: &quot;select a_a/data[at0001]/events[at0002]/time/value, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0012]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0012]/value/unit, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0014]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/unit, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0094]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/unit, a/uid/value, a/name/value from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.ecg_result.v1] WHERE e/ehr_id/value= &apos;${ehrId_index}&apos;&quot;&#xd;
+	&quot;q&quot;: &quot;select a_a/data[at0001]/events[at0002]/time/value, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0012]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0012]/value/unit, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0014]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/unit, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0094]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/unit, a/uid/value, a/name/value from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.ecg_result.v1] WHERE e/ehr_id/value= &apos;${ehrId_index}&apos; LIMIT 10&quot;&#xd;
 }</stringProp>
                   <stringProp name="Argument.metadata">=</stringProp>
                 </elementProp>
