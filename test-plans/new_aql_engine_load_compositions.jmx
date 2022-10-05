@@ -1,0 +1,1877 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.5">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="New AQL Engine Load Compositions On EHRs" enabled="true">
+      <stringProp name="TestPlan.comments">https://jira.vitagroup.ag/browse/CDR-557</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults" enabled="true">
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+        <stringProp name="HTTPSampler.domain">${__P(host,localhost)}</stringProp>
+        <stringProp name="HTTPSampler.port">${__P(port,8080)}</stringProp>
+        <stringProp name="HTTPSampler.protocol"></stringProp>
+        <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+        <stringProp name="HTTPSampler.path"></stringProp>
+        <stringProp name="HTTPSampler.concurrentPool">6</stringProp>
+        <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+        <stringProp name="HTTPSampler.response_timeout"></stringProp>
+      </ConfigTestElement>
+      <hashTree/>
+      <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="HTTP Header Manager" enabled="true">
+        <collectionProp name="HeaderManager.headers">
+          <elementProp name="" elementType="Header">
+            <stringProp name="Header.name">Content-Type</stringProp>
+            <stringProp name="Header.value">application/json</stringProp>
+          </elementProp>
+        </collectionProp>
+      </HeaderManager>
+      <hashTree/>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">${__P(loopCount,1)}</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(threads,1)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(rampUp,1)}</stringProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Retrieve 10 EHRs" enabled="true">
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">{&#xd;
+&quot;q&quot;: &quot;SELECT e/ehr_id/value as ehr_id,c/uid/value as composition_id  FROM EHR e  CONTAINS COMPOSITION c LIMIT 1 OFFSET ${__Random(1,100)}&quot;&#xd;
+}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.domain"></stringProp>
+          <stringProp name="HTTPSampler.port"></stringProp>
+          <stringProp name="HTTPSampler.protocol"></stringProp>
+          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?use_new_engine=true</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+          <stringProp name="HTTPSampler.response_timeout"></stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.custom_message"></stringProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">16</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="JSON Extractor" enabled="true">
+            <stringProp name="JSONPostProcessor.referenceNames">all_ehrs</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.rows.*.[0]</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">-1</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues">NA</stringProp>
+          </JSONPostProcessor>
+          <hashTree/>
+        </hashTree>
+        <ForeachController guiclass="ForeachControlPanel" testclass="ForeachController" testname="ForEach Controller" enabled="true">
+          <stringProp name="ForeachController.inputVal">all_ehrs</stringProp>
+          <stringProp name="ForeachController.returnVal">ehrId_index</stringProp>
+          <boolProp name="ForeachController.useSeparator">true</boolProp>
+        </ForeachController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="1. Create composition: Corona Anamnese" enabled="true">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&#xd;
+  &quot;_type&quot;: &quot;COMPOSITION&quot;,&#xd;
+  &quot;name&quot;: {&#xd;
+    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+    &quot;value&quot;: &quot;Bericht&quot;&#xd;
+  },&#xd;
+  &quot;uid&quot;: {&#xd;
+    &quot;_type&quot;: &quot;OBJECT_VERSION_ID&quot;,&#xd;
+    &quot;value&quot;: &quot;93a018f1-ad95-4d52-bb8f-0f64d7f7cce6::piri.ehrscape.com::1&quot;&#xd;
+  },&#xd;
+  &quot;archetype_details&quot;: {&#xd;
+    &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+    &quot;archetype_id&quot;: {&#xd;
+      &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+      &quot;value&quot;: &quot;openEHR-EHR-COMPOSITION.report.v1&quot;&#xd;
+    },&#xd;
+    &quot;template_id&quot;: {&#xd;
+      &quot;_type&quot;: &quot;TEMPLATE_ID&quot;,&#xd;
+      &quot;value&quot;: &quot;Corona_Anamnese&quot;&#xd;
+    },&#xd;
+    &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+  },&#xd;
+  &quot;archetype_node_id&quot;: &quot;openEHR-EHR-COMPOSITION.report.v1&quot;,&#xd;
+  &quot;language&quot;: {&#xd;
+    &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+    &quot;terminology_id&quot;: {&#xd;
+      &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+      &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+    },&#xd;
+    &quot;code_string&quot;: &quot;de&quot;&#xd;
+  },&#xd;
+  &quot;territory&quot;: {&#xd;
+    &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+    &quot;terminology_id&quot;: {&#xd;
+      &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+      &quot;value&quot;: &quot;ISO_3166-1&quot;&#xd;
+    },&#xd;
+    &quot;code_string&quot;: &quot;DE&quot;&#xd;
+  },&#xd;
+  &quot;category&quot;: {&#xd;
+    &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+    &quot;value&quot;: &quot;event&quot;,&#xd;
+    &quot;defining_code&quot;: {&#xd;
+      &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+      &quot;terminology_id&quot;: {&#xd;
+        &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+        &quot;value&quot;: &quot;openehr&quot;&#xd;
+      },&#xd;
+      &quot;code_string&quot;: &quot;433&quot;&#xd;
+    }&#xd;
+  },&#xd;
+  &quot;composer&quot;: {&#xd;
+    &quot;_type&quot;: &quot;PARTY_IDENTIFIED&quot;,&#xd;
+    &quot;name&quot;: &quot;birger.haarbrandt@plri.de&quot;&#xd;
+  },&#xd;
+  &quot;context&quot;: {&#xd;
+    &quot;_type&quot;: &quot;EVENT_CONTEXT&quot;,&#xd;
+    &quot;start_time&quot;: {&#xd;
+      &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+      &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+    },&#xd;
+    &quot;setting&quot;: {&#xd;
+      &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+      &quot;value&quot;: &quot;other care&quot;,&#xd;
+      &quot;defining_code&quot;: {&#xd;
+        &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+        &quot;terminology_id&quot;: {&#xd;
+          &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+          &quot;value&quot;: &quot;openehr&quot;&#xd;
+        },&#xd;
+        &quot;code_string&quot;: &quot;238&quot;&#xd;
+      }&#xd;
+    }&#xd;
+  },&#xd;
+  &quot;content&quot;: [&#xd;
+    {&#xd;
+      &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+      &quot;name&quot;: {&#xd;
+        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+        &quot;value&quot;: &quot;Geschichte/Historie&quot;&#xd;
+      },&#xd;
+      &quot;archetype_details&quot;: {&#xd;
+        &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+        &quot;archetype_id&quot;: {&#xd;
+          &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+          &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.story.v1&quot;&#xd;
+        },&#xd;
+        &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+      },&#xd;
+      &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.story.v1&quot;,&#xd;
+      &quot;language&quot;: {&#xd;
+        &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+        &quot;terminology_id&quot;: {&#xd;
+          &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+          &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+        },&#xd;
+        &quot;code_string&quot;: &quot;de&quot;&#xd;
+      },&#xd;
+      &quot;encoding&quot;: {&#xd;
+        &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+        &quot;terminology_id&quot;: {&#xd;
+          &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+          &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+        },&#xd;
+        &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+      },&#xd;
+      &quot;subject&quot;: {&#xd;
+        &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+      },&#xd;
+      &quot;data&quot;: {&#xd;
+        &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+        &quot;name&quot;: {&#xd;
+          &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+          &quot;value&quot;: &quot;Event Series&quot;&#xd;
+        },&#xd;
+        &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+        &quot;origin&quot;: {&#xd;
+          &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+          &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+        },&#xd;
+        &quot;events&quot;: [&#xd;
+          {&#xd;
+            &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+            &quot;time&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;data&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+              &quot;name&quot;: {&#xd;
+                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                &quot;value&quot;: &quot;Tree&quot;&#xd;
+              },&#xd;
+              &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+              &quot;items&quot;: [&#xd;
+                {&#xd;
+                  &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Geschichte&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                  &quot;value&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;War in Ischgl&quot;&#xd;
+                  }&#xd;
+                }&#xd;
+              ]&#xd;
+            }&#xd;
+          }&#xd;
+        ]&#xd;
+      }&#xd;
+    },&#xd;
+    {&#xd;
+      &quot;_type&quot;: &quot;SECTION&quot;,&#xd;
+      &quot;name&quot;: {&#xd;
+        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+        &quot;value&quot;: &quot;Symptome&quot;&#xd;
+      },&#xd;
+      &quot;archetype_details&quot;: {&#xd;
+        &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+        &quot;archetype_id&quot;: {&#xd;
+          &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+          &quot;value&quot;: &quot;openEHR-EHR-SECTION.adhoc.v1&quot;&#xd;
+        },&#xd;
+        &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+      },&#xd;
+      &quot;archetype_node_id&quot;: &quot;openEHR-EHR-SECTION.adhoc.v1&quot;,&#xd;
+      &quot;items&quot;: [&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Husten&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Tree&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Spezifisches Symptom/Anzeichen&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0022&quot;,&#xd;
+                      &quot;items&quot;: [&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Bezeichnung des Symptoms oder Anzeichens.&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Husten&quot;&#xd;
+                          }&#xd;
+                        },&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden?&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0005&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden&quot;,&#xd;
+                            &quot;defining_code&quot;: {&#xd;
+                              &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                              &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;local&quot;&#xd;
+                              },&#xd;
+                              &quot;code_string&quot;: &quot;at0023&quot;&#xd;
+                            }&#xd;
+                          }&#xd;
+                        }&#xd;
+                      ]&#xd;
+                    }&#xd;
+                  ]&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        },&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Schnupfen&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Tree&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Spezifisches Symptom/Anzeichen&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0022&quot;,&#xd;
+                      &quot;items&quot;: [&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Bezeichnung des Symptoms oder Anzeichens.&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Schnupfen&quot;&#xd;
+                          }&#xd;
+                        },&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden?&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0005&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden&quot;,&#xd;
+                            &quot;defining_code&quot;: {&#xd;
+                              &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                              &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;local&quot;&#xd;
+                              },&#xd;
+                              &quot;code_string&quot;: &quot;at0023&quot;&#xd;
+                            }&#xd;
+                          }&#xd;
+                        }&#xd;
+                      ]&#xd;
+                    }&#xd;
+                  ]&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        },&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Heiserkeit&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Tree&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Spezifisches Symptom/Anzeichen&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0022&quot;,&#xd;
+                      &quot;items&quot;: [&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Bezeichnung des Symptoms oder Anzeichens.&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Heiserkeit&quot;&#xd;
+                          }&#xd;
+                        },&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden?&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0005&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Nicht vorhanden&quot;,&#xd;
+                            &quot;defining_code&quot;: {&#xd;
+                              &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                              &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;local&quot;&#xd;
+                              },&#xd;
+                              &quot;code_string&quot;: &quot;at0024&quot;&#xd;
+                            }&#xd;
+                          }&#xd;
+                        }&#xd;
+                      ]&#xd;
+                    }&#xd;
+                  ]&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        },&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Fieber oder erhöhte Körpertemperatur&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Tree&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Spezifisches Symptom/Anzeichen&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0022&quot;,&#xd;
+                      &quot;items&quot;: [&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Bezeichnung des Symptoms oder Anzeichens.&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Fieber oder erhöhte Körpertemperatur&quot;&#xd;
+                          }&#xd;
+                        },&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden?&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0005&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden&quot;,&#xd;
+                            &quot;defining_code&quot;: {&#xd;
+                              &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                              &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;local&quot;&#xd;
+                              },&#xd;
+                              &quot;code_string&quot;: &quot;at0023&quot;&#xd;
+                            }&#xd;
+                          }&#xd;
+                        }&#xd;
+                      ]&#xd;
+                    }&#xd;
+                  ]&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        },&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Körpertemperatur&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.body_temperature.v2&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.body_temperature.v2&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Single&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Temperatur&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                      &quot;value&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                        &quot;magnitude&quot;: 39,&#xd;
+                        &quot;units&quot;: &quot;°C&quot;&#xd;
+                      }&#xd;
+                    }&#xd;
+                  ]&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        },&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Gestörter Geruchssinn&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Tree&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Spezifisches Symptom/Anzeichen&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0022&quot;,&#xd;
+                      &quot;items&quot;: [&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Bezeichnung des Symptoms oder Anzeichens.&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;gestörter Geruchssinn&quot;&#xd;
+                          }&#xd;
+                        },&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden?&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0005&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Nicht vorhanden&quot;,&#xd;
+                            &quot;defining_code&quot;: {&#xd;
+                              &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                              &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;local&quot;&#xd;
+                              },&#xd;
+                              &quot;code_string&quot;: &quot;at0024&quot;&#xd;
+                            }&#xd;
+                          }&#xd;
+                        }&#xd;
+                      ]&#xd;
+                    }&#xd;
+                  ]&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        },&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Gestörter Geschmackssinn&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Tree&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Spezifisches Symptom/Anzeichen&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0022&quot;,&#xd;
+                      &quot;items&quot;: [&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Bezeichnung des Symptoms oder Anzeichens.&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;gestörter Geschmackssinn&quot;&#xd;
+                          }&#xd;
+                        },&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden?&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0005&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Nicht vorhanden&quot;,&#xd;
+                            &quot;defining_code&quot;: {&#xd;
+                              &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                              &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;local&quot;&#xd;
+                              },&#xd;
+                              &quot;code_string&quot;: &quot;at0024&quot;&#xd;
+                            }&#xd;
+                          }&#xd;
+                        }&#xd;
+                      ]&#xd;
+                    }&#xd;
+                  ]&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        },&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Durchfall&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Tree&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Spezifisches Symptom/Anzeichen&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0022&quot;,&#xd;
+                      &quot;items&quot;: [&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Bezeichnung des Symptoms oder Anzeichens.&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Durchfall&quot;&#xd;
+                          }&#xd;
+                        },&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Vorhanden?&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0005&quot;,&#xd;
+                          &quot;value&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Nicht vorhanden&quot;,&#xd;
+                            &quot;defining_code&quot;: {&#xd;
+                              &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                              &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;local&quot;&#xd;
+                              },&#xd;
+                              &quot;code_string&quot;: &quot;at0024&quot;&#xd;
+                            }&#xd;
+                          }&#xd;
+                        }&#xd;
+                      ]&#xd;
+                    }&#xd;
+                  ]&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        }&#xd;
+      ]&#xd;
+    },&#xd;
+    {&#xd;
+      &quot;_type&quot;: &quot;SECTION&quot;,&#xd;
+      &quot;name&quot;: {&#xd;
+        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+        &quot;value&quot;: &quot;Risikogebiet&quot;&#xd;
+      },&#xd;
+      &quot;archetype_details&quot;: {&#xd;
+        &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+        &quot;archetype_id&quot;: {&#xd;
+          &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+          &quot;value&quot;: &quot;openEHR-EHR-SECTION.adhoc.v1&quot;&#xd;
+        },&#xd;
+        &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+      },&#xd;
+      &quot;archetype_node_id&quot;: &quot;openEHR-EHR-SECTION.adhoc.v1&quot;,&#xd;
+      &quot;items&quot;: [&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Historie der Reise&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.travel_history.v0&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.travel_history.v0&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Jedes Ereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Tree&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Aufenthalt in den letzten 14 Tage in einem der Risikogebiete für Coronainfektion oder Kontakt zu Menschen, die dort waren&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0111&quot;,&#xd;
+                      &quot;value&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Ja&quot;,&#xd;
+                        &quot;defining_code&quot;: {&#xd;
+                          &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                          &quot;terminology_id&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                            &quot;value&quot;: &quot;local&quot;&#xd;
+                          },&#xd;
+                          &quot;code_string&quot;: &quot;at0112&quot;&#xd;
+                        }&#xd;
+                      }&#xd;
+                    },&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Ortsbeschreibung&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0134&quot;,&#xd;
+                      &quot;items&quot;: [&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Standort&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_details&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+                            &quot;archetype_id&quot;: {&#xd;
+                              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+                              &quot;value&quot;: &quot;openEHR-EHR-CLUSTER.location.v1&quot;&#xd;
+                            },&#xd;
+                            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-CLUSTER.location.v1&quot;,&#xd;
+                          &quot;items&quot;: [&#xd;
+                            {&#xd;
+                              &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                              &quot;name&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Standortbeschreibung&quot;&#xd;
+                              },&#xd;
+                              &quot;archetype_node_id&quot;: &quot;at0046&quot;,&#xd;
+                              &quot;value&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Norditalien&quot;&#xd;
+                              }&#xd;
+                            }&#xd;
+                          ]&#xd;
+                        }&#xd;
+                      ]&#xd;
+                    }&#xd;
+                  ]&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        },&#xd;
+        {&#xd;
+          &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+          &quot;name&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;Reisefall&quot;&#xd;
+          },&#xd;
+          &quot;archetype_details&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+            &quot;archetype_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.travel_event.v0&quot;&#xd;
+            },&#xd;
+            &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+          },&#xd;
+          &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.travel_event.v0&quot;,&#xd;
+          &quot;language&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;de&quot;&#xd;
+          },&#xd;
+          &quot;encoding&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+              &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+              &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+          },&#xd;
+          &quot;subject&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+          },&#xd;
+          &quot;data&quot;: {&#xd;
+            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+              &quot;value&quot;: &quot;History&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+            &quot;origin&quot;: {&#xd;
+              &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+              &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+            },&#xd;
+            &quot;events&quot;: [&#xd;
+              {&#xd;
+                &quot;_type&quot;: &quot;INTERVAL_EVENT&quot;,&#xd;
+                &quot;name&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;Beliebiges Intervallereignis&quot;&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                &quot;time&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                  &quot;value&quot;: &quot;2020-05-11T22:53:12.039139+02:00&quot;&#xd;
+                },&#xd;
+                &quot;data&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                  &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Tree&quot;&#xd;
+                  },&#xd;
+                  &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                  &quot;items&quot;: [&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Letzte Reise?&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0004&quot;,&#xd;
+                      &quot;value&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Ja - national&quot;,&#xd;
+                        &quot;defining_code&quot;: {&#xd;
+                          &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                          &quot;terminology_id&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                            &quot;value&quot;: &quot;local&quot;&#xd;
+                          },&#xd;
+                          &quot;code_string&quot;: &quot;at0006&quot;&#xd;
+                        }&#xd;
+                      }&#xd;
+                    },&#xd;
+                    {&#xd;
+                      &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                      &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Bestimmte Reise&quot;&#xd;
+                      },&#xd;
+                      &quot;archetype_node_id&quot;: &quot;at0008&quot;,&#xd;
+                      &quot;items&quot;: [&#xd;
+                        {&#xd;
+                          &quot;_type&quot;: &quot;CLUSTER&quot;,&#xd;
+                          &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Bestimmtes Reiseziel&quot;&#xd;
+                          },&#xd;
+                          &quot;archetype_node_id&quot;: &quot;at0010&quot;,&#xd;
+                          &quot;items&quot;: [&#xd;
+                            {&#xd;
+                              &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                              &quot;name&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Land&quot;&#xd;
+                              },&#xd;
+                              &quot;archetype_node_id&quot;: &quot;at0011&quot;,&#xd;
+                              &quot;value&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Deutschland&quot;&#xd;
+                              }&#xd;
+                            },&#xd;
+                            {&#xd;
+                              &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                              &quot;name&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Bundesland / Region&quot;&#xd;
+                              },&#xd;
+                              &quot;archetype_node_id&quot;: &quot;at0012&quot;,&#xd;
+                              &quot;value&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Baden-Württemberg&quot;&#xd;
+                              }&#xd;
+                            },&#xd;
+                            {&#xd;
+                              &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                              &quot;name&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Stadt&quot;&#xd;
+                              },&#xd;
+                              &quot;archetype_node_id&quot;: &quot;at0013&quot;,&#xd;
+                              &quot;value&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Mannheim&quot;&#xd;
+                              }&#xd;
+                            }&#xd;
+                          ]&#xd;
+                        }&#xd;
+                      ]&#xd;
+                    }&#xd;
+                  ]&#xd;
+                },&#xd;
+                &quot;width&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_DURATION&quot;,&#xd;
+                  &quot;value&quot;: &quot;P0D&quot;&#xd;
+                },&#xd;
+                &quot;math_function&quot;: {&#xd;
+                  &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                  &quot;value&quot;: &quot;mean&quot;,&#xd;
+                  &quot;defining_code&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                    &quot;terminology_id&quot;: {&#xd;
+                      &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                      &quot;value&quot;: &quot;openehr&quot;&#xd;
+                    },&#xd;
+                    &quot;code_string&quot;: &quot;146&quot;&#xd;
+                  }&#xd;
+                }&#xd;
+              }&#xd;
+            ]&#xd;
+          }&#xd;
+        }&#xd;
+      ]&#xd;
+    }&#xd;
+  ]&#xd;
+}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+            <stringProp name="HTTPSampler.domain"></stringProp>
+            <stringProp name="HTTPSampler.port"></stringProp>
+            <stringProp name="HTTPSampler.protocol"></stringProp>
+            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${ehrId_index}/composition</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+            <stringProp name="HTTPSampler.response_timeout"></stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49590">204</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.custom_message"></stringProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">16</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+              <stringProp name="RegexExtractor.useHeaders">true</stringProp>
+              <stringProp name="RegexExtractor.refname">compositionId</stringProp>
+              <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default"></stringProp>
+              <stringProp name="RegexExtractor.match_number"></stringProp>
+            </RegexExtractor>
+            <hashTree/>
+          </hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="2. Create composition: ECG Result" enabled="true">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&#xd;
+    &quot;_type&quot;: &quot;COMPOSITION&quot;,&#xd;
+    &quot;name&quot;: {&#xd;
+        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+        &quot;value&quot;: &quot;ecg_result&quot;&#xd;
+    },&#xd;
+    &quot;archetype_details&quot;: {&#xd;
+        &quot;archetype_id&quot;: {&#xd;
+            &quot;value&quot;: &quot;openEHR-EHR-COMPOSITION.report.v1&quot;&#xd;
+        },&#xd;
+        &quot;template_id&quot;: {&#xd;
+            &quot;value&quot;: &quot;ecg_result&quot;&#xd;
+        },&#xd;
+        &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+    },&#xd;
+    &quot;language&quot;: {&#xd;
+        &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+        &quot;terminology_id&quot;: {&#xd;
+            &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+            &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+        },&#xd;
+        &quot;code_string&quot;: &quot;de&quot;&#xd;
+    },&#xd;
+    &quot;territory&quot;: {&#xd;
+        &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+        &quot;terminology_id&quot;: {&#xd;
+            &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+            &quot;value&quot;: &quot;ISO_3166-1&quot;&#xd;
+        },&#xd;
+        &quot;code_string&quot;: &quot;DE&quot;&#xd;
+    },&#xd;
+    &quot;category&quot;: {&#xd;
+        &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+        &quot;value&quot;: &quot;event&quot;,&#xd;
+        &quot;defining_code&quot;: {&#xd;
+            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+            &quot;terminology_id&quot;: {&#xd;
+                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                &quot;value&quot;: &quot;openehr&quot;&#xd;
+            },&#xd;
+            &quot;code_string&quot;: &quot;433&quot;&#xd;
+        }&#xd;
+    },&#xd;
+    &quot;composer&quot;: {&#xd;
+        &quot;_type&quot;: &quot;PARTY_IDENTIFIED&quot;,&#xd;
+        &quot;name&quot;: &quot;Markus Stein&quot;&#xd;
+    },&#xd;
+    &quot;context&quot;: {&#xd;
+        &quot;_type&quot;: &quot;EVENT_CONTEXT&quot;,&#xd;
+        &quot;start_time&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+            &quot;value&quot;: &quot;2022-02-03T04:05:06.000&quot;&#xd;
+        },&#xd;
+        &quot;end_time&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+            &quot;value&quot;: &quot;2022-02-03T04:05:06.000&quot;&#xd;
+        },&#xd;
+        &quot;setting&quot;: {&#xd;
+            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+            &quot;value&quot;: &quot;home&quot;,&#xd;
+            &quot;defining_code&quot;: {&#xd;
+                &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                &quot;terminology_id&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                    &quot;value&quot;: &quot;openehr&quot;&#xd;
+                },&#xd;
+                &quot;code_string&quot;: &quot;225&quot;&#xd;
+            }&#xd;
+        },&#xd;
+        &quot;other_context&quot;: {&#xd;
+            &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                &quot;value&quot;: &quot;Tree&quot;&#xd;
+            },&#xd;
+            &quot;items&quot;: [&#xd;
+                {&#xd;
+                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                    &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Bericht ID&quot;&#xd;
+                    },&#xd;
+                    &quot;value&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Lorem ipsum&quot;&#xd;
+                    },&#xd;
+                    &quot;archetype_node_id&quot;: &quot;at0002&quot;&#xd;
+                },&#xd;
+                {&#xd;
+                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                    &quot;name&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Status&quot;&#xd;
+                    },&#xd;
+                    &quot;value&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;Lorem ipsum&quot;&#xd;
+                    },&#xd;
+                    &quot;archetype_node_id&quot;: &quot;at0005&quot;&#xd;
+                }&#xd;
+            ],&#xd;
+            &quot;archetype_node_id&quot;: &quot;at0001&quot;&#xd;
+        },&#xd;
+        &quot;health_care_facility&quot;: {&#xd;
+            &quot;_type&quot;: &quot;PARTY_IDENTIFIED&quot;,&#xd;
+            &quot;name&quot;: &quot;DOE, John&quot;&#xd;
+        }&#xd;
+    },&#xd;
+    &quot;content&quot;: [&#xd;
+        {&#xd;
+            &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+            &quot;name&quot;: {&#xd;
+                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                &quot;value&quot;: &quot;EKG Ergebnis&quot;&#xd;
+            },&#xd;
+            &quot;archetype_details&quot;: {&#xd;
+                &quot;archetype_id&quot;: {&#xd;
+                    &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.ecg_result.v1&quot;&#xd;
+                },&#xd;
+                &quot;template_id&quot;: {&#xd;
+                    &quot;value&quot;: &quot;ecg_result&quot;&#xd;
+                },&#xd;
+                &quot;rm_version&quot;: &quot;1.0.4&quot;&#xd;
+            },&#xd;
+            &quot;language&quot;: {&#xd;
+                &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                &quot;terminology_id&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                    &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+                },&#xd;
+                &quot;code_string&quot;: &quot;de&quot;&#xd;
+            },&#xd;
+            &quot;encoding&quot;: {&#xd;
+                &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                &quot;terminology_id&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                    &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+                },&#xd;
+                &quot;code_string&quot;: &quot;UTF-8&quot;&#xd;
+            },&#xd;
+            &quot;subject&quot;: {&#xd;
+                &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+            },&#xd;
+            &quot;data&quot;: {&#xd;
+                &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Event Series&quot;&#xd;
+                },&#xd;
+                &quot;origin&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                    &quot;value&quot;: &quot;2022-02-03T04:05:06.000&quot;&#xd;
+                },&#xd;
+                &quot;events&quot;: [&#xd;
+                    {&#xd;
+                        &quot;_type&quot;: &quot;INTERVAL_EVENT&quot;,&#xd;
+                        &quot;name&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;Beliebiges Ereignis&quot;&#xd;
+                        },&#xd;
+                        &quot;time&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                            &quot;value&quot;: &quot;2022-02-05T04:05:06.000&quot;&#xd;
+                        },&#xd;
+                        &quot;data&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                            &quot;name&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                &quot;value&quot;: &quot;Tree&quot;&#xd;
+                            },&#xd;
+                            &quot;items&quot;: [&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;Globale QT-Zeit&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;ms&quot;,&#xd;
+                                        &quot;magnitude&quot;: 60.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0007&quot;&#xd;
+                                },&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;Globale PQ-Zeit&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;ms&quot;,&#xd;
+                                        &quot;magnitude&quot;: 20.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0012&quot;&#xd;
+                                },&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;Globale QRS-Dauer&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;ms&quot;,&#xd;
+                                        &quot;magnitude&quot;: 8.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0014&quot;&#xd;
+                                },&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;P-Achse&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;deg&quot;,&#xd;
+                                        &quot;magnitude&quot;: 70.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0020&quot;&#xd;
+                                },&#xd;
+                                {&#xd;
+                                    &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                        &quot;value&quot;: &quot;Atriale Frequenz&quot;&#xd;
+                                    },&#xd;
+                                    &quot;value&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                        &quot;units&quot;: &quot;/min&quot;,&#xd;
+                                        &quot;magnitude&quot;: 60.0&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0094&quot;&#xd;
+                                }&#xd;
+                            ],&#xd;
+                            &quot;archetype_node_id&quot;: &quot;at0005&quot;&#xd;
+                        },&#xd;
+                        &quot;width&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_DURATION&quot;,&#xd;
+                            &quot;value&quot;: &quot;PT42H&quot;&#xd;
+                        },&#xd;
+                        &quot;math_function&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                            &quot;value&quot;: &quot;minimum&quot;,&#xd;
+                            &quot;defining_code&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                                &quot;terminology_id&quot;: {&#xd;
+                                    &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                    &quot;value&quot;: &quot;openehr&quot;&#xd;
+                                },&#xd;
+                                &quot;code_string&quot;: &quot;145&quot;&#xd;
+                            }&#xd;
+                        },&#xd;
+                        &quot;archetype_node_id&quot;: &quot;at0002&quot;,&#xd;
+                        &quot;uid&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;HIER_OBJECT_ID&quot;,&#xd;
+                            &quot;value&quot;: &quot;d6ae69e7-1030-3525-bb73-1da9e03989cd&quot;&#xd;
+                        }&#xd;
+                    }&#xd;
+                ],&#xd;
+                &quot;archetype_node_id&quot;: &quot;at0001&quot;&#xd;
+            },&#xd;
+            &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.ecg_result.v1&quot;,&#xd;
+            &quot;uid&quot;: {&#xd;
+                &quot;_type&quot;: &quot;HIER_OBJECT_ID&quot;,&#xd;
+                &quot;value&quot;: &quot;a77acf3b-d10f-3171-9300-6991899819b7&quot;&#xd;
+            }&#xd;
+        }&#xd;
+    ],&#xd;
+    &quot;archetype_node_id&quot;: &quot;openEHR-EHR-COMPOSITION.report.v1&quot;,&#xd;
+    &quot;uid&quot;: {&#xd;
+        &quot;_type&quot;: &quot;OBJECT_VERSION_ID&quot;,&#xd;
+        &quot;value&quot;: &quot;3762a102-a318-4ce3-a9c6-e9883b2b09c3::local.ehrbase.org::1&quot;&#xd;
+    }&#xd;
+}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+            <stringProp name="HTTPSampler.domain"></stringProp>
+            <stringProp name="HTTPSampler.port"></stringProp>
+            <stringProp name="HTTPSampler.protocol"></stringProp>
+            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${ehrId_index}/composition</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+            <stringProp name="HTTPSampler.response_timeout"></stringProp>
+            <stringProp name="TestPlan.comments">based on: https://github.com/ehrbase/performance-test/blob/feature/CDR-510_load_matrix_data/src/main/resources/compositions/repeatable/05_ecg_result_2.json</stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49590">204</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.custom_message"></stringProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">16</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+              <stringProp name="RegexExtractor.useHeaders">true</stringProp>
+              <stringProp name="RegexExtractor.refname">compositionId</stringProp>
+              <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default"></stringProp>
+              <stringProp name="RegexExtractor.match_number"></stringProp>
+            </RegexExtractor>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <sentBytes>true</sentBytes>
+            <url>true</url>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+            <connectTime>true</connectTime>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
