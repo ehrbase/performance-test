@@ -1,0 +1,709 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.5">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Database Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="JDBC Connection Config YugabyteDB" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="connectionProperties"></stringProp>
+          <stringProp name="dataSource">YugabyteDBPool</stringProp>
+          <stringProp name="dbUrl">jdbc:postgresql://10.216.24.66:5433/ehrbase</stringProp>
+          <stringProp name="driver">org.postgresql.Driver</stringProp>
+          <stringProp name="initQuery"></stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password">VnZLTu7s92z9bd5</stringProp>
+          <stringProp name="poolMax">0</stringProp>
+          <boolProp name="preinit">false</boolProp>
+          <stringProp name="timeout">10000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">60000</stringProp>
+          <stringProp name="username">ehrbase</stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Get Random EHR ID" enabled="true">
+          <stringProp name="dataSource">YugabyteDBPool</stringProp>
+          <stringProp name="query">select ehr_id from ehr.entry2 where &quot;field_idx_len&quot; = 0
+                                   and&quot;rm_entity&quot; = &apos;COMPOSITION&apos; group by ehr_id having  count(*) &lt; 300 limit 4 offset ${__Random(1,5000)};</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+          <stringProp name="resultSetMaxRows"></stringProp>
+          <stringProp name="resultVariable">randomEHRId</stringProp>
+          <stringProp name="variableNames">ehrId</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+        <RandomOrderController guiclass="RandomOrderControllerGui" testclass="RandomOrderController" testname="Random Order Controller" enabled="true"/>
+        <hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Query 1: Body Weight Measure" enabled="true">
+            <stringProp name="dataSource">YugabyteDBPool</stringProp>
+            <stringProp name="query">select &quot;F0&quot;
+from (
+  select
+    &quot;COMPOSITION_0_0_false_comp_id&quot;,
+    &quot;COMPOSITION_0_0_false_entity_concept&quot;,
+    &quot;COMPOSITION_0_0_false_entity_path&quot;,
+    &quot;COMPOSITION_0_0_false_rm_entity&quot;,
+    &quot;COMPOSITION_0_0_false_field_idx&quot;,
+    &quot;OBSERVATION_1_0_false_comp_id&quot;,
+    &quot;OBSERVATION_1_0_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_0_false_entity_path&quot;,
+    &quot;OBSERVATION_1_0_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_0_false_field_idx&quot;,
+    &quot;OBSERVATION_1_1_false_comp_id&quot;,
+    &quot;OBSERVATION_1_1_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_1_false_entity_path&quot;,
+    &quot;OBSERVATION_1_1_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_1_false_field_idx&quot;,
+    &quot;OBSERVATION_1_2_false_comp_id&quot;,
+    &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_2_false_entity_path&quot;,
+    &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_2_false_field_idx&quot;,
+    &quot;F0&quot;,
+    &quot;F1&quot;
+  from (
+    select
+      &quot;COMPOSITION_0_0_false&quot;.&quot;comp_id&quot; as &quot;COMPOSITION_0_0_false_comp_id&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;entity_concept&quot; as &quot;COMPOSITION_0_0_false_entity_concept&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;entity_path&quot; as &quot;COMPOSITION_0_0_false_entity_path&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;rm_entity&quot; as &quot;COMPOSITION_0_0_false_rm_entity&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;field_idx&quot; as &quot;COMPOSITION_0_0_false_field_idx&quot;,
+      &quot;ehr_id&quot; as &quot;F1&quot;
+    from &quot;ehr&quot;.&quot;entry2&quot; as &quot;COMPOSITION_0_0_false&quot;
+    where (
+      true
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;field_idx_len&quot; = 0
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;rm_entity&quot; = &apos;COMPOSITION&apos;
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_1}&apos;
+    )
+  ) as &quot;alias_51699935&quot;
+    join lateral (
+      select
+        &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_0_false_comp_id&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_0_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_0_false_entity_path&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_0_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_0_false_field_idx&quot;,
+        &quot;OBSERVATION_1_1_false_comp_id&quot;,
+        &quot;OBSERVATION_1_1_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_1_false_entity_path&quot;,
+        &quot;OBSERVATION_1_1_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_1_false_field_idx&quot;,
+        &quot;OBSERVATION_1_2_false_comp_id&quot;,
+        &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_2_false_entity_path&quot;,
+        &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_2_false_field_idx&quot;,
+        &quot;F0&quot;
+      from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_0_false&quot;
+        left outer join lateral (
+          select
+            &quot;OBSERVATION_1_1_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_1_false_comp_id&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_1_false_entity_concept&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_1_false_entity_path&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_1_false_rm_entity&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_1_false_field_idx&quot;,
+            &quot;OBSERVATION_1_2_false_comp_id&quot;,
+            &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+            &quot;OBSERVATION_1_2_false_entity_path&quot;,
+            &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+            &quot;OBSERVATION_1_2_false_field_idx&quot;,
+            &quot;F0&quot;
+          from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_1_false&quot;
+            left outer join lateral (
+              select
+                &quot;OBSERVATION_1_2_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_2_false_comp_id&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_2_false_entity_path&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_2_false_field_idx&quot;,
+                fields -&gt;&gt; &apos;/5430&apos; as &quot;F0&quot;
+              from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_2_false&quot;
+              where (
+                true
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;field_idx_len&quot; = 2
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.body_weight.v2&apos;
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_1}&apos;
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;comp_id&quot; = &quot;OBSERVATION_1_1_false&quot;.&quot;comp_id&quot;
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;entity_path&quot; = &quot;OBSERVATION_1_1_false&quot;.&quot;entity_path&quot;
+                and (&quot;OBSERVATION_1_2_false&quot;.&quot;field_idx&quot;)[1] = (&quot;OBSERVATION_1_1_false&quot;.&quot;field_idx&quot;)[1]
+              )
+            ) as &quot;alias_77869297&quot;
+              on true
+          where (
+            true
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;field_idx_len&quot; = 1
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.body_weight.v2&apos;
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_1}&apos;
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;comp_id&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot;
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;entity_path&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;entity_path&quot;
+          )
+        ) as &quot;alias_85708034&quot;
+          on true
+      where (
+        true
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;field_idx_len&quot; = 0
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.body_weight.v2&apos;
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_1}&apos;
+        and &quot;alias_51699935&quot;.&quot;COMPOSITION_0_0_false_comp_id&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot;
+      )
+    ) as &quot;alias_21380608&quot;
+      on true
+  where &quot;F1&quot; = &apos;${ehrId_1}&apos;
+  limit 10
+) as &quot;alias_50794531&quot;</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="resultSetHandler">Store as String</stringProp>
+            <stringProp name="resultSetMaxRows"></stringProp>
+            <stringProp name="resultVariable">testOutputQ1</stringProp>
+            <stringProp name="variableNames"></stringProp>
+          </JDBCSampler>
+          <hashTree/>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Query 2: COVID Symptoms" enabled="true">
+            <stringProp name="dataSource">YugabyteDBPool</stringProp>
+            <stringProp name="query">select &quot;F0&quot;, &quot;F1&quot;, &quot;F2&quot;
+from (
+  select
+    &quot;COMPOSITION_0_0_false_comp_id&quot;,
+    &quot;COMPOSITION_0_0_false_entity_concept&quot;,
+    &quot;COMPOSITION_0_0_false_entity_path&quot;,
+    &quot;COMPOSITION_0_0_false_rm_entity&quot;,
+    &quot;COMPOSITION_0_0_false_field_idx&quot;,
+    &quot;OBSERVATION_1_0_false_comp_id&quot;,
+    &quot;OBSERVATION_1_0_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_0_false_entity_path&quot;,
+    &quot;OBSERVATION_1_0_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_0_false_field_idx&quot;,
+    &quot;OBSERVATION_1_1_false_comp_id&quot;,
+    &quot;OBSERVATION_1_1_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_1_false_entity_path&quot;,
+    &quot;OBSERVATION_1_1_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_1_false_field_idx&quot;,
+    &quot;F0&quot;,
+    &quot;F0_magnitude&quot;,
+    &quot;OBSERVATION_1_2_false_comp_id&quot;,
+    &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_2_false_entity_path&quot;,
+    &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_2_false_field_idx&quot;,
+    &quot;F1&quot;,
+    &quot;OBSERVATION_1_3_false_comp_id&quot;,
+    &quot;OBSERVATION_1_3_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_3_false_entity_path&quot;,
+    &quot;OBSERVATION_1_3_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_3_false_field_idx&quot;,
+    &quot;F2&quot;,
+    &quot;F3&quot;
+  from (
+    select
+      &quot;COMPOSITION_0_0_false&quot;.&quot;comp_id&quot; as &quot;COMPOSITION_0_0_false_comp_id&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;entity_concept&quot; as &quot;COMPOSITION_0_0_false_entity_concept&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;entity_path&quot; as &quot;COMPOSITION_0_0_false_entity_path&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;rm_entity&quot; as &quot;COMPOSITION_0_0_false_rm_entity&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;field_idx&quot; as &quot;COMPOSITION_0_0_false_field_idx&quot;,
+      &quot;ehr_id&quot; as &quot;F3&quot;
+    from &quot;ehr&quot;.&quot;entry2&quot; as &quot;COMPOSITION_0_0_false&quot;
+    where (
+      true
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;field_idx_len&quot; = 0
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;rm_entity&quot; = &apos;COMPOSITION&apos;
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_2}&apos;
+    )
+  ) as &quot;alias_51699935&quot;
+    join lateral (
+      select
+        &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_0_false_comp_id&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_0_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_0_false_entity_path&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_0_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_0_false_field_idx&quot;,
+        &quot;OBSERVATION_1_1_false_comp_id&quot;,
+        &quot;OBSERVATION_1_1_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_1_false_entity_path&quot;,
+        &quot;OBSERVATION_1_1_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_1_false_field_idx&quot;,
+        &quot;F0&quot;,
+        &quot;F0_magnitude&quot;,
+        &quot;OBSERVATION_1_2_false_comp_id&quot;,
+        &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_2_false_entity_path&quot;,
+        &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_2_false_field_idx&quot;,
+        &quot;F1&quot;,
+        &quot;OBSERVATION_1_3_false_comp_id&quot;,
+        &quot;OBSERVATION_1_3_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_3_false_entity_path&quot;,
+        &quot;OBSERVATION_1_3_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_3_false_field_idx&quot;,
+        &quot;F2&quot;
+      from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_0_false&quot;
+        left outer join lateral (
+          select
+            &quot;OBSERVATION_1_1_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_1_false_comp_id&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_1_false_entity_concept&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_1_false_entity_path&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_1_false_rm_entity&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_1_false_field_idx&quot;,
+            fields -&gt;&gt; &apos;/5226&apos; as &quot;F0&quot;,
+            (fields -&gt; &apos;/5426&apos;)::numeric as &quot;F0_magnitude&quot;,
+            &quot;OBSERVATION_1_2_false_comp_id&quot;,
+            &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+            &quot;OBSERVATION_1_2_false_entity_path&quot;,
+            &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+            &quot;OBSERVATION_1_2_false_field_idx&quot;,
+            &quot;F1&quot;,
+            &quot;OBSERVATION_1_3_false_comp_id&quot;,
+            &quot;OBSERVATION_1_3_false_entity_concept&quot;,
+            &quot;OBSERVATION_1_3_false_entity_path&quot;,
+            &quot;OBSERVATION_1_3_false_rm_entity&quot;,
+            &quot;OBSERVATION_1_3_false_field_idx&quot;,
+            &quot;F2&quot;
+          from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_1_false&quot;
+            left outer join lateral (
+              select
+                &quot;OBSERVATION_1_2_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_2_false_comp_id&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_2_false_entity_path&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_2_false_field_idx&quot;,
+                fields -&gt;&gt; &apos;/5230&apos; as &quot;F1&quot;,
+                &quot;OBSERVATION_1_3_false_comp_id&quot;,
+                &quot;OBSERVATION_1_3_false_entity_concept&quot;,
+                &quot;OBSERVATION_1_3_false_entity_path&quot;,
+                &quot;OBSERVATION_1_3_false_rm_entity&quot;,
+                &quot;OBSERVATION_1_3_false_field_idx&quot;,
+                &quot;F2&quot;
+              from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_2_false&quot;
+                left outer join lateral (
+                  select
+                    &quot;OBSERVATION_1_3_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_3_false_comp_id&quot;,
+                    &quot;OBSERVATION_1_3_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_3_false_entity_concept&quot;,
+                    &quot;OBSERVATION_1_3_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_3_false_entity_path&quot;,
+                    &quot;OBSERVATION_1_3_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_3_false_rm_entity&quot;,
+                    &quot;OBSERVATION_1_3_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_3_false_field_idx&quot;,
+                    fields -&gt;&gt; &apos;/5428&apos; as &quot;F2&quot;
+                  from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_3_false&quot;
+                  where (
+                    true
+                    and &quot;OBSERVATION_1_3_false&quot;.&quot;field_idx_len&quot; = 3
+                    and &quot;OBSERVATION_1_3_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&apos;
+                    and &quot;OBSERVATION_1_3_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_2}&apos;
+                    and &quot;OBSERVATION_1_3_false&quot;.&quot;comp_id&quot; = &quot;OBSERVATION_1_2_false&quot;.&quot;comp_id&quot;
+                    and &quot;OBSERVATION_1_3_false&quot;.&quot;entity_path&quot; = &quot;OBSERVATION_1_2_false&quot;.&quot;entity_path&quot;
+                    and (&quot;OBSERVATION_1_3_false&quot;.&quot;field_idx&quot;)[2] = (&quot;OBSERVATION_1_2_false&quot;.&quot;field_idx&quot;)[2]
+                    and (&quot;OBSERVATION_1_3_false&quot;.&quot;field_idx&quot;)[1] = (&quot;OBSERVATION_1_2_false&quot;.&quot;field_idx&quot;)[1]
+                  )
+                ) as &quot;alias_60089504&quot;
+                  on true
+              where (
+                true
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;field_idx_len&quot; = 2
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&apos;
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_2}&apos;
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;comp_id&quot; = &quot;OBSERVATION_1_1_false&quot;.&quot;comp_id&quot;
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;entity_path&quot; = &quot;OBSERVATION_1_1_false&quot;.&quot;entity_path&quot;
+                and (&quot;OBSERVATION_1_2_false&quot;.&quot;field_idx&quot;)[1] = (&quot;OBSERVATION_1_1_false&quot;.&quot;field_idx&quot;)[1]
+              )
+            ) as &quot;alias_77869297&quot;
+              on true
+          where (
+            true
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;field_idx_len&quot; = 1
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&apos;
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_2}&apos;
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;comp_id&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot;
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;entity_path&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;entity_path&quot;
+          )
+        ) as &quot;alias_85708034&quot;
+          on true
+      where (
+        true
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;field_idx_len&quot; = 0
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.symptom_sign_screening.v0&apos;
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_2}&apos;
+        and &quot;alias_51699935&quot;.&quot;COMPOSITION_0_0_false_comp_id&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot;
+      )
+    ) as &quot;alias_21380608&quot;
+      on true
+  where &quot;F3&quot; = &apos;${ehrId_2}&apos;
+  limit 10
+) as &quot;alias_50794531&quot;</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="resultSetHandler">Store as String</stringProp>
+            <stringProp name="resultSetMaxRows"></stringProp>
+            <stringProp name="resultVariable">testOutputQ2</stringProp>
+            <stringProp name="variableNames"></stringProp>
+          </JDBCSampler>
+          <hashTree/>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Query 3: ECG Result" enabled="true">
+            <stringProp name="dataSource">YugabyteDBPool</stringProp>
+            <stringProp name="query">select
+  &quot;F0&quot;,
+  &quot;F1&quot;,
+  &quot;F2&quot;,
+  &quot;F3&quot;,
+  &quot;F4&quot;,
+  &quot;F5&quot;,
+  &quot;F6&quot;,
+  &quot;F7&quot;,
+  &quot;F8&quot;
+from (
+  select
+    &quot;COMPOSITION_0_0_false_comp_id&quot;,
+    &quot;COMPOSITION_0_0_false_entity_concept&quot;,
+    &quot;COMPOSITION_0_0_false_entity_path&quot;,
+    &quot;COMPOSITION_0_0_false_rm_entity&quot;,
+    &quot;COMPOSITION_0_0_false_field_idx&quot;,
+    &quot;OBSERVATION_1_0_false_comp_id&quot;,
+    &quot;OBSERVATION_1_0_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_0_false_entity_path&quot;,
+    &quot;OBSERVATION_1_0_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_0_false_field_idx&quot;,
+    &quot;OBSERVATION_1_1_false_comp_id&quot;,
+    &quot;OBSERVATION_1_1_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_1_false_entity_path&quot;,
+    &quot;OBSERVATION_1_1_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_1_false_field_idx&quot;,
+    &quot;F0&quot;,
+    &quot;F0_magnitude&quot;,
+    &quot;OBSERVATION_1_2_false_comp_id&quot;,
+    &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_2_false_entity_path&quot;,
+    &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_2_false_field_idx&quot;,
+    &quot;F1&quot;,
+    &quot;F2&quot;,
+    &quot;F3&quot;,
+    &quot;F4&quot;,
+    &quot;F5&quot;,
+    &quot;F6&quot;,
+    &quot;F7&quot;,
+    &quot;F8&quot;,
+    &quot;F9&quot;
+  from (
+    select
+      &quot;COMPOSITION_0_0_false&quot;.&quot;comp_id&quot; as &quot;COMPOSITION_0_0_false_comp_id&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;entity_concept&quot; as &quot;COMPOSITION_0_0_false_entity_concept&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;entity_path&quot; as &quot;COMPOSITION_0_0_false_entity_path&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;rm_entity&quot; as &quot;COMPOSITION_0_0_false_rm_entity&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;field_idx&quot; as &quot;COMPOSITION_0_0_false_field_idx&quot;,
+      fields -&gt;&gt; &apos;/5304&apos; as &quot;F7&quot;,
+      fields -&gt;&gt; &apos;/5306&apos; as &quot;F8&quot;,
+      &quot;ehr_id&quot; as &quot;F9&quot;
+    from &quot;ehr&quot;.&quot;entry2&quot; as &quot;COMPOSITION_0_0_false&quot;
+    where (
+      true
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;field_idx_len&quot; = 0
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;rm_entity&quot; = &apos;COMPOSITION&apos;
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_3}&apos;
+    )
+  ) as &quot;alias_51699935&quot;
+    join lateral (
+      select
+        &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_0_false_comp_id&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_0_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_0_false_entity_path&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_0_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_0_false_field_idx&quot;,
+        &quot;OBSERVATION_1_1_false_comp_id&quot;,
+        &quot;OBSERVATION_1_1_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_1_false_entity_path&quot;,
+        &quot;OBSERVATION_1_1_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_1_false_field_idx&quot;,
+        &quot;F0&quot;,
+        &quot;F0_magnitude&quot;,
+        &quot;OBSERVATION_1_2_false_comp_id&quot;,
+        &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_2_false_entity_path&quot;,
+        &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_2_false_field_idx&quot;,
+        &quot;F1&quot;,
+        &quot;F2&quot;,
+        &quot;F3&quot;,
+        &quot;F4&quot;,
+        &quot;F5&quot;,
+        &quot;F6&quot;
+      from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_0_false&quot;
+        left outer join lateral (
+          select
+            &quot;OBSERVATION_1_1_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_1_false_comp_id&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_1_false_entity_concept&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_1_false_entity_path&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_1_false_rm_entity&quot;,
+            &quot;OBSERVATION_1_1_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_1_false_field_idx&quot;,
+            fields -&gt;&gt; &apos;/5226&apos; as &quot;F0&quot;,
+            (fields -&gt; &apos;/5426&apos;)::numeric as &quot;F0_magnitude&quot;,
+            &quot;OBSERVATION_1_2_false_comp_id&quot;,
+            &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+            &quot;OBSERVATION_1_2_false_entity_path&quot;,
+            &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+            &quot;OBSERVATION_1_2_false_field_idx&quot;,
+            &quot;F1&quot;,
+            &quot;F2&quot;,
+            &quot;F3&quot;,
+            &quot;F4&quot;,
+            &quot;F5&quot;,
+            &quot;F6&quot;
+          from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_1_false&quot;
+            left outer join lateral (
+              select
+                &quot;OBSERVATION_1_2_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_2_false_comp_id&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_2_false_entity_concept&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_2_false_entity_path&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_2_false_rm_entity&quot;,
+                &quot;OBSERVATION_1_2_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_2_false_field_idx&quot;,
+                fields -&gt;&gt; &apos;/7501&apos; as &quot;F1&quot;,
+                fields -&gt;&gt; &apos;/7601&apos; as &quot;F2&quot;,
+                fields -&gt;&gt; &apos;/7602&apos; as &quot;F3&quot;,
+                fields -&gt;&gt; &apos;/7603&apos; as &quot;F4&quot;,
+                fields -&gt;&gt; &apos;/7604&apos; as &quot;F5&quot;,
+                fields -&gt;&gt; &apos;/7605&apos; as &quot;F6&quot;
+              from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_2_false&quot;
+              where (
+                true
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;field_idx_len&quot; = 2
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.ecg_result.v1&apos;
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_3}&apos;
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;comp_id&quot; = &quot;OBSERVATION_1_1_false&quot;.&quot;comp_id&quot;
+                and &quot;OBSERVATION_1_2_false&quot;.&quot;entity_path&quot; = &quot;OBSERVATION_1_1_false&quot;.&quot;entity_path&quot;
+                and (&quot;OBSERVATION_1_2_false&quot;.&quot;field_idx&quot;)[1] = (&quot;OBSERVATION_1_1_false&quot;.&quot;field_idx&quot;)[1]
+              )
+            ) as &quot;alias_77869297&quot;
+              on true
+          where (
+            true
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;field_idx_len&quot; = 1
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.ecg_result.v1&apos;
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_3}&apos;
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;comp_id&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot;
+            and &quot;OBSERVATION_1_1_false&quot;.&quot;entity_path&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;entity_path&quot;
+          )
+        ) as &quot;alias_85708034&quot;
+          on true
+      where (
+        true
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;field_idx_len&quot; = 0
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.ecg_result.v1&apos;
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_3}&apos;
+        and &quot;alias_51699935&quot;.&quot;COMPOSITION_0_0_false_comp_id&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot;
+      )
+    ) as &quot;alias_21380608&quot;
+      on true
+  where &quot;F9&quot; = &apos;${ehrId_3}&apos;
+  limit 10
+) as &quot;alias_50794531&quot;</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="resultSetHandler">Store as String</stringProp>
+            <stringProp name="resultSetMaxRows"></stringProp>
+            <stringProp name="resultVariable">testOutputQ3</stringProp>
+            <stringProp name="variableNames"></stringProp>
+          </JDBCSampler>
+          <hashTree/>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Query 4: Get First Document" enabled="true">
+            <stringProp name="dataSource">YugabyteDBPool</stringProp>
+            <stringProp name="query">select &quot;F0&quot;, &quot;F1&quot;, &quot;F2&quot;
+from (
+  select
+    &quot;COMPOSITION_0_0_false_comp_id&quot;,
+    &quot;COMPOSITION_0_0_false_entity_concept&quot;,
+    &quot;COMPOSITION_0_0_false_entity_path&quot;,
+    &quot;COMPOSITION_0_0_false_rm_entity&quot;,
+    &quot;COMPOSITION_0_0_false_field_idx&quot;,
+    &quot;OBSERVATION_1_0_false_comp_id&quot;,
+    &quot;OBSERVATION_1_0_false_entity_concept&quot;,
+    &quot;OBSERVATION_1_0_false_entity_path&quot;,
+    &quot;OBSERVATION_1_0_false_rm_entity&quot;,
+    &quot;OBSERVATION_1_0_false_field_idx&quot;,
+    &quot;F0&quot;,
+    &quot;F1&quot;,
+    &quot;F3&quot;,
+    &quot;F3_magnitude&quot;
+  from (
+    select
+      &quot;COMPOSITION_0_0_false&quot;.&quot;comp_id&quot; as &quot;COMPOSITION_0_0_false_comp_id&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;entity_concept&quot; as &quot;COMPOSITION_0_0_false_entity_concept&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;entity_path&quot; as &quot;COMPOSITION_0_0_false_entity_path&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;rm_entity&quot; as &quot;COMPOSITION_0_0_false_rm_entity&quot;,
+      &quot;COMPOSITION_0_0_false&quot;.&quot;field_idx&quot; as &quot;COMPOSITION_0_0_false_field_idx&quot;,
+      &quot;ehr_id&quot; as &quot;F0&quot;,
+      fields -&gt;&gt; &apos;/5304&apos; as &quot;F1&quot;,
+      fields -&gt;&gt; &apos;/5210&apos; as &quot;F3&quot;,
+      (fields -&gt; &apos;/5211&apos;)::numeric as &quot;F3_magnitude&quot;
+    from &quot;ehr&quot;.&quot;entry2&quot; as &quot;COMPOSITION_0_0_false&quot;
+    where (
+      true
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;field_idx_len&quot; = 0
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;rm_entity&quot; = &apos;COMPOSITION&apos;
+      and &quot;COMPOSITION_0_0_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_4}&apos;
+    )
+  ) as &quot;alias_51699935&quot;
+    join lateral (
+      select
+        &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot; as &quot;OBSERVATION_1_0_false_comp_id&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;entity_concept&quot; as &quot;OBSERVATION_1_0_false_entity_concept&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;entity_path&quot; as &quot;OBSERVATION_1_0_false_entity_path&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;rm_entity&quot; as &quot;OBSERVATION_1_0_false_rm_entity&quot;,
+        &quot;OBSERVATION_1_0_false&quot;.&quot;field_idx&quot; as &quot;OBSERVATION_1_0_false_field_idx&quot;
+      from &quot;ehr&quot;.&quot;entry2&quot; as &quot;OBSERVATION_1_0_false&quot;
+      where (
+        true
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;field_idx_len&quot; = 0
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;entity_concept&quot; = &apos;openEHR-EHR-OBSERVATION.ecg_result.v1&apos;
+        and &quot;OBSERVATION_1_0_false&quot;.&quot;ehr_id&quot; = &apos;${ehrId_4}&apos;
+        and &quot;alias_51699935&quot;.&quot;COMPOSITION_0_0_false_comp_id&quot; = &quot;OBSERVATION_1_0_false&quot;.&quot;comp_id&quot;
+      )
+    ) as &quot;alias_21380608&quot;
+      on true
+  where &quot;F0&quot; = &apos;${ehrId_4}&apos;
+  order by &quot;F3_magnitude&quot; desc
+  limit 1
+) as &quot;alias_50794531&quot;
+  left outer join lateral (
+    select
+      &quot;COMPOSITION_0_0_true&quot;.&quot;comp_id&quot;,
+       jsonb_agg( jsonb_build_object(&apos;entity_path&apos;,entity_path)|| jsonb_build_object(&apos;entity_idx&apos;,entity_idx) || jsonb_build_object(&apos;field_idx&apos;,field_idx)  ||  fields) as &quot;F2&quot;
+    from &quot;ehr&quot;.&quot;entry2&quot; as &quot;COMPOSITION_0_0_true&quot;
+    where (
+      true
+      and &quot;COMPOSITION_0_0_true&quot;.&quot;ehr_id&quot; = &apos;${ehrId_4}&apos;
+      and &quot;COMPOSITION_0_0_true&quot;.&quot;comp_id&quot; = &quot;COMPOSITION_0_0_false_comp_id&quot;
+    )
+    group by &quot;COMPOSITION_0_0_true&quot;.&quot;comp_id&quot;
+  ) as &quot;alias_85633273&quot;
+    on true</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="resultSetHandler">Store as String</stringProp>
+            <stringProp name="resultSetMaxRows"></stringProp>
+            <stringProp name="resultVariable">testOutputQ4</stringProp>
+            <stringProp name="variableNames"></stringProp>
+          </JDBCSampler>
+          <hashTree/>
+        </hashTree>
+        <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Check if connection isClosed" enabled="true">
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">def connection = org.apache.jmeter.protocol.jdbc.config.DataSourceElement.getConnection(&apos;YugabyteDBPool&apos;)
+//log.info(&apos;Connection closed: &apos; + connection.isClosed())
+connection.close()
+log.info(&apos;Connection closed: &apos; + connection.isClosed())</stringProp>
+          <stringProp name="scriptLanguage">groovy</stringProp>
+        </JSR223PostProcessor>
+        <hashTree/>
+        <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>true</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <sentBytes>true</sentBytes>
+              <url>true</url>
+              <threadCounts>true</threadCounts>
+              <idleTime>true</idleTime>
+              <connectTime>true</connectTime>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <sentBytes>true</sentBytes>
+            <url>true</url>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+            <connectTime>true</connectTime>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
