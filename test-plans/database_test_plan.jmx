@@ -32,7 +32,7 @@
           <stringProp name="connectionAge">5000</stringProp>
           <stringProp name="connectionProperties"></stringProp>
           <stringProp name="dataSource">YugabyteDBPool</stringProp>
-          <stringProp name="dbUrl">jdbc:postgresql://${__P(yuga_hostname,10.216.24.66)}:${__P(yuga_port,5433)}/${__P(yuga_db,ehrbase)}</stringProp>
+          <stringProp name="dbUrl">jdbc:postgresql://10.216.24.66:5433,10.216.24.67:5433,10.216.24.68:5433,10.216.24.69:5433,10.216.24.70:5433,10.216.24.71:5433,10.216.24.72:5433/ehrbase?load-balance=true</stringProp>
           <stringProp name="driver">org.postgresql.Driver</stringProp>
           <stringProp name="initQuery"></stringProp>
           <boolProp name="keepAlive">true</boolProp>
