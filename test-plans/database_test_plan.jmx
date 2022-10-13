@@ -624,6 +624,7 @@ from (
           <stringProp name="parameters"></stringProp>
           <stringProp name="script">def connection = org.apache.jmeter.protocol.jdbc.config.DataSourceElement.getConnection(&apos;YugabyteDBPool&apos;)
 //log.info(&apos;Connection closed: &apos; + connection.isClosed())
+//test
 connection.close()
 log.info(&apos;Connection closed: &apos; + connection.isClosed())</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
