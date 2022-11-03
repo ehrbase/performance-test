@@ -37,7 +37,7 @@
       <hashTree/>
       <CounterConfig guiclass="CounterConfigGui" testclass="CounterConfig" testname="ExecutionCounter" enabled="true">
         <stringProp name="CounterConfig.start">0</stringProp>
-        <stringProp name="CounterConfig.end">1</stringProp>
+        <stringProp name="CounterConfig.end">2</stringProp>
         <stringProp name="CounterConfig.incr">1</stringProp>
         <stringProp name="CounterConfig.name">execCounter</stringProp>
         <stringProp name="CounterConfig.format"></stringProp>
@@ -66,7 +66,7 @@
         <hashTree>
           <CounterConfig guiclass="CounterConfigGui" testclass="CounterConfig" testname="CreateSelectionCounter" enabled="true">
             <stringProp name="CounterConfig.start">0</stringProp>
-            <stringProp name="CounterConfig.end">19</stringProp>
+            <stringProp name="CounterConfig.end">9</stringProp>
             <stringProp name="CounterConfig.incr">1</stringProp>
             <stringProp name="CounterConfig.name">createCounter</stringProp>
             <stringProp name="CounterConfig.format"></stringProp>
@@ -136,7 +136,7 @@
             <hashTree/>
           </hashTree>
           <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Create small composition in 60% of cases" enabled="true">
-            <stringProp name="IfController.condition">${__jexl3(${createCounter} &gt;= &quot;0&quot; &amp;&amp; ${createCounter} &lt;= &quot;11&quot;)}</stringProp>
+            <stringProp name="IfController.condition">${__jexl3(${createCounter} &gt;= &quot;0&quot; &amp;&amp; ${createCounter} &lt;= &quot;5&quot;)}</stringProp>
             <boolProp name="IfController.evaluateAll">false</boolProp>
             <boolProp name="IfController.useExpression">true</boolProp>
           </IfController>
@@ -447,7 +447,7 @@
             </hashTree>
           </hashTree>
           <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Create medium-sized composition in 30% of cases" enabled="true">
-            <stringProp name="IfController.condition">${__jexl3(${createCounter} &gt;= &quot;12&quot; &amp;&amp; ${createCounter} &lt;= &quot;17&quot;)}</stringProp>
+            <stringProp name="IfController.condition">${__jexl3(${createCounter} &gt;= &quot;6&quot; &amp;&amp; ${createCounter} &lt;= &quot;8&quot;)}</stringProp>
             <boolProp name="IfController.evaluateAll">false</boolProp>
             <boolProp name="IfController.useExpression">true</boolProp>
           </IfController>
@@ -1883,7 +1883,7 @@
             </hashTree>
           </hashTree>
           <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Create large composition in 10% of cases" enabled="true">
-            <stringProp name="IfController.condition">${__jexl3(${createCounter} &gt;= &quot;18&quot; &amp;&amp; ${createCounter} &lt;= &quot;19&quot;)}</stringProp>
+            <stringProp name="IfController.condition">${__jexl3(${createCounter} == &quot;9&quot;)}</stringProp>
             <boolProp name="IfController.evaluateAll">false</boolProp>
             <boolProp name="IfController.useExpression">true</boolProp>
           </IfController>
