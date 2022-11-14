@@ -165,11 +165,6 @@
     </dependencyManagement>
 
     <dependencies>
-
-        <dependency>
-            <groupId>org.ehrbase.openehr</groupId>
-            <artifactId>jooq-pg</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.ehrbase.openehr.sdk</groupId>
             <artifactId>serialisation</artifactId>

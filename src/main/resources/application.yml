@@ -38,7 +38,7 @@ logging:
     org.hibernate: warn
     org.springframework: warn
 loader:
-  enabled: false
+  enabled: true
   keepIndexes: true
   matrixInsertThreads: 10
   dbAdmin: true
