@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.5">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="New AQL Engine Queries" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults" enabled="true">
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+        <stringProp name="HTTPSampler.domain">${__P(host,localhost)}</stringProp>
+        <stringProp name="HTTPSampler.port">${__P(port,8080)}</stringProp>
+        <stringProp name="HTTPSampler.protocol"></stringProp>
+        <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+        <stringProp name="HTTPSampler.path"></stringProp>
+        <stringProp name="HTTPSampler.concurrentPool">6</stringProp>
+        <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+        <stringProp name="HTTPSampler.response_timeout"></stringProp>
+      </ConfigTestElement>
+      <hashTree/>
+      <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="HTTP Header Manager" enabled="true">
+        <collectionProp name="HeaderManager.headers">
+          <elementProp name="" elementType="Header">
+            <stringProp name="Header.name">Content-Type</stringProp>
+            <stringProp name="Header.value">application/json</stringProp>
+          </elementProp>
+        </collectionProp>
+      </HeaderManager>
+      <hashTree/>
+      <CounterConfig guiclass="CounterConfigGui" testclass="CounterConfig" testname="ExecutionCounter" enabled="true">
+        <stringProp name="CounterConfig.start">0</stringProp>
+        <stringProp name="CounterConfig.end">1</stringProp>
+        <stringProp name="CounterConfig.incr">1</stringProp>
+        <stringProp name="CounterConfig.name">execCounter</stringProp>
+        <stringProp name="CounterConfig.format"></stringProp>
+        <boolProp name="CounterConfig.per_user">true</boolProp>
+      </CounterConfig>
+      <hashTree/>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">${__P(loopCount,100)}</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(threads,1)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(rampUp,1)}</stringProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Get Random EHR" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.domain"></stringProp>
+          <stringProp name="HTTPSampler.port"></stringProp>
+          <stringProp name="HTTPSampler.protocol"></stringProp>
+          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+          <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/random</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+          <stringProp name="HTTPSampler.response_timeout"></stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.custom_message"></stringProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">16</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">randomEhr</stringProp>
+            <stringProp name="RegexExtractor.regex">&quot;(.*)&quot;</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">NA</stringProp>
+            <stringProp name="RegexExtractor.match_number"></stringProp>
+          </RegexExtractor>
+          <hashTree/>
+        </hashTree>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Run create every 10th time" enabled="true">
+          <stringProp name="IfController.condition">${__jexl3(${execCounter} == &quot;0&quot;)}</stringProp>
+          <boolProp name="IfController.evaluateAll">true</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Create composition: Blood Pressure" enabled="true">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&#xd;
+                &quot;uid&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;OBJECT_VERSION_ID&quot;,&#xd;
+                    &quot;value&quot;: &quot;ec09f908-fc1c-43bf-9d1b-ae58b6c3273a::local.ehrbase.org::1&quot;&#xd;
+                },&#xd;
+                &quot;name&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;Blutdruck&quot;&#xd;
+                },&#xd;
+                &quot;_type&quot;: &quot;COMPOSITION&quot;,&#xd;
+                &quot;context&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;EVENT_CONTEXT&quot;,&#xd;
+                    &quot;setting&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                        &quot;value&quot;: &quot;secondary medical care&quot;,&#xd;
+                        &quot;defining_code&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                            &quot;code_string&quot;: &quot;232&quot;,&#xd;
+                            &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;openehr&quot;&#xd;
+                            }&#xd;
+                        }&#xd;
+                    },&#xd;
+                    &quot;start_time&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;DV_DATE_TIME&quot;,&#xd;
+                        &quot;value&quot;: &quot;2021-04-14T00:00:00.000+02:00&quot;&#xd;
+                    },&#xd;
+                    &quot;other_context&quot;: {&#xd;
+                        &quot;name&quot;: {&#xd;
+                            &quot;value&quot;: &quot;Baum&quot;,&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;&#xd;
+                        },&#xd;
+                        &quot;archetype_node_id&quot;: &quot;at0001&quot;,&#xd;
+                        &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                        &quot;items&quot;: [&#xd;
+                            {&#xd;
+                                &quot;name&quot;: {&#xd;
+                                    &quot;value&quot;: &quot;Status&quot;,&#xd;
+                                    &quot;_type&quot;: &quot;DV_TEXT&quot;&#xd;
+                                },&#xd;
+                                &quot;value&quot;: {&#xd;
+                                    &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                                    &quot;value&quot;: &quot;final&quot;,&#xd;
+                                    &quot;defining_code&quot;: {&#xd;
+                                        &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                                        &quot;code_string&quot;: &quot;at0012&quot;,&#xd;
+                                        &quot;terminology_id&quot;: {&#xd;
+                                            &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                            &quot;value&quot;: &quot;local&quot;&#xd;
+                                        }&#xd;
+                                    }&#xd;
+                                },&#xd;
+                                &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                &quot;archetype_node_id&quot;: &quot;at0004&quot;&#xd;
+                            },&#xd;
+                            {&#xd;
+                                &quot;name&quot;: {&#xd;
+                                    &quot;value&quot;: &quot;Kategorie&quot;,&#xd;
+                                    &quot;_type&quot;: &quot;DV_TEXT&quot;&#xd;
+                                },&#xd;
+                                &quot;value&quot;: {&#xd;
+                                    &quot;_type&quot;: &quot;DV_TEXT&quot;,&#xd;
+                                    &quot;value&quot;: &quot;vital-signs&quot;&#xd;
+                                },&#xd;
+                                &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                &quot;archetype_node_id&quot;: &quot;at0005&quot;&#xd;
+                            }&#xd;
+                        ]&#xd;
+                    }&#xd;
+                },&#xd;
+                &quot;category&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;DV_CODED_TEXT&quot;,&#xd;
+                    &quot;value&quot;: &quot;event&quot;,&#xd;
+                    &quot;defining_code&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                        &quot;code_string&quot;: &quot;433&quot;,&#xd;
+                        &quot;terminology_id&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                            &quot;value&quot;: &quot;openehr&quot;&#xd;
+                        }&#xd;
+                    }&#xd;
+                },&#xd;
+                &quot;composer&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+                },&#xd;
+                &quot;language&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                    &quot;code_string&quot;: &quot;de&quot;,&#xd;
+                    &quot;terminology_id&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                        &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+                    }&#xd;
+                },&#xd;
+                &quot;territory&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                    &quot;code_string&quot;: &quot;DE&quot;,&#xd;
+                    &quot;terminology_id&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                        &quot;value&quot;: &quot;ISO_3166-1&quot;&#xd;
+                    }&#xd;
+                },&#xd;
+                &quot;feeder_audit&quot;: {&#xd;
+                    &quot;originating_system_audit&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;FEEDER_AUDIT_DETAILS&quot;,&#xd;
+                        &quot;system_id&quot;: &quot;FHIR-Bridge&quot;&#xd;
+                    },&#xd;
+                    &quot;originating_system_item_ids&quot;: [&#xd;
+                        {&#xd;
+                            &quot;id&quot;: &quot;Observation/6115aed3-8b17-42ce-97d5-67e25b02a702/_history/1&quot;,&#xd;
+                            &quot;type&quot;: &quot;fhir_logical_id&quot;,&#xd;
+                            &quot;_type&quot;: &quot;DV_IDENTIFIER&quot;&#xd;
+                        },&#xd;
+                        {&#xd;
+                            &quot;id&quot;: &quot;Patient/b3f5d4e0-f0d3-4b09-8bb5-36e313c625b5/_history/1&quot;,&#xd;
+                            &quot;_type&quot;: &quot;DV_IDENTIFIER&quot;,&#xd;
+                            &quot;assigner&quot;: &quot;fhir_patient_id&quot;&#xd;
+                        },&#xd;
+                        {&#xd;
+                            &quot;id&quot;: &quot;b775d069-547a-42f0-b24c-f3708ad49acc&quot;,&#xd;
+                            &quot;type&quot;: &quot;fhir_patient_identifier&quot;,&#xd;
+                            &quot;_type&quot;: &quot;DV_IDENTIFIER&quot;&#xd;
+                        }&#xd;
+                    ],&#xd;
+                    &quot;_type&quot;: &quot;FEEDER_AUDIT&quot;&#xd;
+                },&#xd;
+                &quot;archetype_details&quot;: {&#xd;
+                    &quot;_type&quot;: &quot;ARCHETYPED&quot;,&#xd;
+                    &quot;rm_version&quot;: &quot;1.0.4&quot;,&#xd;
+                    &quot;template_id&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;TEMPLATE_ID&quot;,&#xd;
+                        &quot;value&quot;: &quot;Blutdruck&quot;&#xd;
+                    },&#xd;
+                    &quot;archetype_id&quot;: {&#xd;
+                        &quot;_type&quot;: &quot;ARCHETYPE_ID&quot;,&#xd;
+                        &quot;value&quot;: &quot;openEHR-EHR-COMPOSITION.registereintrag.v1&quot;&#xd;
+                    }&#xd;
+                },&#xd;
+                &quot;archetype_node_id&quot;: &quot;openEHR-EHR-COMPOSITION.registereintrag.v1&quot;,&#xd;
+                &quot;content&quot;: [&#xd;
+                    {&#xd;
+                        &quot;name&quot;: {&#xd;
+                            &quot;value&quot;: &quot;Blutdruck&quot;,&#xd;
+                            &quot;_type&quot;: &quot;DV_TEXT&quot;&#xd;
+                        },&#xd;
+                        &quot;_type&quot;: &quot;OBSERVATION&quot;,&#xd;
+                        &quot;subject&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;PARTY_SELF&quot;&#xd;
+                        },&#xd;
+                        &quot;encoding&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                            &quot;code_string&quot;: &quot;UTF-8&quot;,&#xd;
+                            &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;IANA_character-sets&quot;&#xd;
+                            }&#xd;
+                        },&#xd;
+                        &quot;language&quot;: {&#xd;
+                            &quot;_type&quot;: &quot;CODE_PHRASE&quot;,&#xd;
+                            &quot;code_string&quot;: &quot;de&quot;,&#xd;
+                            &quot;terminology_id&quot;: {&#xd;
+                                &quot;_type&quot;: &quot;TERMINOLOGY_ID&quot;,&#xd;
+                                &quot;value&quot;: &quot;ISO_639-1&quot;&#xd;
+                            }&#xd;
+                        },&#xd;
+                        &quot;data&quot;: {&#xd;
+                            &quot;name&quot;: {&#xd;
+                                &quot;value&quot;: &quot;Historie&quot;,&#xd;
+                                &quot;_type&quot;: &quot;DV_TEXT&quot;&#xd;
+                            },&#xd;
+                            &quot;origin&quot;: {&#xd;
+                                &quot;value&quot;: &quot;2021-04-14T00:00:00.000+02:00&quot;,&#xd;
+                                &quot;_type&quot;: &quot;DV_DATE_TIME&quot;&#xd;
+                            },&#xd;
+                            &quot;events&quot;: [&#xd;
+                                {&#xd;
+                                    &quot;name&quot;: {&#xd;
+                                        &quot;value&quot;: &quot;Beliebiges Ereignis&quot;,&#xd;
+                                        &quot;_type&quot;: &quot;DV_TEXT&quot;&#xd;
+                                    },&#xd;
+                                    &quot;time&quot;: {&#xd;
+                                        &quot;value&quot;: &quot;2021-04-14T00:00:00.000+02:00&quot;,&#xd;
+                                        &quot;_type&quot;: &quot;DV_DATE_TIME&quot;&#xd;
+                                    },&#xd;
+                                    &quot;_type&quot;: &quot;POINT_EVENT&quot;,&#xd;
+                                    &quot;data&quot;: {&#xd;
+                                        &quot;name&quot;: {&#xd;
+                                            &quot;value&quot;: &quot;Blutdruck&quot;,&#xd;
+                                            &quot;_type&quot;: &quot;DV_TEXT&quot;&#xd;
+                                        },&#xd;
+                                        &quot;archetype_node_id&quot;: &quot;at0003&quot;,&#xd;
+                                        &quot;_type&quot;: &quot;ITEM_TREE&quot;,&#xd;
+                                        &quot;items&quot;: [&#xd;
+                                            {&#xd;
+                                                &quot;name&quot;: {&#xd;
+                                                    &quot;value&quot;: &quot;Systolisch&quot;,&#xd;
+                                                    &quot;_type&quot;: &quot;DV_TEXT&quot;&#xd;
+                                                },&#xd;
+                                                &quot;value&quot;: {&#xd;
+                                                    &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                                    &quot;units&quot;: &quot;mm[Hg]&quot;,&#xd;
+                                                    &quot;magnitude&quot;: 110.0&#xd;
+                                                },&#xd;
+                                                &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                                &quot;archetype_node_id&quot;: &quot;at0004&quot;&#xd;
+                                            },&#xd;
+                                            {&#xd;
+                                                &quot;name&quot;: {&#xd;
+                                                    &quot;value&quot;: &quot;Diastolisch&quot;,&#xd;
+                                                    &quot;_type&quot;: &quot;DV_TEXT&quot;&#xd;
+                                                },&#xd;
+                                                &quot;value&quot;: {&#xd;
+                                                    &quot;_type&quot;: &quot;DV_QUANTITY&quot;,&#xd;
+                                                    &quot;units&quot;: &quot;mm[Hg]&quot;,&#xd;
+                                                    &quot;magnitude&quot;: 60.0&#xd;
+                                                },&#xd;
+                                                &quot;_type&quot;: &quot;ELEMENT&quot;,&#xd;
+                                                &quot;archetype_node_id&quot;: &quot;at0005&quot;&#xd;
+                                            }&#xd;
+                                        ]&#xd;
+                                    },&#xd;
+                                    &quot;archetype_node_id&quot;: &quot;at0006&quot;&#xd;
+                                }&#xd;
+                            ],&#xd;
+                            &quot;_type&quot;: &quot;HISTORY&quot;,&#xd;
+                            &quot;archetype_node_id&quot;: &quot;at0001&quot;&#xd;
+                        },&#xd;
+                        &quot;archetype_details&quot;: {&#xd;
+                            &quot;rm_version&quot;: &quot;1.0.4&quot;,&#xd;
+                            &quot;template_id&quot;: {&#xd;
+                                &quot;value&quot;: &quot;Blutdruck&quot;&#xd;
+                            },&#xd;
+                            &quot;archetype_id&quot;: {&#xd;
+                                &quot;value&quot;: &quot;openEHR-EHR-OBSERVATION.blood_pressure.v2&quot;&#xd;
+                            }&#xd;
+                        },&#xd;
+                        &quot;archetype_node_id&quot;: &quot;openEHR-EHR-OBSERVATION.blood_pressure.v2&quot;&#xd;
+                    }&#xd;
+                ]&#xd;
+            }</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+            <stringProp name="HTTPSampler.domain"></stringProp>
+            <stringProp name="HTTPSampler.port"></stringProp>
+            <stringProp name="HTTPSampler.protocol"></stringProp>
+            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${randomEhr}/composition_new</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+            <stringProp name="HTTPSampler.response_timeout"></stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+              <stringProp name="RegexExtractor.useHeaders">true</stringProp>
+              <stringProp name="RegexExtractor.refname">compositionId</stringProp>
+              <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default"></stringProp>
+              <stringProp name="RegexExtractor.match_number"></stringProp>
+            </RegexExtractor>
+            <hashTree/>
+          </hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Get composition: Blood Pressure by version ID" enabled="true">
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+            <stringProp name="HTTPSampler.domain"></stringProp>
+            <stringProp name="HTTPSampler.port"></stringProp>
+            <stringProp name="HTTPSampler.protocol"></stringProp>
+            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/ehr/${randomEhr}/composition_new/${compositionId}</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+            <stringProp name="HTTPSampler.response_timeout"></stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+              <stringProp name="RegexExtractor.useHeaders">true</stringProp>
+              <stringProp name="RegexExtractor.refname">compositionId</stringProp>
+              <stringProp name="RegexExtractor.regex">ETag: &quot;(.+)&quot;</stringProp>
+              <stringProp name="RegexExtractor.template">$1$</stringProp>
+              <stringProp name="RegexExtractor.default"></stringProp>
+              <stringProp name="RegexExtractor.match_number"></stringProp>
+            </RegexExtractor>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+        <RandomOrderController guiclass="RandomOrderControllerGui" testclass="RandomOrderController" testname="Queries in random order" enabled="true"/>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Query 1: Body Weight Measure" enabled="true">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&#xd;
+	&quot;q&quot;: &quot;select a_a/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.body_weight.v2] WHERE e/ehr_id/value=&apos;${randomEhr}&apos; LIMIT 10&quot;&#xd;
+}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+            <stringProp name="HTTPSampler.domain"></stringProp>
+            <stringProp name="HTTPSampler.port"></stringProp>
+            <stringProp name="HTTPSampler.protocol"></stringProp>
+            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?explain=false&amp;use_new_engine=true</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+            <stringProp name="HTTPSampler.response_timeout"></stringProp>
+            <stringProp name="TestPlan.comments">https://jira.vitagroup.ag/browse/CDR-549</stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.custom_message"></stringProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">16</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+          </hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Query 2: COVID Symptoms" enabled="true">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&#xd;
+	&quot;q&quot;: &quot;select a_a/data[at0001]/events[at0002]/time/value, a_a/data[at0001]/events[at0002]/data[at0003]/items[at0022]/name/value, a_a/data[at0001]/events[at0002]/data[at0003]/items[at0022]/items[at0004]/value/value from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0] WHERE e/ehr_id/value= &apos;${randomEhr}&apos; LIMIT 10&quot;&#xd;
+}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+            <stringProp name="HTTPSampler.domain"></stringProp>
+            <stringProp name="HTTPSampler.port"></stringProp>
+            <stringProp name="HTTPSampler.protocol"></stringProp>
+            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?explain=false&amp;use_new_engine=true</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+            <stringProp name="HTTPSampler.response_timeout"></stringProp>
+            <stringProp name="TestPlan.comments">https://jira.vitagroup.ag/browse/CDR-549</stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.custom_message"></stringProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">16</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+          </hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Query 3: ECG Result" enabled="true">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&#xd;
+	&quot;q&quot;: &quot;select a_a/data[at0001]/events[at0002]/time/value, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0012]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0012]/value/unit, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0014]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/unit, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0094]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/magnitude, a_a/data[at0001]/events[at0002]/data[at0005]/items[at0007]/value/unit, a/uid/value, a/name/value from EHR e contains COMPOSITION a contains OBSERVATION a_a[openEHR-EHR-OBSERVATION.ecg_result.v1] WHERE e/ehr_id/value= &apos;${randomEhr}&apos; LIMIT 10&quot;&#xd;
+}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+            <stringProp name="HTTPSampler.domain"></stringProp>
+            <stringProp name="HTTPSampler.port"></stringProp>
+            <stringProp name="HTTPSampler.protocol"></stringProp>
+            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+            <stringProp name="HTTPSampler.path">/ehrbase/rest/openehr/v1/query/aql?explain=false&amp;use_new_engine=true</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+            <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+            <stringProp name="HTTPSampler.response_timeout"></stringProp>
+            <stringProp name="TestPlan.comments">https://jira.vitagroup.ag/browse/CDR-549</stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.custom_message"></stringProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">16</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <sentBytes>true</sentBytes>
+            <url>true</url>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+            <connectTime>true</connectTime>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
