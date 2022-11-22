@@ -1,0 +1,221 @@
+{
+  "_type": "COMPOSITION",
+  "archetype_node_id": "openEHR-EHR-COMPOSITION.registereintrag.v1",
+  "composer": {
+    "_type": "PARTY_IDENTIFIED",
+    "name": "Max Mustermann"
+  },
+  "language": {
+    "_type": "CODE_PHRASE",
+    "terminology_id": {
+      "_type": "TERMINOLOGY_ID",
+      "value": "ISO_639-1"
+    },
+    "code_string": "de"
+  },
+  "content": [
+    {
+      "_type": "ADMIN_ENTRY",
+      "workflow_id": {
+        "_type": "OBJECT_REF",
+        "namespace": "unknown",
+        "id": {
+          "_type": "GENERIC_ID",
+          "scheme": "scheme",
+          "value": "03ec02fe-e592-35da-841d-27de78dfb384"
+        },
+        "type": "ANY"
+      },
+      "data": {
+        "_type": "ITEM_TREE",
+        "uid": {
+          "_type": "HIER_OBJECT_ID",
+          "value": "94951d2e-e5e4-3639-ba36-ffbea9c2c446"
+        },
+        "archetype_node_id": "at0001",
+        "name": {
+          "_type": "DV_TEXT",
+          "value": "Tree"
+        },
+        "items": [
+          {
+            "_type": "ELEMENT",
+            "archetype_node_id": "at0040",
+            "name": {
+              "_type": "DV_TEXT",
+              "value": "Art der Entlassung"
+            },
+            "value": {
+              "_type": "DV_CODED_TEXT",
+              "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                  "_type": "TERMINOLOGY_ID",
+                  "value": "http://snomed.info/sct"
+                },
+                "code_string": "261665006"
+              },
+              "value": "Unknown (qualifier value)"
+            }
+          }
+        ]
+      },
+      "archetype_node_id": "openEHR-EHR-ADMIN_ENTRY.discharge_summary.v0",
+      "subject": {
+        "_type": "PARTY_SELF"
+      },
+      "language": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "ISO_639-1"
+        },
+        "code_string": "de"
+      },
+      "encoding": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "IANA_character-sets"
+        },
+        "code_string": "ISO-10646-UTF-1"
+      },
+      "uid": {
+        "_type": "HIER_OBJECT_ID",
+        "value": "c0f79931-56ae-3da5-8f36-b61afc4fa1d0"
+      },
+      "archetype_details": {
+        "_type": "ARCHETYPED",
+        "rm_version": "1.0.4",
+        "archetype_id": {
+          "_type": "ARCHETYPE_ID",
+          "value": "openEHR-EHR-ADMIN_ENTRY.discharge_summary.v0"
+        },
+        "template_id": {
+          "_type": "TEMPLATE_ID",
+          "value": "GECCO_Entlassungsdaten"
+        }
+      },
+      "provider": {
+        "_type": "PARTY_SELF"
+      },
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "Entlassungsart"
+      }
+    }
+  ],
+  "uid": {
+    "_type": "OBJECT_VERSION_ID",
+    "value": "d4c16117-4f4e-47c6-a4bf-e6d102eb87a7::local.ehrbase.org::0"
+  },
+  "archetype_details": {
+    "_type": "ARCHETYPED",
+    "rm_version": "1.0.4",
+    "archetype_id": {
+      "_type": "ARCHETYPE_ID",
+      "value": "openEHR-EHR-COMPOSITION.registereintrag.v1"
+    },
+    "template_id": {
+      "_type": "TEMPLATE_ID",
+      "value": "GECCO_Entlassungsdaten"
+    }
+  },
+  "context": {
+    "_type": "EVENT_CONTEXT",
+    "start_time": {
+      "_type": "DV_DATE_TIME",
+      "value": "2022-02-03T04:05:06"
+    },
+    "other_context": {
+      "_type": "ITEM_TREE",
+      "uid": {
+        "_type": "HIER_OBJECT_ID",
+        "value": "25e8703c-c504-3c41-8343-ee0cdde70923"
+      },
+      "archetype_node_id": "at0001",
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "Baum"
+      },
+      "items": [
+        {
+          "_type": "ELEMENT",
+          "archetype_node_id": "at0005",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "Kategorie"
+          },
+          "value": {
+            "_type": "DV_TEXT",
+            "value": "Lorem ipsum"
+          }
+        },
+        {
+          "_type": "ELEMENT",
+          "archetype_node_id": "at0004",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "Status"
+          },
+          "value": {
+            "_type": "DV_CODED_TEXT",
+            "defining_code": {
+              "_type": "CODE_PHRASE",
+              "terminology_id": {
+                "_type": "TERMINOLOGY_ID",
+                "value": "local"
+              },
+              "code_string": "at0010"
+            },
+            "value": "registriert"
+          }
+        }
+      ]
+    },
+    "end_time": {
+      "_type": "DV_DATE_TIME",
+      "value": "2022-02-03T04:05:06"
+    },
+    "health_care_facility": {
+      "_type": "PARTY_IDENTIFIED",
+      "name": "DOE, John"
+    },
+    "setting": {
+      "_type": "DV_CODED_TEXT",
+      "defining_code": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "openehr"
+        },
+        "code_string": "225"
+      },
+      "value": "home"
+    }
+  },
+  "name": {
+    "_type": "DV_TEXT",
+    "value": "Entlassungsdaten"
+  },
+  "category": {
+    "_type": "DV_CODED_TEXT",
+    "defining_code": {
+      "_type": "CODE_PHRASE",
+      "terminology_id": {
+        "_type": "TERMINOLOGY_ID",
+        "value": "openehr"
+      },
+      "code_string": "433"
+    },
+    "value": "event"
+  },
+  "territory": {
+    "_type": "CODE_PHRASE",
+    "terminology_id": {
+      "_type": "TERMINOLOGY_ID",
+      "value": "ISO_3166-1"
+    },
+    "code_string": "DE"
+  }
+}

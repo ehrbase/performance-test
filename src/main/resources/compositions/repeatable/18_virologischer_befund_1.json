@@ -66,6 +66,71 @@
         },
         "code_string": "238"
       }
+    },
+    "other_context": {
+      "_type": "ITEM_TREE",
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "Baum"
+      },
+      "items": [
+        {
+          "_type": "ELEMENT",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "Bericht-ID"
+          },
+          "value": {
+            "_type": "DV_TEXT",
+            "value": "Lorem ipsum"
+          },
+          "archetype_node_id": "at0002"
+        },
+        {
+          "_type": "ELEMENT",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "Status"
+          },
+          "value": {
+            "_type": "DV_TEXT",
+            "value": "Zwischenbefund"
+          },
+          "archetype_node_id": "at0005"
+        },
+        {
+          "_type": "CLUSTER",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "Fallidentifikation"
+          },
+          "archetype_details": {
+            "archetype_id": {
+              "value": "openEHR-EHR-CLUSTER.case_identification.v0"
+            },
+            "template_id": {
+              "value": "Virologischer Befund"
+            },
+            "rm_version": "1.0.4"
+          },
+          "items": [
+            {
+              "_type": "ELEMENT",
+              "name": {
+                "_type": "DV_TEXT",
+                "value": "Fall-Kennung"
+              },
+              "value": {
+                "_type": "DV_TEXT",
+                "value": "Lorem ipsum"
+              },
+              "archetype_node_id": "at0001"
+            }
+          ],
+          "archetype_node_id": "openEHR-EHR-CLUSTER.case_identification.v0"
+        }
+      ],
+      "archetype_node_id": "at0001"
     }
   },
   "content": [

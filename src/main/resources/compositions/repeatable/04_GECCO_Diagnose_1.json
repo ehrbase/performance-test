@@ -103,7 +103,8 @@
       "archetype_node_id" : "at0001"
     }
   },
-  "content" : [ {
+  "content" : [
+    {
     "_type" : "EVALUATION",
     "name" : {
       "_type" : "DV_TEXT",
@@ -162,10 +163,187 @@
           }
         },
         "archetype_node_id" : "at0002"
-      } ],
+      },
+        {
+          "_type": "CLUSTER",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "Körperstelle"
+          },
+          "archetype_details": {
+            "archetype_id": {
+              "value": "openEHR-EHR-CLUSTER.anatomical_location.v1"
+            },
+            "template_id": {
+              "value": "GECCO_Diagnose"
+            },
+            "rm_version": "1.0.4"
+          },
+          "items": [
+            {
+              "_type": "ELEMENT",
+              "name": {
+                "_type": "DV_TEXT",
+                "value": "Name der Körperstelle"
+              },
+              "value": {
+                "_type": "DV_CODED_TEXT",
+                "value": "http://snomed.info/sct::302509004 | Entire heart",
+                "defining_code": {
+                  "_type": "CODE_PHRASE",
+                  "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "http://snomed.info/sct"
+                  },
+                  "code_string": "302509004"
+                }
+              },
+              "archetype_node_id": "at0001"
+            },
+            {
+              "_type": "ELEMENT",
+              "name": {
+                "_type": "DV_TEXT",
+                "value": "Lateralität"
+              },
+              "value": {
+                "_type": "DV_CODED_TEXT",
+                "value": "Links",
+                "defining_code": {
+                  "_type": "CODE_PHRASE",
+                  "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "local"
+                  },
+                  "code_string": "at0003"
+                }
+              },
+              "archetype_node_id": "at0002"
+            }
+          ],
+          "archetype_node_id": "openEHR-EHR-CLUSTER.anatomical_location.v1"
+        } ],
       "archetype_node_id" : "at0001"
     },
     "archetype_node_id" : "openEHR-EHR-EVALUATION.problem_diagnosis.v1"
-  } ],
+  },
+    {
+      "_type": "EVALUATION",
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "Ausgeschlossene Diagnose"
+      },
+      "archetype_details": {
+        "archetype_id": {
+          "value": "openEHR-EHR-EVALUATION.exclusion_specific.v1"
+        },
+        "template_id": {
+          "value": "GECCO_Diagnose"
+        },
+        "rm_version": "1.0.4"
+      },
+      "language": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "ISO_639-1"
+        },
+        "code_string": "de"
+      },
+      "encoding": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "IANA_character-sets"
+        },
+        "code_string": "ISO-10646-UTF-1"
+      },
+      "workflow_id": {
+        "_type": "OBJECT_REF",
+        "namespace": "unknown",
+        "type": "ANY",
+        "id": {
+          "_type": "GENERIC_ID",
+          "value": "2806f817-48a1-3969-ac60-66b0b4599675",
+          "scheme": "scheme"
+        }
+      },
+      "subject": {
+        "_type": "PARTY_SELF"
+      },
+      "provider": {
+        "_type": "PARTY_SELF"
+      },
+      "guideline_id": {
+        "_type": "OBJECT_REF",
+        "namespace": "unknown",
+        "type": "ANY",
+        "id": {
+          "_type": "GENERIC_ID",
+          "value": "c693cfaa-5041-3533-abbe-d66036f1d0a9",
+          "scheme": "scheme"
+        }
+      },
+      "data": {
+        "_type": "ITEM_TREE",
+        "name": {
+          "_type": "DV_TEXT",
+          "value": "Tree"
+        },
+        "items": [
+          {
+            "_type": "ELEMENT",
+            "name": {
+              "_type": "DV_TEXT",
+              "value": "Aussage über den Ausschluss"
+            },
+            "value": {
+              "_type": "DV_CODED_TEXT",
+              "value": "Known absent (qualifier value)",
+              "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                  "_type": "TERMINOLOGY_ID",
+                  "value": "http://snomed.info/sct"
+                },
+                "code_string": "410594000"
+              }
+            },
+            "archetype_node_id": "at0002"
+          },
+          {
+            "_type": "ELEMENT",
+            "name": {
+              "_type": "DV_CODED_TEXT",
+              "value": "Problem/Diagnose",
+              "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                  "_type": "TERMINOLOGY_ID",
+                  "value": "local"
+                },
+                "code_string": "at0004"
+              }
+            },
+            "value": {
+              "_type": "DV_CODED_TEXT",
+              "value": "A00.0 Cholera durch Vibrio cholerae O:1, Biovar cholerae",
+              "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                  "_type": "TERMINOLOGY_ID",
+                  "value": "//fhir.hl7.org/ValueSet/$expand?url=https://www.netzwerk-universitaetsmedizin.de/fhir/ValueSet/diseases-combined"
+                },
+                "code_string": "A00.0"
+              }
+            },
+            "archetype_node_id": "at0003"
+          }
+        ],
+        "archetype_node_id": "at0001"
+      },
+      "archetype_node_id": "openEHR-EHR-EVALUATION.exclusion_specific.v1"
+    }
+  ],
   "archetype_node_id" : "openEHR-EHR-COMPOSITION.registereintrag.v1"
 }

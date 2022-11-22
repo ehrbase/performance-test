@@ -1,0 +1,365 @@
+{
+  "_type": "COMPOSITION",
+  "archetype_node_id": "openEHR-EHR-COMPOSITION.registereintrag.v1",
+  "composer": {
+    "_type": "PARTY_IDENTIFIED",
+    "name": "Max Mustermann"
+  },
+  "language": {
+    "_type": "CODE_PHRASE",
+    "terminology_id": {
+      "_type": "TERMINOLOGY_ID",
+      "value": "ISO_639-1"
+    },
+    "code_string": "de"
+  },
+  "content": [
+    {
+      "_type": "EVALUATION",
+      "workflow_id": {
+        "_type": "OBJECT_REF",
+        "namespace": "unknown",
+        "id": {
+          "_type": "GENERIC_ID",
+          "scheme": "scheme",
+          "value": "6743d721-4a3c-3d65-ae9d-79004b1bb674"
+        },
+        "type": "ANY"
+      },
+      "data": {
+        "_type": "ITEM_TREE",
+        "archetype_node_id": "at0001",
+        "name": {
+          "_type": "DV_TEXT",
+          "value": "Item tree"
+        },
+        "items": [
+          {
+            "_type": "CLUSTER",
+            "archetype_details": {
+              "_type": "ARCHETYPED",
+              "rm_version": "1.0.4",
+              "archetype_id": {
+                "_type": "ARCHETYPE_ID",
+                "value": "openEHR-EHR-CLUSTER.study_participation.v1"
+              },
+              "template_id": {
+                "_type": "TEMPLATE_ID",
+                "value": "GECCO_Studienteilnahme"
+              }
+            },
+            "archetype_node_id": "openEHR-EHR-CLUSTER.study_participation.v1",
+            "name": {
+              "_type": "DV_TEXT",
+              "value": "Studienteilnahme"
+            },
+            "items": [
+              {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at0014",
+                "name": {
+                  "_type": "DV_TEXT",
+                  "value": "Bestätigte Covid-19-Diagnose als Hauptursache für Aufnahme in Studie"
+                },
+                "value": {
+                  "_type": "DV_CODED_TEXT",
+                  "defining_code": {
+                    "_type": "CODE_PHRASE",
+                    "terminology_id": {
+                      "_type": "TERMINOLOGY_ID",
+                      "value": "http://snomed.info/sct"
+                    },
+                    "code_string": "373066001"
+                  },
+                  "value": "http://snomed.info/sct::373066001 | Yes (qualifier value)"
+                }
+              },
+              {
+                "_type": "CLUSTER",
+                "archetype_details": {
+                  "_type": "ARCHETYPED",
+                  "rm_version": "1.0.4",
+                  "archetype_id": {
+                    "_type": "ARCHETYPE_ID",
+                    "value": "openEHR-EHR-CLUSTER.study_details.v1"
+                  },
+                  "template_id": {
+                    "_type": "TEMPLATE_ID",
+                    "value": "GECCO_Studienteilnahme"
+                  }
+                },
+                "archetype_node_id": "openEHR-EHR-CLUSTER.study_details.v1",
+                "name": {
+                  "_type": "DV_TEXT",
+                  "value": "Studie/Prüfung"
+                },
+                "items": [
+                  {
+                    "_type": "ELEMENT",
+                    "archetype_node_id": "at0004",
+                    "name": {
+                      "_type": "DV_TEXT",
+                      "value": "Beschreibung"
+                    },
+                    "value": {
+                      "_type": "DV_TEXT",
+                      "value": "Lorem ipsum"
+                    }
+                  },
+                  {
+                    "_type": "ELEMENT",
+                    "archetype_node_id": "at0001",
+                    "name": {
+                      "_type": "DV_TEXT",
+                      "value": "Titel der Studie/Prüfung"
+                    },
+                    "value": {
+                      "_type": "DV_CODED_TEXT",
+                      "defining_code": {
+                        "_type": "CODE_PHRASE",
+                        "terminology_id": {
+                          "_type": "TERMINOLOGY_ID",
+                          "value": "eCRF"
+                        },
+                        "code_string": "03"
+                      },
+                      "value": "Participation in interventional clinical trials"
+                    }
+                  },
+                  {
+                    "_type": "CLUSTER",
+                    "archetype_node_id": "at0033",
+                    "name": {
+                      "_type": "DV_TEXT",
+                      "value": "Registrierung"
+                    },
+                    "items": [
+                      {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0035",
+                        "name": {
+                          "_type": "DV_TEXT",
+                          "value": "Registername"
+                        },
+                        "value": {
+                          "_type": "DV_CODED_TEXT",
+                          "defining_code": {
+                            "_type": "CODE_PHRASE",
+                            "terminology_id": {
+                              "_type": "TERMINOLOGY_ID",
+                              "value": "eCRF"
+                            },
+                            "code_string": "04"
+                          },
+                          "value": "EudraCT Number‎"
+                        }
+                      },
+                      {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0034",
+                        "name": {
+                          "_type": "DV_TEXT",
+                          "value": "Registrierungsnummer"
+                        },
+                        "value": {
+                          "_type": "DV_TEXT",
+                          "value": "Lorem ipsum"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "_type": "ELEMENT",
+            "archetype_node_id": "at0002",
+            "name": {
+              "_type": "DV_TEXT",
+              "value": "Bereits an interventionellen klinischen Studien teilgenommen?"
+            },
+            "value": {
+              "_type": "DV_CODED_TEXT",
+              "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                  "_type": "TERMINOLOGY_ID",
+                  "value": "http://snomed.info/sct"
+                },
+                "code_string": "373066001"
+              },
+              "value": "http://snomed.info/sct::373066001 | Yes (qualifier value) Yes (qualifier value)"
+            }
+          }
+        ]
+      },
+      "archetype_node_id": "openEHR-EHR-EVALUATION.gecco_study_participation.v0",
+      "subject": {
+        "_type": "PARTY_SELF"
+      },
+      "language": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "ISO_639-1"
+        },
+        "code_string": "de"
+      },
+      "encoding": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "IANA_character-sets"
+        },
+        "code_string": "ISO-10646-UTF-1"
+      },
+      "uid": {
+        "_type": "HIER_OBJECT_ID",
+        "value": "86552adc-7375-3db4-aaef-77db0c414a9f"
+      },
+      "guideline_id": {
+        "_type": "OBJECT_REF",
+        "namespace": "unknown",
+        "id": {
+          "_type": "GENERIC_ID",
+          "scheme": "scheme",
+          "value": "7499de57-98e2-3360-979e-84df238cf097"
+        },
+        "type": "ANY"
+      },
+      "archetype_details": {
+        "_type": "ARCHETYPED",
+        "rm_version": "1.0.4",
+        "archetype_id": {
+          "_type": "ARCHETYPE_ID",
+          "value": "openEHR-EHR-EVALUATION.gecco_study_participation.v0"
+        },
+        "template_id": {
+          "_type": "TEMPLATE_ID",
+          "value": "GECCO_Studienteilnahme"
+        }
+      },
+      "provider": {
+        "_type": "PARTY_SELF"
+      },
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "GECCO_Studienteilnahme"
+      }
+    }
+  ],
+  "uid": {
+    "_type": "OBJECT_VERSION_ID",
+    "value": "eeaebdb6-c3cd-4fa5-8de2-49c76808ec6f::local.ehrbase.org::0"
+  },
+  "archetype_details": {
+    "_type": "ARCHETYPED",
+    "rm_version": "1.0.4",
+    "archetype_id": {
+      "_type": "ARCHETYPE_ID",
+      "value": "openEHR-EHR-COMPOSITION.registereintrag.v1"
+    },
+    "template_id": {
+      "_type": "TEMPLATE_ID",
+      "value": "GECCO_Studienteilnahme"
+    }
+  },
+  "context": {
+    "_type": "EVENT_CONTEXT",
+    "start_time": {
+      "_type": "DV_DATE_TIME",
+      "value": "2022-02-03T04:05:06"
+    },
+    "other_context": {
+      "_type": "ITEM_TREE",
+      "uid": {
+        "_type": "HIER_OBJECT_ID",
+        "value": "25e8703c-c504-3c41-8343-ee0cdde70923"
+      },
+      "archetype_node_id": "at0001",
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "Baum"
+      },
+      "items": [
+        {
+          "_type": "ELEMENT",
+          "archetype_node_id": "at0005",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "Kategorie"
+          },
+          "value": {
+            "_type": "DV_TEXT",
+            "value": "survey"
+          }
+        },
+        {
+          "_type": "ELEMENT",
+          "archetype_node_id": "at0004",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "Status"
+          },
+          "value": {
+            "_type": "DV_CODED_TEXT",
+            "defining_code": {
+              "_type": "CODE_PHRASE",
+              "terminology_id": {
+                "_type": "TERMINOLOGY_ID",
+                "value": "local"
+              },
+              "code_string": "at0010"
+            },
+            "value": "registriert"
+          }
+        }
+      ]
+    },
+    "end_time": {
+      "_type": "DV_DATE_TIME",
+      "value": "2022-02-03T04:05:06"
+    },
+    "health_care_facility": {
+      "_type": "PARTY_IDENTIFIED",
+      "name": "DOE, John"
+    },
+    "setting": {
+      "_type": "DV_CODED_TEXT",
+      "defining_code": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "openehr"
+        },
+        "code_string": "225"
+      },
+      "value": "home"
+    }
+  },
+  "name": {
+    "_type": "DV_TEXT",
+    "value": "GECCO_Studienteilnahme"
+  },
+  "category": {
+    "_type": "DV_CODED_TEXT",
+    "defining_code": {
+      "_type": "CODE_PHRASE",
+      "terminology_id": {
+        "_type": "TERMINOLOGY_ID",
+        "value": "openehr"
+      },
+      "code_string": "433"
+    },
+    "value": "event"
+  },
+  "territory": {
+    "_type": "CODE_PHRASE",
+    "terminology_id": {
+      "_type": "TERMINOLOGY_ID",
+      "value": "ISO_3166-1"
+    },
+    "code_string": "DE"
+  }
+}
