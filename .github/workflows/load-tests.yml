@@ -65,7 +65,7 @@ jobs:
           sleep 1m
         env:
           #ehrbase-perftest-ubuntu-2023-05-11_2
-          HCLOUD_IMAGE: 110471480
+          HCLOUD_IMAGE: 110474689
           HCLOUD_SERVER: 19045767
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         timeout-minutes: 15
