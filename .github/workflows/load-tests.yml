@@ -73,7 +73,10 @@ jobs:
       #  timeout-minutes: 15
 
       - name: Start minikube
-        run: ssh ehrbase-load-test "minikube start --memory 16384 --cpus 7 --driver=docker --force"
+        run: |
+          ssh ehrbase-load-test "minikube start --memory 16384 --cpus 7 --driver=docker --force"
+          KUBE_IP=$(ssh ehrbase-load-test 'minikube ip')
+          echo "KUBE_IP=$KUBE_IP" >> $GITHUB_ENV
 
       - name: Update Docker image
         if: "${{ github.event.inputs.image != '' }}"
@@ -96,12 +99,12 @@ jobs:
         timeout-minutes: 240
 
       - name: Generate report
-        run: ssh ehrbase-load-test "curl -X POST -f -s -u webtester:Dctm1234 http://localhost:30902/webtester/rest/jmeter/test-executions/${{ env.EXECUTION_ID }}/generate-report"
+        run: ssh ehrbase-load-test "curl -X POST -f -s -u webtester:Dctm1234 http://${{ env.KUBE_IP }}:30902/webtester/rest/jmeter/test-executions/${{ env.EXECUTION_ID }}/generate-report"
 
       - name: Download JTL and report
         run: |
-          ssh ehrbase-load-test "curl -s -u webtester:Dctm1234 http://localhost:30902/webtester/rest/jmeter/test-executions/${{ env.EXECUTION_ID }}/report -o ~/report.zip"
-          ssh ehrbase-load-test "curl -s -u webtester:Dctm1234 http://localhost:30902/webtester/rest/jmeter/test-executions/${{ env.EXECUTION_ID }}/logfile -o ~/result.jtl"
+          ssh ehrbase-load-test "curl -s -u webtester:Dctm1234 http://${{ env.KUBE_IP }}:30902/webtester/rest/jmeter/test-executions/${{ env.EXECUTION_ID }}/report -o ~/report.zip"
+          ssh ehrbase-load-test "curl -s -u webtester:Dctm1234 http://${{ env.KUBE_IP }}:30902/webtester/rest/jmeter/test-executions/${{ env.EXECUTION_ID }}/logfile -o ~/result.jtl"
           
           scp ehrbase-load-test:~/report.zip ~/report.zip
           unzip ~/report.zip -d ~
