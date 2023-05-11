@@ -64,7 +64,10 @@ jobs:
           echo "Waiting for SSH service to be ready..."
           sleep 1m
         env:
-          HCLOUD_IMAGE: 68159203
+          #ehrbase-perftest-ubuntu-2023-05-11
+          HCLOUD_IMAGE: 110453127
+          #ehrbase-perftest-ubuntu-ccx32
+          #HCLOUD_IMAGE: 68159203
           HCLOUD_SERVER: 19045767
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         timeout-minutes: 15
