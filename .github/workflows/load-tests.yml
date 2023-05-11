@@ -73,7 +73,7 @@ jobs:
       #  timeout-minutes: 15
 
       - name: Start minikube
-        run: ssh ehrbase-load-test "minikube start --driver=docker --force"
+        run: ssh ehrbase-load-test "minikube start --memory 16384 --cpus 7 --driver=docker --force"
 
       - name: Update Docker image
         if: "${{ github.event.inputs.image != '' }}"
