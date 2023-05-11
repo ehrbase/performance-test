@@ -58,22 +58,22 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_KEY: ${{ secrets.SSH_KEY }}
 
-      - name: Rebuild server
-        run: |
-          hcloud server rebuild --image=$HCLOUD_IMAGE $HCLOUD_SERVER
-          echo "Waiting for SSH service to be ready..."
-          sleep 1m
-        env:
-          #ehrbase-perftest-ubuntu-2023-05-11
-          HCLOUD_IMAGE: 110453127
-          #ehrbase-perftest-ubuntu-ccx32
-          #HCLOUD_IMAGE: 68159203
-          HCLOUD_SERVER: 19045767
-          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
-        timeout-minutes: 15
+      #- name: Rebuild server
+      #  run: |
+      #    hcloud server rebuild --image=$HCLOUD_IMAGE $HCLOUD_SERVER
+      #    echo "Waiting for SSH service to be ready..."
+      #    sleep 1m
+      #  env:
+      #    #ehrbase-perftest-ubuntu-2023-05-11
+      #    HCLOUD_IMAGE: 110453127
+      #    #ehrbase-perftest-ubuntu-ccx32
+      #    #HCLOUD_IMAGE: 68159203
+      #    HCLOUD_SERVER: 19045767
+      #    HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+      #  timeout-minutes: 15
 
       - name: Start minikube
-        run: ssh ehrbase-load-test "minikube start --driver=docker"
+        run: ssh ehrbase-load-test "minikube start --driver=docker --force"
 
       - name: Update Docker image
         if: "${{ github.event.inputs.image != '' }}"
