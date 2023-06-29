@@ -3,7 +3,7 @@ FROM eclipse-temurin:11-jre-alpine
 RUN apk update && \
     apk add wget
 
-ARG JMETER_VERSION=5.4.3
+ARG JMETER_VERSION=5.5
 ENV JMETER_HOME /opt/apache-jmeter-${JMETER_VERSION}
 
 RUN wget https://downloads.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz && \
