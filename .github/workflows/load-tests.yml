@@ -19,8 +19,7 @@ on:
         description: Loop count
         default: '100'
         required: true
-  schedule:
-    - cron: '5 4 * * *'
+
 
 jobs:
   build:
